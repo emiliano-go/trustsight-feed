@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    env:
+      TRUSTSIGHT_SRC: ${{ github.workspace }}/vendor/trustsight/src
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: emiliano-go/trustsight
+          path: vendor/trustsight
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: python scripts/build_rule_catalog.py --check
+      - run: npm run verify:csp
+      - run: npm run build
+      - run: npm test

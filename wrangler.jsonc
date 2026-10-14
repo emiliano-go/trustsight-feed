@@ -1,0 +1,36 @@
+{
+  // trustsight-feed: a Worker that polls an ntfy topic on a cron, stores every
+  // notification in D1, and serves the feed API plus the static Preact app.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "trustsight-feed",
+  "main": "worker/index.js",
+  "compatibility_date": "2025-08-01",
+  "observability": { "enabled": true },
+  // Static frontend. `not_found_handling` gives the detail routes
+  // (/<date>/<time>/) back the SPA shell; API paths never match an asset so
+  // they reach the Worker.
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "trustsight-feed",
+      "database_id": "541b4a69-29ae-422a-ad38-6076c5ae0b54",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "triggers": {
+    // Poll well under ntfy's ~12h message cache so nothing is missed.
+    "crons": ["*/5 * * * *"]
+  },
+  "routes": [
+    { "pattern": "watcher.trustsight.org", "custom_domain": true }
+  ],
+  "vars": {
+    "NTFY_SERVER": "https://ntfy.sh",
+    "NTFY_TOPIC": "trustsight-aur-1d8a3fd2"
+  }
+}

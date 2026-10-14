@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0D1117" />
+    <script>
+      (function () {
+        var d = document.documentElement
+        var K = 'ts-theme'
+        var v
+        try { v = localStorage.getItem(K) } catch (e) {}
+        /* An explicit stored choice wins; otherwise follow the system theme. */
+        var theme = v === 'light' || v === 'dark'
+          ? v
+          : (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+        d.setAttribute('data-theme', theme)
+        try {
+          d.setAttribute('data-font-size', localStorage.getItem('ts-font-size') === 'large' ? 'large' : 'normal')
+          var contrast = localStorage.getItem('ts-contrast')
+          if (contrast === 'high' || contrast === 'normal') d.setAttribute('data-contrast', contrast)
+        } catch (e) {}
+        var meta = document.querySelector('meta[name="theme-color"]')
+        if (meta) meta.content = theme === 'light' ? '#FBFBF9' : '#0D1117'
+      })()
+    </script>
+    <meta name="author" content="Emiliano Gandini" />
+    <meta name="keywords" content="TrustSight, AUR security, PKGBUILD audit, Arch Linux, ntfy, AUR watcher, supply chain security, alerts feed" />
+    <title>TrustSight Watcher | AUR alert feed</title>
+    <meta name="description" content="A live, searchable feed of TrustSight's AUR watcher alerts: every notification preserved, each with its full evidence document and the rules it fired." />
+    <link rel="canonical" href="https://watcher.trustsight.org/">
+    <meta name="robots" content="index,follow">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="TrustSight Watcher | AUR alert feed">
+    <meta property="og:description" content="A live, searchable feed of TrustSight's AUR watcher alerts: every notification preserved, each with its full evidence document and the rules it fired.">
+    <meta property="og:url" content="https://watcher.trustsight.org/">
+    <meta property="og:site_name" content="TrustSight Watcher">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32x32.png" sizes="32x32" type="image/png" />
+    <link rel="icon" href="/favicon-16x16.png" sizes="16x16" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

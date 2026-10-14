@@ -1,0 +1,12 @@
+{
+  "name": "trustsight-feed-test",
+  "main": "../worker/index.js",
+  "compatibility_date": "2025-08-01",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "trustsight-feed-test",
+      "database_id": "test"
+    }
+  ]
+}

