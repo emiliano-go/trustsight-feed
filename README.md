@@ -62,6 +62,26 @@ page is one compressed HTML response; the app then fetches `/api/feed`.
 On a phone, a rule explanation opens as a modal (a bottom sheet) rather than a
 hover box, and every control is sized for touch.
 
+## API
+
+A read-only JSON API over the same store, with an OpenAPI 3.1 description:
+
+- `/api` the styled reference page (rendered from the spec).
+- `/api/openapi.json` the OpenAPI document.
+- `/api/feed` search, with `q`, `event`, `day`, `from`, `to`, `limit` and a
+  keyset cursor.
+- `/api/latest` and `/api/latest/{n}` the most recent notifications.
+- `/api/date/{YYYY-MM-DD}` and `/api/date/{YYYY-MM-DD}/{timeframe}` a UTC day
+  or a window in it (`HH`, `HH-HH`, or `HHMM-HHMM`).
+- `/api/package/{name}` and `/api/rule/{id}` everything mentioning a package or
+  fired by a rule.
+- `/api/messages/{slug}`, `/api/stats`.
+
+Every endpoint is CORS open. A client is limited to 120 requests a minute by
+the Cloudflare rate limiting binding; past the cap the API answers HTTP 429
+with a `Retry-After` header. The spec is the single source of truth: the
+Worker serves it and the reference page renders from it.
+
 ## Layout
 
 ```

@@ -387,6 +387,42 @@ a.chip:hover { border-color: var(--accent); color: var(--accent); }
 .alert-item { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; max-width: 100%; }
 .alert-item .pkg__name { word-break: break-word; }
 
+/* ---------- API reference ---------- */
+
+.api-endpoint { padding: 20px 0; border-bottom: 1px solid var(--rule); }
+.api-endpoint:first-of-type { border-top: 1px solid var(--rule); }
+.api-endpoint__head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.api-method {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--accent);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 0.6471rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.api-path { font-family: var(--font-mono); font-size: 0.8529rem; color: var(--fg); word-break: break-all; }
+.api-endpoint__title { margin: 10px 0 0; font-size: 1rem; font-weight: 700; }
+.api-endpoint__desc { margin: 8px 0 0; max-width: 70ch; color: var(--fg-muted); font-size: 0.8824rem; line-height: 1.6; }
+
+.api-params { width: 100%; border-collapse: collapse; font-size: 0.8235rem; }
+.api-params th, .api-params td { padding: 10px 16px 10px 0; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
+.api-params thead th {
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6176rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.api-params tbody th { color: var(--fg); font-family: var(--font-mono); font-weight: 700; white-space: nowrap; }
+.api-params td { color: var(--fg-muted); }
+.api-params tbody tr:last-child th, .api-params tbody tr:last-child td { border-bottom: 0; }
+.api-example { font-family: var(--font-mono); font-size: 0.9em; }
+.api-try { display: inline-block; margin: 14px 0 0; font-family: var(--font-mono); font-size: 0.7647rem; }
+
 .json { margin-top: 16px; }
 
 /* ---------- rule modal (touch / narrow screens) ---------- */

@@ -1,5 +1,5 @@
 import { env, SELF } from 'cloudflare:test'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { baseSlug, buildSearchText, ftsQuery, isTrustSightNotification, parseNotification, pickHeadline, summarize } from '../worker/lib.js'
 
 function messageEvent(overrides = {}) {
@@ -129,5 +129,89 @@ describe('search text', () => {
     expect(text).toContain('G005')
     expect(text).toContain('libuv')
     expect(text).toContain('evil')
+  })
+})
+
+const INSERT_SQL = `INSERT INTO notifications
+  (id, time, event, topic, title, priority, tags, day, slug, message_raw,
+   payload, n_alerts, n_over_threshold, n_ioc, n_impersonation, search_text, created_at)
+ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+
+async function seed(overrides = {}) {
+  await env.DB.exec('DELETE FROM notifications')
+  const row = parseNotification({ ...messageEvent(), ...overrides })
+  await env.DB.prepare(INSERT_SQL).bind(
+    row.id, row.time, row.event, row.topic, row.title, row.priority, row.tags,
+    row.day, row.slug, row.message_raw, row.payload, row.n_alerts,
+    row.n_over_threshold, row.n_ioc, row.n_impersonation, row.search_text, 0
+  ).run()
+  return row
+}
+
+describe('api endpoints', () => {
+  beforeEach(async () => { await seed() })
+
+  it('serves the OpenAPI spec and an endpoint index', async () => {
+    const spec = await SELF.fetch('https://example.com/api/openapi.json')
+    expect(spec.status).toBe(200)
+    expect(spec.headers.get('access-control-allow-origin')).toBe('*')
+    const doc = await spec.json()
+    expect(doc.openapi).toBe('3.1.0')
+    expect(doc.paths['/api/latest']).toBeTruthy()
+    expect(doc.paths['/api/date/{date}/{timeframe}']).toBeTruthy()
+
+    const index = await SELF.fetch('https://example.com/api/')
+    const body = await index.json()
+    expect(body.endpoints).toContain('GET /api/latest')
+    expect(body.endpoints).toContain('GET /api/openapi.json')
+  })
+
+  it('returns the latest notification with its payload', async () => {
+    const res = await SELF.fetch('https://example.com/api/latest')
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.item.slug).toBe('2026-05-02/120000')
+    expect(body.item.iso).toBe('2026-05-02T12:00:00.000Z')
+    expect(body.item.payload.event).toBe('trustsight.alerts')
+  })
+
+  it('returns the latest n as a list', async () => {
+    const res = await SELF.fetch('https://example.com/api/latest/5')
+    const body = await res.json()
+    expect(body.count).toBe(1)
+    expect(body.items[0].packages).toContain('hot-pkg')
+  })
+
+  it('filters by date, hour and range', async () => {
+    const dated = await (await SELF.fetch('https://example.com/api/date/2026-05-02')).json()
+    expect(dated.count).toBe(1)
+    const hour = await (await SELF.fetch('https://example.com/api/date/2026-05-02/12')).json()
+    expect(hour.count).toBe(1)
+    const otherHour = await (await SELF.fetch('https://example.com/api/date/2026-05-02/13')).json()
+    expect(otherHour.count).toBe(0)
+    const range = await (await SELF.fetch('https://example.com/api/date/2026-05-02/11-13')).json()
+    expect(range.count).toBe(1)
+    const minutes = await (await SELF.fetch('https://example.com/api/date/2026-05-02/1159-1201')).json()
+    expect(minutes.count).toBe(1)
+  })
+
+  it('rejects a bad date or timeframe', async () => {
+    expect((await SELF.fetch('https://example.com/api/date/2026-02-31')).status).toBe(400)
+    expect((await SELF.fetch('https://example.com/api/date/2026-05-02/25')).status).toBe(400)
+  })
+
+  it('searches by package and by rule', async () => {
+    const pkg = await (await SELF.fetch('https://example.com/api/package/hot-pkg')).json()
+    expect(pkg.count).toBe(1)
+    const rule = await (await SELF.fetch('https://example.com/api/rule/H001')).json()
+    expect(rule.count).toBe(1)
+    const none = await (await SELF.fetch('https://example.com/api/package/does-not-exist')).json()
+    expect(none.count).toBe(0)
+  })
+
+  it('handles CORS preflight', async () => {
+    const res = await SELF.fetch('https://example.com/api/latest', { method: 'OPTIONS' })
+    expect(res.status).toBe(204)
+    expect(res.headers.get('access-control-allow-methods')).toContain('GET')
   })
 })

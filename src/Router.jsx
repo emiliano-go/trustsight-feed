@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'preact/hooks'
+import { ApiDocs } from './ApiDocs.jsx'
 import { App } from './App.jsx'
 import { Message } from './Message.jsx'
 import { RuleModal } from './RuleModal.jsx'
@@ -7,6 +8,7 @@ const DETAIL_RE = /^\d{4}-\d{2}-\d{2}\/\d{6}/
 
 function parseRoute(pathname) {
   const clean = pathname.replace(/^\/+|\/+$/g, '')
+  if (clean === 'api') return { view: 'api', slug: '' }
   if (DETAIL_RE.test(clean)) return { view: 'message', slug: clean }
   return { view: 'feed', slug: '' }
 }
@@ -42,7 +44,7 @@ export function Router() {
 
   return (
     <>
-      {route.view === 'message' ? <Message slug={route.slug} /> : <App />}
+      {route.view === 'api' ? <ApiDocs /> : route.view === 'message' ? <Message slug={route.slug} /> : <App />}
       <RuleModal />
     </>
   )

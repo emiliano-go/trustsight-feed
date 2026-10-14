@@ -117,6 +117,7 @@ export function summarize(row) {
   return {
     slug: row.slug,
     time: row.time,
+    iso: row.time ? new Date(row.time * 1000).toISOString() : null,
     event: row.event,
     title: row.title,
     headline: pickHeadline(payload, row.title || 'watcher cycle'),
