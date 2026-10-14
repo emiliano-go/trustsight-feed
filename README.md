@@ -44,6 +44,13 @@ resource, stop.
 ntfy topic  ->  Worker cron  ->  D1  ->  Worker /api  ->  Preact feed
 ```
 
+## Performance
+
+Same shape as trustsight.org: the single stylesheet is inlined at build time
+(no render-blocking request, hash pinned in the CSP), the Inter font is
+preloaded, and a small static shell paints before the app mounts. The feed
+page is one compressed HTML response; the app then fetches `/api/feed`.
+
 ## URLs
 
 - `/` the feed, newest first, with search and event filters.
