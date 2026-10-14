@@ -230,6 +230,16 @@ describe('api endpoints', () => {
     }
   })
 
+  it('serves JSON to navigation requests (no SPA fallback for /api)', async () => {
+    for (const path of ['/api/feed?event=all', '/api/latest']) {
+      const res = await SELF.fetch(`https://example.com${path}`, {
+        headers: { 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'document', accept: 'text/html' },
+      })
+      expect(res.status).toBe(200)
+      expect(res.headers.get('content-type')).toContain('application/json')
+    }
+  })
+
   it('handles CORS preflight', async () => {
     const res = await SELF.fetch('https://example.com/api/latest', { method: 'OPTIONS' })
     expect(res.status).toBe(204)

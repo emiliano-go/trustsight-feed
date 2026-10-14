@@ -12,7 +12,12 @@
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
-    "not_found_handling": "single-page-application"
+    "not_found_handling": "single-page-application",
+    // Without this, the SPA fallback answers a browser navigation to
+    // /api/feed with index.html before the Worker runs, so the API is only
+    // reachable by non-navigation clients. Run the Worker first for all
+    // requests; it forwards non-API paths back to the assets binding.
+    "run_worker_first": true
   },
   "d1_databases": [
     {
