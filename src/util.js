@@ -12,6 +12,31 @@ export function formatUtc(time) {
   )
 }
 
+/** `UTC+2`, `UTC-3`, `UTC-3:30` - the browser's own offset, signed east. */
+export function utcOffsetLabel(date = new Date()) {
+  const mins = -date.getTimezoneOffset()
+  const sign = mins < 0 ? '-' : '+'
+  const abs = Math.abs(mins)
+  const h = Math.floor(abs / 60)
+  const m = abs % 60
+  return `UTC${sign}${h}${m ? `:${pad(m)}` : ''}`
+}
+
+/**
+ * The reader's local time with its offset, then the UTC time, e.g.
+ * `2026-10-14 10:35 UTC-3 - 13:35 UTC`. The date is the reader's own day.
+ */
+export function formatTime(time) {
+  if (!time) return ''
+  const ms = time * 1000
+  const d = new Date(ms)
+  const local =
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+    `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  const utc = `${pad(new Date(ms).getUTCHours())}:${pad(new Date(ms).getUTCMinutes())} UTC`
+  return `${local} ${utcOffsetLabel(d)} - ${utc}`
+}
+
 /** Relative "3m ago" from a unix-seconds timestamp. */
 export function relative(time, now = Date.now()) {
   if (!time) return ''
@@ -36,3 +61,18 @@ export function eventBadgeClass(event) {
 
 export const AUR_PACKAGE = (name) =>
   `https://aur.archlinux.org/packages/${encodeURIComponent(name)}`
+
+/** The raw PKGBUILD on the AUR's cgit, the artifact the finding points at. */
+export const AUR_PKGBUILD = (name) =>
+  `https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=${encodeURIComponent(name)}`
+
+/** `PKGBUILD:12`, a bare file, or a bare line - '' when the finding has no
+ * location (a novelty, corpus or provenance finding names a fact, not a line). */
+export function locationLabel(finding) {
+  const file = finding && finding.file
+  const line = finding && finding.line
+  if (file && line) return `${file}:${line}`
+  if (file) return String(file)
+  if (line) return `line ${line}`
+  return ''
+}

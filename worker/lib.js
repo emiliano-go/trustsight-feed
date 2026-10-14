@@ -79,6 +79,9 @@ export function buildSearchText({ event, title, day, payload }) {
   for (const o of (payload && payload.over_threshold) || []) {
     push(o.package); push(o.version)
     for (const r of o.rules || []) push(r)
+    // The located findings: the rule id (again) and the file it fired in, so
+    // a search for a filename or a zero-weight rule still matches.
+    for (const f of o.findings || []) { push(f.rule_id); push(f.file) }
   }
   for (const m of (payload && payload.ioc_matches) || []) { push(m.package); push(m.indicator) }
   for (const c of (payload && payload.campaign_cluster) || []) {
@@ -90,6 +93,7 @@ export function buildSearchText({ event, title, day, payload }) {
     for (const x of im.members || []) push(x)
     for (const x of im.targets || []) push(x)
   }
+  for (const r of (payload && payload.refusals) || []) { push(r.package) }
   return [...new Set(parts.filter((p) => p !== undefined && p !== null && p !== ''))].join(' ')
 }
 
@@ -107,13 +111,21 @@ export function summarize(row) {
   for (const o of payload.over_threshold || []) {
     addPkg(o.package)
     for (const r of o.rules || []) addRule(r)
+    for (const f of o.findings || []) addRule(f.rule_id)
   }
   for (const m of payload.ioc_matches || []) addPkg(m.package)
-  for (const c of payload.campaign_cluster || []) addRule(c.rule_id)
+  for (const c of payload.campaign_cluster || []) {
+    addRule(c.rule_id)
+    // The member packages are the campaign; the search index already names
+    // them, and leaving them out of the projection showed a campaign with no
+    // packages attached to it.
+    for (const m of c.members || []) addPkg(m)
+  }
   for (const im of payload.impersonation || []) {
     addPkg(im.maintainer)
     for (const x of im.members || []) addPkg(x)
   }
+  for (const r of payload.refusals || []) addPkg(r.package)
   return {
     slug: row.slug,
     time: row.time,
@@ -163,11 +175,24 @@ export function pickHeadline(payload, fallback = '') {
     return `campaign across ${top.count} packages (${top.rule_id})`
   }
 
+  const refusals = payload.refusals || []
+  if (refusals.length) {
+    const pkgs = refusals.map((r) => r.package).filter(Boolean).sort()
+    if (pkgs.length === 1) return `analysis could not fully read ${pkgs[0]}`
+    return `${pkgs.length} packages the analysis could not fully read (${pkgs[0]} first)`
+  }
+
   const over = payload.over_threshold || []
   if (over.length) {
     const ranked = [...over].sort((a, b) => (b.score - a.score) || String(a.package).localeCompare(String(b.package)))
     const top = ranked[0]
-    const lead = top.rules && top.rules[0] ? ` (${top.rules[0]})` : ''
+    // Lead with the heaviest finding, not rules[0]: the rule list now carries
+    // zero-weight declared practices, and "(P001)" names a declaration, not
+    // the risk the headline is for.
+    const findings = [...(top.findings || [])].sort((a, b) =>
+      ((b.weight || 0) - (a.weight || 0)) || String(a.rule_id || '').localeCompare(String(b.rule_id || '')))
+    const leadRule = findings[0] ? findings[0].rule_id : (top.rules && top.rules[0])
+    const lead = leadRule ? ` (${leadRule})` : ''
     const extra = ranked.length - 1
     return `${top.package} scored ${top.score}${lead}${extra ? ` +${extra} more` : ''}`
   }

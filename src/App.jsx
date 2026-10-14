@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks'
 import { AccessibilityMenu, ThemeSwitch, Wordmark } from './Controls.jsx'
 import { RuleChip } from './RuleChip.jsx'
-import { AUR_PACKAGE, eventBadgeClass, eventLabel, formatUtc, relative } from './util.js'
+import { AUR_PACKAGE, eventBadgeClass, eventLabel, formatTime, relative } from './util.js'
 
 const DOCS = 'https://docs.trustsight.org'
 const SECURITY = `${DOCS}/security/`
@@ -21,7 +21,7 @@ function FeedItem({ item }) {
   return (
     <article className="feed-item">
       <div className="feed-item__head">
-        <a className="feed-item__time" href={href} data-route>{formatUtc(item.time)}</a>
+        <a className="feed-item__time" href={href} data-route>{formatTime(item.time)}</a>
         <span className={eventBadgeClass(item.event)}>{eventLabel(item.event)}</span>
         {item.day ? <span className="badge">day {item.day}</span> : null}
       </div>
@@ -46,6 +46,8 @@ export function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [stats, setStats] = useState(null)
+  const [now, setNow] = useState(() => Date.now())
+  const [refreshTick, setRefreshTick] = useState(0)
 
   async function load({ append = false, q, ev, before, beforeRow } = {}) {
     setLoading(true)
@@ -69,15 +71,34 @@ export function App() {
     }
   }
 
+  // Stats are cheap and the watcher keeps pushing: refresh them, and the
+  // relative "last signal" clock, so neither freezes on a stale first paint.
   useEffect(() => {
-    fetch('/api/stats').then((r) => r.json()).then(setStats).catch(() => {})
+    let live = true
+    const refresh = () => fetch('/api/stats')
+      .then((r) => r.json())
+      .then((d) => { if (live) setStats(d) })
+      .catch(() => {})
+    refresh()
+    const timer = setInterval(refresh, 30000)
+    return () => { live = false; clearInterval(timer) }
+  }, [])
+
+  // A live feed: reload the first page and re-tick the clock every minute, so
+  // a notification stored since the page opened appears without a manual reload.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(Date.now())
+      setRefreshTick((t) => t + 1)
+    }, 60000)
+    return () => clearInterval(timer)
   }, [])
 
   useEffect(() => {
     const timer = setTimeout(() => load({ q: query, ev: event }), 250)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, event])
+  }, [query, event, refreshTick])
 
   return (
     <div className="page" id="top">
@@ -105,7 +126,11 @@ export function App() {
         </p>
         <div className="masthead-stats">
           <div><b>{stats ? stats.total : '…'}</b>alert notifications preserved</div>
-          {stats && Number.isFinite(stats.last) ? <div><b>{relative(stats.last)}</b>last signal</div> : null}
+          {stats && Number.isFinite(stats.last) ? (
+            <div title={`last stored notification: ${formatTime(stats.last)}`}>
+              <b>{relative(stats.last, now)}</b>last signal
+            </div>
+          ) : null}
           {stats ? <div><b>{stats.over_threshold}</b>over threshold</div> : null}
           {stats ? <div><b>{stats.ioc}</b>IOC matches</div> : null}
         </div>

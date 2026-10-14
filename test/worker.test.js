@@ -68,6 +68,37 @@ describe('lib parsing', () => {
     expect(summary.rules).toEqual(['H088', 'H001', 'R001'])
   })
 
+  it('leads the over-threshold headline with the heaviest finding', () => {
+    // The rule list now carries zero-weight declared practices; the headline
+    // must name the risk, not the first (possibly weight-0) rule in the list.
+    expect(pickHeadline({
+      over_threshold: [{
+        package: 'hot-pkg', score: 45,
+        rules: ['P001', 'R001'],
+        findings: [
+          { rule_id: 'P001', weight: 0, file: '', line: null },
+          { rule_id: 'R001', weight: 30, file: 'PKGBUILD', line: 12 },
+        ],
+      }],
+    })).toBe('hot-pkg scored 45 (R001)')
+  })
+
+  it('summarizes findings into rules and searchable file names', () => {
+    const summary = summarize({ payload: JSON.stringify({
+      over_threshold: [{
+        package: 'hot-pkg',
+        findings: [{ rule_id: 'NOVELTY', file: '', line: null }, { rule_id: 'P001', file: 'PKGBUILD', line: 3 }],
+      }],
+    }) })
+    expect(summary.rules).toContain('NOVELTY')
+    expect(summary.rules).toContain('P001')
+    const text = buildSearchText({ payload: {
+      over_threshold: [{ package: 'hot-pkg', findings: [{ rule_id: 'R001', file: 'evil.install' }] }],
+    } })
+    expect(text).toContain('evil.install')
+    expect(text).toContain('R001')
+  })
+
   it('names the top signal in the headline, deterministically', () => {
     expect(pickHeadline({ alerts: [{ package: 'b', rule_id: 'H088' }, { package: 'a', rule_id: 'H088' }] }))
       .toBe('H088 on a +1 more')

@@ -387,6 +387,90 @@ a.chip:hover { border-color: var(--accent); color: var(--accent); }
 .alert-item { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; max-width: 100%; }
 .alert-item .pkg__name { word-break: break-word; }
 
+/* ---------- located findings ---------- */
+
+.findings {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.finding {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-top: 1px solid var(--rule);
+  font-size: 0.8824rem;
+}
+.finding:first-child { border-top: 0; }
+.finding__loc {
+  font-family: var(--font-mono);
+  font-size: 0.7647rem;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  padding: 1px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.finding__loc--none { color: var(--fg-muted); background: transparent; font-style: italic; }
+.finding__reason { color: var(--fg-muted); flex: 1 1 240px; min-width: 0; }
+
+/* ---------- package / member actions ---------- */
+
+.pkg__action,
+.member__pkgbuild {
+  font-family: var(--font-mono);
+  font-size: 0.7059rem;
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--rule));
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+.pkg__action:hover,
+.member__pkgbuild:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+/* ---------- campaigns ---------- */
+
+.campaign__subhead {
+  margin: 16px 0 8px;
+  font-family: var(--font-mono);
+  font-size: 0.6471rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.campaign-members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+.campaign-members li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 11px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.8235rem;
+}
+.campaign-members .member__name { color: var(--fg); border-bottom: 0; word-break: break-word; }
+.campaign-members .member__name:hover { color: var(--accent); }
+
+/* ---------- json actions ---------- */
+
+.json-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
 /* ---------- API reference ---------- */
 
 .api-endpoint { padding: 20px 0; border-bottom: 1px solid var(--rule); }

