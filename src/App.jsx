@@ -6,6 +6,7 @@ import { AUR_PACKAGE, eventBadgeClass, eventLabel, formatUtc, relative } from '.
 const DOCS = 'https://docs.trustsight.org'
 const SECURITY = `${DOCS}/security/`
 const GITHUB = 'https://github.com/emiliano-go/trustsight'
+const FEED_REPO = 'https://github.com/emiliano-go/trustsight-feed'
 const SITE = 'https://trustsight.org'
 
 const FILTERS = [
@@ -77,10 +78,6 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, event])
 
-  const totalLabel = stats && Number.isFinite(stats.total)
-    ? `${stats.total} alert${stats.total === 1 ? '' : 's'} preserved`
-    : ''
-
   return (
     <div className="page" id="top">
       <a className="skip-link" href="#content">Skip to content</a>
@@ -93,11 +90,11 @@ export function App() {
             <ThemeSwitch />
           </div>
         </div>
-        <h1>AUR <span>watcher feed</span></h1>
+        <h1>AUR watcher feed</h1>
         <p className="masthead-definition">
-          Every alert the TrustSight watcher raises, preserved as it was published and searchable by
-          package, rule, version or day. Each entry keeps its full evidence document: what changed,
-          which rules fired, and what the analysis could not read.
+          Notifications from the TrustSight AUR watcher, stored as the watcher published them.
+          Search them by package, rule, version or day. Each entry links to its full evidence
+          document.
         </p>
         <p className="masthead-note">
           TrustSight produces evidence, not proof of safety. It never runs a PKGBUILD and never
@@ -106,16 +103,17 @@ export function App() {
           update is safe. See the <a href={SECURITY} target="_blank" rel="noreferrer">security model</a>.
         </p>
         <div className="masthead-stats">
-          <div><b>{totalLabel || (loading ? '…' : '0 alerts')}</b>live from the watcher</div>
+          <div><b>{stats ? stats.total : '…'}</b>alert notifications preserved</div>
           {stats && Number.isFinite(stats.last) ? <div><b>{relative(stats.last)}</b>last signal</div> : null}
           {stats ? <div><b>{stats.over_threshold}</b>over threshold</div> : null}
           {stats ? <div><b>{stats.ioc}</b>IOC matches</div> : null}
         </div>
         <nav className="masthead-links" aria-label="Primary">
-          <a href={SITE} target="_blank" rel="noreferrer">trustsight.org ↗</a>
           <a href={DOCS} target="_blank" rel="noreferrer">Docs ↗</a>
           <a href={SECURITY} target="_blank" rel="noreferrer">Security model ↗</a>
-          <a href={GITHUB} target="_blank" rel="noreferrer">GitHub ↗</a>
+          <a href={SITE} target="_blank" rel="noreferrer">trustsight.org ↗</a>
+          <a href={GITHUB} target="_blank" rel="noreferrer">Tool source ↗</a>
+          <a href={FEED_REPO} target="_blank" rel="noreferrer">Feed source ↗</a>
         </nav>
       </header>
 
@@ -181,8 +179,8 @@ export function App() {
       <footer className="colophon" aria-label="Colophon">
         <div>
           <h2>TrustSight Watcher</h2>
-          <p>Alerts are ingested from the watcher&rsquo;s ntfy topic and preserved in a searchable store. host: watcher.trustsight.org</p>
-          <p>Built by <strong>Emiliano Gandini</strong>. Source is MIT licensed.</p>
+          <p>Alerts are ingested from the watcher&rsquo;s ntfy topic and preserved in a searchable store. This site is watcher.trustsight.org.</p>
+          <p>Built by <strong>Emiliano Gandini</strong>. MIT licensed.</p>
         </div>
         <div>
           <h2>Sources</h2>
@@ -190,7 +188,8 @@ export function App() {
             <li><a href={SITE} target="_blank" rel="noreferrer">trustsight.org ↗</a></li>
             <li><a href={DOCS} target="_blank" rel="noreferrer">Documentation ↗</a></li>
             <li><a href={`${DOCS}/reference/rules/`} target="_blank" rel="noreferrer">Rules reference ↗</a></li>
-            <li><a href={GITHUB} target="_blank" rel="noreferrer">Source on GitHub ↗</a></li>
+            <li><a href={GITHUB} target="_blank" rel="noreferrer">Tool source on GitHub ↗</a></li>
+            <li><a href={FEED_REPO} target="_blank" rel="noreferrer">Feed source on GitHub ↗</a></li>
           </ul>
         </div>
         <p className="colophon-note">

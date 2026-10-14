@@ -18,7 +18,25 @@
 /* ---------- masthead tweaks for the feed ---------- */
 
 .masthead--feed { min-height: 0; padding: 34px 0 56px; }
-.masthead--feed h1 { margin-top: clamp(40px, 8vh, 74px); }
+
+/* A serious documentation header, not a landing hero: sentence case, a
+   restrained size, and a muted definition instead of a shout. */
+.masthead--feed h1 {
+  margin: clamp(36px, 7vh, 64px) 0 0;
+  font-size: clamp(1.7647rem, 3.4vw, 2.5294rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  text-transform: none;
+}
+
+.masthead--feed .masthead-definition {
+  margin-top: 18px;
+  max-width: 54em;
+  color: var(--fg-muted);
+  font-size: clamp(1rem, 1.6vw, 1.1176rem);
+  line-height: 1.6;
+}
 
 .masthead-stats {
   display: flex;
