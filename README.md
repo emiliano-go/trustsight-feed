@@ -77,6 +77,9 @@ A read-only JSON API over the same store, with an OpenAPI 3.1 description:
 - `/api/package/{name}` and `/api/rule/{id}` everything mentioning a package or
   fired by a rule.
 - `/api/messages/{slug}`, `/api/stats`.
+- `/health` (and `/healthz`) liveness and readiness: `ok` with the schema
+  version and the time of the most recent notification, or `503` when the
+  database is unreachable. Not rate limited.
 
 Every endpoint is CORS open. A client is limited to 120 requests a minute by
 the Cloudflare rate limiting binding; past the cap the API answers HTTP 429

@@ -12,9 +12,35 @@ function rateLimited() {
   })
 }
 
+// A cheap liveness and readiness check. Not rate limited, so a monitor is
+// never throttled, and no-store so it is always current.
+async function health(env) {
+  const headers = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }
+  try {
+    const schema = await env.DB.prepare('SELECT value FROM meta WHERE key = ?').bind('schema').first()
+    const last = await env.DB.prepare('SELECT MAX(time) AS t FROM notifications').first()
+    return new Response(JSON.stringify({
+      status: 'ok',
+      time: new Date().toISOString(),
+      db: 'ok',
+      schema: schema ? schema.value : null,
+      last: last ? last.t : null,
+    }), { status: 200, headers })
+  } catch (err) {
+    return new Response(JSON.stringify({
+      status: 'degraded',
+      time: new Date().toISOString(),
+      db: 'error',
+      error: String(err && err.message ? err.message : err),
+    }), { status: 503, headers })
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url)
+
+    if (url.pathname === '/health' || url.pathname === '/healthz') return health(env)
 
     // The bare /api path is the HTML reference page, served by the SPA.
     if (url.pathname === '/api') return env.ASSETS.fetch(request)

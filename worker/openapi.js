@@ -243,6 +243,33 @@ export const openapiSpec = {
         responses: { 200: { description: 'The OpenAPI document.', content: { 'application/json': { schema: { type: 'object' } } } }, 429: RATE_LIMITED },
       },
     },
+    '/health': {
+      get: {
+        tags: ['Meta'],
+        summary: 'Liveness and readiness',
+        description: 'Returns ok with the schema version and the time of the most recent notification, or 503 when the database is unreachable. Not rate limited.',
+        responses: {
+          200: {
+            description: 'Healthy.',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    status: { type: 'string', example: 'ok' },
+                    time: { type: 'string', format: 'date-time' },
+                    db: { type: 'string', example: 'ok' },
+                    schema: { type: ['string', 'null'], example: '1' },
+                    last: { type: ['integer', 'null'], description: 'Unix seconds of the most recent notification.' },
+                  },
+                },
+              },
+            },
+          },
+          503: { description: 'Database unreachable.', content: { 'application/json': { schema: ERROR } } },
+        },
+      },
+    },
   },
   components: {
     schemas: {

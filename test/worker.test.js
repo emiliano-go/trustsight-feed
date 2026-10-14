@@ -222,4 +222,15 @@ describe('api endpoints', () => {
     expect(res.status).toBe(204)
     expect(res.headers.get('access-control-allow-methods')).toContain('GET')
   })
+
+  it('reports health from the database', async () => {
+    const res = await SELF.fetch('https://example.com/health')
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.status).toBe('ok')
+    expect(body.db).toBe('ok')
+    expect(body.schema).toBe('1')
+    expect(body.last).toBe(1777723200)
+    expect(res.headers.get('cache-control')).toBe('no-store')
+  })
 })
