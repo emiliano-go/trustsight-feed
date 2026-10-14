@@ -45,8 +45,13 @@ ntfy topic  ->  Worker cron  ->  D1  ->  Worker /api  ->  Preact feed
 ## URLs
 
 - `/` the feed, newest first, with search and event filters.
-- `/<YYYY-MM-DD>/<HHMMSS>/` one notification, full JSON, rule hover boxes.
+- `/<YYYY-MM-DD>/<HHMMSS>/` one notification, split into explained sections:
+  new alerts, packages over threshold (each with its rule breakdown), IOC
+  matches, and campaigns. The full JSON is hidden behind a Show JSON button.
   A same-second collision appends the ntfy id to keep the slug unique.
+
+On a phone, a rule explanation opens as a modal (a bottom sheet) rather than a
+hover box, and every control is sized for touch.
 
 ## Layout
 
