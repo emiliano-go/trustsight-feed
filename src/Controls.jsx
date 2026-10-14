@@ -1,4 +1,5 @@
-// Masthead controls, ported from trustsight-web so the look and behaviour
+// Masthead controls, ported from trustsight-web
+// (https://github.com/emiliano-go/trustsight-web) so the look and behaviour
 // match: a sun/moon theme pill and the accessibility menu. Both are driven by
 // src/main.jsx through the same `data-*` attributes.
 

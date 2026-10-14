@@ -7,7 +7,9 @@ The TrustSight container keeps running wherever it runs and pushing one JSON
 document per alert cycle to an ntfy topic. Nothing about the container changes.
 This project subscribes to that topic, preserves every notification in SQLite,
 and serves a feed where each notification has its own page with the full
-evidence document and hover explanations for every rule it fired.
+evidence document and hover explanations for every rule it fired. The
+interface is styled from
+[trustsight-web](https://github.com/emiliano-go/trustsight-web).
 
 ## Security model
 
