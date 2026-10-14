@@ -119,6 +119,7 @@ export function summarize(row) {
     time: row.time,
     event: row.event,
     title: row.title,
+    headline: pickHeadline(payload, row.title || 'watcher cycle'),
     day: row.day,
     priority: row.priority,
     tags: safeTags(row.tags),
@@ -131,6 +132,56 @@ export function summarize(row) {
     packages,
     rules,
   }
+}
+
+/**
+ * The short, deterministic name for a document, mirroring the watcher's own
+ * headline rule: name the most significant signal (impersonation, IOC,
+ * campaign, over-threshold package, rule firing), ordered explicitly so the
+ * same document always produces the same string. Falls back to the stored
+ * title for documents that carry none of these (a heartbeat).
+ */
+export function pickHeadline(payload, fallback = '') {
+  const impersonation = payload.impersonation || []
+  if (impersonation.length) {
+    const camp = impersonation.reduce((a, b) =>
+      (b.count > a.count || (b.count === a.count && String(b.maintainer || '') > String(a.maintainer || ''))) ? b : a)
+    return `impersonation campaign by ${camp.maintainer || 'one submitter'} (${camp.count} name-clones)`
+  }
+
+  const ioc = payload.ioc_matches || []
+  if (ioc.length) {
+    const packages = [...new Set(ioc.map((m) => m.package))].sort()
+    return ioc.length === 1 ? `IOC match on ${packages[0]}` : `${ioc.length} IOC matches (${packages[0]} first)`
+  }
+
+  const clusters = payload.campaign_cluster || []
+  if (clusters.length) {
+    const top = clusters.reduce((a, b) =>
+      (b.count > a.count || (b.count === a.count && String(b.rule_id) > String(a.rule_id))) ? b : a)
+    return `campaign across ${top.count} packages (${top.rule_id})`
+  }
+
+  const over = payload.over_threshold || []
+  if (over.length) {
+    const ranked = [...over].sort((a, b) => (b.score - a.score) || String(a.package).localeCompare(String(b.package)))
+    const top = ranked[0]
+    const lead = top.rules && top.rules[0] ? ` (${top.rules[0]})` : ''
+    const extra = ranked.length - 1
+    return `${top.package} scored ${top.score}${lead}${extra ? ` +${extra} more` : ''}`
+  }
+
+  const alerts = payload.alerts || []
+  if (alerts.length) {
+    const counts = {}
+    for (const a of alerts) counts[a.rule_id] = (counts[a.rule_id] || 0) + 1
+    const rule = Object.keys(counts).sort((a, b) => (counts[b] - counts[a]) || a.localeCompare(b))[0]
+    const packages = [...new Set(alerts.filter((a) => a.rule_id === rule).map((a) => a.package))].sort()
+    const extra = alerts.length - 1
+    return `${rule} on ${packages[0]}${extra ? ` +${extra} more` : ''}`
+  }
+
+  return fallback
 }
 
 function safeTags(tags) {

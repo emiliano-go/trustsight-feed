@@ -25,7 +25,7 @@ function FeedItem({ item }) {
         {item.day ? <span className="badge">day {item.day}</span> : null}
       </div>
       <h3 className="feed-item__title">
-        <a href={href} data-route>{item.title || '(untitled notification)'}</a>
+        <a href={href} data-route>{item.headline || item.title || '(untitled notification)'}</a>
       </h3>
       <div className="feed-item__tags">
         {item.packages.map((name) => (

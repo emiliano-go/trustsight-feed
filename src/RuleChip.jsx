@@ -1,7 +1,6 @@
 import catalog from './rule-catalog.generated.json'
 
 export const DOCS_RULES = 'https://docs.trustsight.org/reference/rules/'
-const MAX_DESC = 240
 
 const SEVERITY_CLASS = {
   FATAL: 'sev--fatal',
@@ -16,13 +15,6 @@ export function severityClass(severity) {
   return SEVERITY_CLASS[String(severity || '').toUpperCase()] || ''
 }
 
-/** Keep the hover box small: cap a long description at a readable length. */
-export function shorten(text) {
-  if (!text) return ''
-  if (text.length <= MAX_DESC) return text
-  return `${text.slice(0, MAX_DESC).trimEnd()}...`
-}
-
 export function ruleInfo(id) {
   const key = String(id || '').toLowerCase()
   return catalog[key] || null
@@ -35,21 +27,37 @@ function isCoarse() {
   return Boolean(touch) || window.innerWidth <= 720
 }
 
+export function openRuleExplanation(id) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent('ts-rule-open', { detail: { id } }))
+}
+
+function RuleBody({ id }) {
+  const rule = ruleInfo(id)
+  const sev = rule && rule.severity ? rule.severity.toUpperCase() : ''
+  return (
+    <span className="rule-pop__head">
+      <strong>{rule ? rule.name : `Rule ${id}`}</strong>
+      {sev ? <span className={`sev ${severityClass(sev)}`}>{sev}</span> : null}
+    </span>
+  )
+}
+
 /**
- * A rule id that explains itself. On a mouse it shows a small popover on
- * hover or focus; on a touch screen (or a narrow viewport) it opens a modal
- * instead, so the explanation never floats off a phone screen. The chip is a
- * span, not a link, so the docs link can live inside without nesting anchors.
+ * A rule id that explains itself. On a mouse it shows the full description in
+ * a popover on hover or focus; on a touch screen (or a narrow viewport) it
+ * opens a modal instead, so the explanation never floats off a phone screen.
+ * The chip is a span, not a link, so the docs link can live inside without
+ * nesting anchors.
  */
 export function RuleChip({ id }) {
   const rule = ruleInfo(id)
-  const sev = rule && rule.severity ? rule.severity.toUpperCase() : ''
 
   function activate(event) {
     if (!isCoarse()) return
     event.preventDefault()
     event.stopPropagation()
-    window.dispatchEvent(new CustomEvent('ts-rule-open', { detail: { id } }))
+    openRuleExplanation(id)
   }
 
   return (
@@ -62,14 +70,11 @@ export function RuleChip({ id }) {
     >
       {id}
       <span className="rule-pop" role="tooltip">
+        <RuleBody id={id} />
         {rule ? (
           <>
-            <span className="rule-pop__head">
-              <strong>{rule.name}</strong>
-              {sev ? <span className={`sev ${severityClass(sev)}`}>{sev}</span> : null}
-            </span>
             <span className="rule-pop__cat">{rule.categoryTitle}</span>
-            {rule.description ? <span className="rule-pop__desc">{shorten(rule.description)}</span> : null}
+            {rule.description ? <span className="rule-pop__desc">{rule.description}</span> : null}
             <a className="rule-pop__link" href={rule.docsUrl} target="_blank" rel="noreferrer">
               rules reference ↗
             </a>
@@ -87,6 +92,52 @@ export function RuleChip({ id }) {
         )}
       </span>
     </span>
+  )
+}
+
+/**
+ * The full explanation as a card. On a wide pointer it shows the whole
+ * description inline; on touch or a narrow viewport it collapses to a compact
+ * card that opens the modal, so a phone never gets a wall of text.
+ */
+export function RuleCard({ id }) {
+  const rule = ruleInfo(id)
+  const sev = rule && rule.severity ? rule.severity.toUpperCase() : ''
+
+  if (isCoarse()) {
+    return (
+      <button
+        type="button"
+        className="rule-card rule-card--compact"
+        onClick={() => openRuleExplanation(id)}
+        aria-label={`Rule ${id}${rule ? `: ${rule.name}` : ''}. Tap for the full explanation.`}
+      >
+        <span className="rule-card__head">
+          <span className="rule-card__id">{id}</span>
+          <span className="rule-card__name">{rule ? rule.name : 'Unknown rule'}</span>
+          {sev ? <span className={`sev ${severityClass(sev)}`}>{sev}</span> : null}
+        </span>
+        <span className="rule-card__tap">Tap for the full explanation</span>
+      </button>
+    )
+  }
+
+  return (
+    <article className="rule-card">
+      <header className="rule-card__head">
+        <span className="rule-card__id">{id}</span>
+        <span className="rule-card__name">{rule ? rule.name : 'Unknown rule'}</span>
+        {sev ? <span className={`sev ${severityClass(sev)}`}>{sev}</span> : null}
+      </header>
+      <p className="rule-card__desc">
+        {rule && rule.description
+          ? rule.description
+          : 'This rule is not in the catalog. It may be reserved or added since the catalog was generated.'}
+      </p>
+      <a className="rule-card__link" href={rule ? rule.docsUrl : DOCS_RULES} target="_blank" rel="noreferrer">
+        rules reference ↗
+      </a>
+    </article>
   )
 }
 

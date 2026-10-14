@@ -227,7 +227,7 @@ a.chip:hover { border-color: var(--accent); color: var(--accent); }
   position: absolute;
   left: 0;
   bottom: calc(100% + 8px);
-  width: min(340px, 78vw);
+  width: min(420px, 86vw);
   padding: 14px 15px;
   background: var(--bg);
   border: 1px solid var(--rule);
@@ -257,7 +257,7 @@ a.chip:hover { border-color: var(--accent); color: var(--accent); }
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
-.rule-pop__desc { display: block; margin: 0 0 10px; color: var(--fg-muted); }
+.rule-pop__desc { display: block; margin: 0 0 10px; color: var(--fg-muted); max-height: 55vh; overflow: auto; }
 .rule-pop__link { font-family: var(--font-mono); font-size: 0.7059rem; border-bottom: 0; }
 
 .sev {
@@ -338,16 +338,6 @@ a.chip:hover { border-color: var(--accent); color: var(--accent); }
 .pkg__name:hover { color: var(--accent); }
 .pkg__version { font-family: var(--font-mono); font-size: 0.7647rem; color: var(--fg-muted); }
 .pkg__meta { margin: 8px 0 0; color: var(--fg-muted); font-size: 0.8235rem; }
-.pkg__rules { margin: 14px 0 0; }
-.pkg__label {
-  display: block;
-  margin-bottom: 8px;
-  color: var(--fg-muted);
-  font-family: var(--font-mono);
-  font-size: 0.6471rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
 
 .detail__explain {
   margin: 0 0 18px;
@@ -357,7 +347,43 @@ a.chip:hover { border-color: var(--accent); color: var(--accent); }
   line-height: 1.6;
 }
 
-.alert-list { flex-direction: column; align-items: flex-start; gap: 10px; }
+/* ---------- rule explanation cards ---------- */
+
+.rule-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+  margin: 14px 0 0;
+}
+
+.rule-card {
+  display: block;
+  padding: 15px 17px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--bg) 60%, var(--fg) 3%);
+}
+
+.rule-card__head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.rule-card__id { font-family: var(--font-mono); font-size: 0.7647rem; font-weight: 700; color: var(--accent); }
+.rule-card__name { font-size: 0.9412rem; font-weight: 700; color: var(--fg); }
+.rule-card__desc { margin: 0 0 12px; color: var(--fg-muted); font-size: 0.8824rem; line-height: 1.6; }
+.rule-card__link { font-family: var(--font-mono); font-size: 0.7647rem; }
+.rule-card__tap { display: block; margin-top: 4px; color: var(--fg-muted); font-family: var(--font-mono); font-size: 0.7059rem; }
+
+.rule-card--compact {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.rule-card--compact:hover,
+.rule-card--compact:focus-visible { border-color: var(--accent); }
+.rule-card--compact .rule-card__head { margin-bottom: 6px; }
+
 .alert-item { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; max-width: 100%; }
 .alert-item .pkg__name { word-break: break-word; }
 

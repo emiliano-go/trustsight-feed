@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
 import { AccessibilityMenu, ThemeSwitch, Wordmark } from './Controls.jsx'
-import { RuleChip, RuleHighlight } from './RuleChip.jsx'
+import { RuleCard, RuleChip, RuleHighlight } from './RuleChip.jsx'
 import { AUR_PACKAGE, eventBadgeClass, eventLabel, formatUtc, relative } from './util.js'
 
 const SECURITY = 'https://docs.trustsight.org/security/'
@@ -15,20 +15,39 @@ export const ENTRY_TYPES = {
   impersonation: 'Many name-clones of a popular package published under one account. The one alert a reviewer must not skim past.',
 }
 
+/** Group a flat alert list by package, so each flagged package owns a section. */
+function groupAlerts(alerts) {
+  const byName = new Map()
+  for (const entry of alerts) {
+    if (!entry.package) continue
+    if (!byName.has(entry.package)) byName.set(entry.package, { package: entry.package, rules: [], seen: new Set() })
+    const group = byName.get(entry.package)
+    if (entry.rule_id && !group.seen.has(entry.rule_id)) {
+      group.seen.add(entry.rule_id)
+      group.rules.push(entry.rule_id)
+    }
+  }
+  return [...byName.values()]
+}
+
 function AlertList({ alerts }) {
   if (!alerts.length) return null
+  const groups = groupAlerts(alerts)
   return (
     <section className="detail__section">
       <h2>New alerts ({alerts.length})</h2>
       <p className="detail__explain">{ENTRY_TYPES.alert}</p>
-      <div className="ref-list alert-list">
-        {alerts.map((entry, i) => (
-          <span className="alert-item" key={`${entry.package}-${entry.rule_id}-${i}`}>
-            <a className="pkg__name" href={AUR_PACKAGE(entry.package)} target="_blank" rel="noreferrer">{entry.package}</a>
-            <RuleChip id={entry.rule_id} />
-          </span>
-        ))}
-      </div>
+      {groups.map((group) => (
+        <article className="pkg" key={group.package}>
+          <header className="pkg__head">
+            <a className="pkg__name" href={AUR_PACKAGE(group.package)} target="_blank" rel="noreferrer">{group.package}</a>
+            <span className="pkg__version">{group.rules.length} rule{group.rules.length === 1 ? '' : 's'}</span>
+          </header>
+          <div className="rule-cards">
+            {group.rules.map((id) => <RuleCard key={id} id={id} />)}
+          </div>
+        </article>
+      ))}
     </section>
   )
 }
@@ -47,13 +66,10 @@ function PackageSections({ packages }) {
             {pkg.score !== undefined && pkg.score !== null ? <span className="badge badge--alerts">score {pkg.score}</span> : null}
           </header>
           {pkg.last_modified ? <p className="pkg__meta">AUR change: {pkg.last_modified}</p> : null}
-          <div className="pkg__rules">
-            <span className="pkg__label">Rules that fired</span>
-            <div className="ref-list">
-              {(pkg.rules || []).length
-                ? pkg.rules.map((id) => <RuleChip key={id} id={id} />)
-                : <span className="pkg__meta">No named rule in this entry.</span>}
-            </div>
+          <div className="rule-cards">
+            {(pkg.rules || []).length
+              ? pkg.rules.map((id) => <RuleCard key={id} id={id} />)
+              : <p className="pkg__meta">No named rule in this entry.</p>}
           </div>
         </article>
       ))}
@@ -161,7 +177,7 @@ export function Message({ slug }) {
 
         {data ? (
           <>
-            <h1>{data.title || '(untitled notification)'}</h1>
+            <h1>{data.headline || data.title || '(untitled notification)'}</h1>
             <div className="detail__meta">
               <span>{formatUtc(data.time)}</span>
               <span>{relative(data.time)}</span>

@@ -1,6 +1,6 @@
 import { env, SELF } from 'cloudflare:test'
 import { describe, expect, it } from 'vitest'
-import { baseSlug, buildSearchText, ftsQuery, isTrustSightNotification, parseNotification, summarize } from '../worker/lib.js'
+import { baseSlug, buildSearchText, ftsQuery, isTrustSightNotification, parseNotification, pickHeadline, summarize } from '../worker/lib.js'
 
 function messageEvent(overrides = {}) {
   return {
@@ -66,6 +66,18 @@ describe('lib parsing', () => {
     const summary = summarize({ ...row, payload: row.payload })
     expect(summary.packages).toEqual(['some-pkg', 'hot-pkg'])
     expect(summary.rules).toEqual(['H088', 'H001', 'R001'])
+  })
+
+  it('names the top signal in the headline, deterministically', () => {
+    expect(pickHeadline({ alerts: [{ package: 'b', rule_id: 'H088' }, { package: 'a', rule_id: 'H088' }] }))
+      .toBe('H088 on a +1 more')
+    expect(pickHeadline({ over_threshold: [{ package: 'hot-pkg', score: 45, rules: ['H001'] }] }))
+      .toBe('hot-pkg scored 45 (H001)')
+    expect(pickHeadline({ ioc_matches: [{ package: 'bad-pkg', indicator: 'x' }] }))
+      .toBe('IOC match on bad-pkg')
+    expect(pickHeadline({ impersonation: [{ maintainer: 'evil', count: 3 }] }))
+      .toBe('impersonation campaign by evil (3 name-clones)')
+    expect(pickHeadline({}, 'TrustSight: alive')).toBe('TrustSight: alive')
   })
 })
 
