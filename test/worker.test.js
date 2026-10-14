@@ -160,7 +160,7 @@ describe('api endpoints', () => {
     expect(doc.paths['/api/latest']).toBeTruthy()
     expect(doc.paths['/api/date/{date}/{timeframe}']).toBeTruthy()
 
-    const index = await SELF.fetch('https://example.com/api/')
+    const index = await SELF.fetch('https://example.com/api/index.json')
     const body = await index.json()
     expect(body.endpoints).toContain('GET /api/latest')
     expect(body.endpoints).toContain('GET /api/openapi.json')
@@ -210,10 +210,23 @@ describe('api endpoints', () => {
   })
 
   it('redirects the docs spellings to the reference page', async () => {
-    for (const path of ['/api/docs', '/api/docs/', '/api/reference']) {
+    for (const path of ['/api/docs', '/api/docs/', '/api/reference', '/api/']) {
       const res = await SELF.fetch(`https://example.com${path}`, { redirect: 'manual' })
       expect(res.status).toBe(308)
       expect(res.headers.get('location')).toBe('/api')
+    }
+  })
+
+  it('redirects root API spellings to their /api equivalent', async () => {
+    for (const [from, to] of [
+      ['/feed', '/api/feed'],
+      ['/latest', '/api/latest'],
+      ['/date/2026-05-02', '/api/date/2026-05-02'],
+      ['/stats', '/api/stats'],
+    ]) {
+      const res = await SELF.fetch(`https://example.com${from}`, { redirect: 'manual' })
+      expect(res.status).toBe(308)
+      expect(res.headers.get('location')).toBe(to)
     }
   })
 

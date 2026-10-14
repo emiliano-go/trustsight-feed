@@ -9,7 +9,8 @@ const MAX_LIMIT = 200
 const SECONDS_PER_DAY = 86400
 
 const ENDPOINTS = [
-  'GET /api',
+  'GET /api (reference page)',
+  'GET /api/index.json',
   'GET /api/docs (redirects to /api)',
   'GET /api/openapi.json',
   'GET /api/feed?q=&event=&day=&from=&to=&limit=&before=&beforeRow=',
@@ -228,7 +229,7 @@ export async function handleApi(request, env, url) {
   }
 
   const path = url.pathname.replace(/\/+$/, '') || '/api'
-  if (path === '/api') return index()
+  if (path === '/api/index.json') return index()
   // The reference page lives in the SPA at /api; send both docs spellings there.
   if (path === '/api/docs' || path === '/api/reference') return redirect('/api')
   if (path === '/api/openapi.json') return json(openapiSpec)

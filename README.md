@@ -66,8 +66,9 @@ hover box, and every control is sized for touch.
 
 A read-only JSON API over the same store, with an OpenAPI 3.1 description:
 
-- `/api` the styled reference page (rendered from the spec). `/api/docs` and
-  `/api/reference` redirect there.
+- `/api` the styled reference page (rendered from the spec). `/api/`,
+  `/api/docs` and `/api/reference` redirect there; `/api/index.json` is a
+  plain endpoint list.
 - `/api/openapi.json` the OpenAPI document.
 - `/api/feed` search, with `q`, `event`, `day`, `from`, `to`, `limit` and a
   keyset cursor.
@@ -80,11 +81,14 @@ A read-only JSON API over the same store, with an OpenAPI 3.1 description:
 - `/health` (and `/healthz`) liveness and readiness: `ok` with the schema
   version and the time of the most recent notification, or `503` when the
   database is unreachable. Not rate limited.
-
 Every endpoint is CORS open. A client is limited to 120 requests a minute by
 the Cloudflare rate limiting binding; past the cap the API answers HTTP 429
 with a `Retry-After` header. The spec is the single source of truth: the
 Worker serves it and the reference page renders from it.
+
+The root spellings `/feed`, `/latest`, `/date/*`, `/package/*`, `/rule/*`,
+`/stats` and `/messages/*` redirect (308) to their `/api` equivalent, so a
+shortened URL never falls through to the app shell.
 
 ## Layout
 

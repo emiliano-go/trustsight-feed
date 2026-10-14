@@ -12,6 +12,17 @@ function rateLimited() {
   })
 }
 
+function redirect(location) {
+  return new Response(null, {
+    status: 308,
+    headers: { location, 'cache-control': 'public, max-age=3600' },
+  })
+}
+
+// Root spellings of the API resources. Without this, /feed and /latest fall
+// through to the SPA and silently render the home page.
+const ROOT_ALIASES = ['/feed', '/latest', '/date', '/package', '/rule', '/stats', '/messages']
+
 // A cheap liveness and readiness check. Not rate limited, so a monitor is
 // never throttled, and no-store so it is always current.
 async function health(env) {
@@ -42,8 +53,15 @@ export default {
 
     if (url.pathname === '/health' || url.pathname === '/healthz') return health(env)
 
-    // The bare /api path is the HTML reference page, served by the SPA.
+    // The bare /api path is the HTML reference page, served by the SPA; its
+    // trailing-slash spelling goes to the same place.
     if (url.pathname === '/api') return env.ASSETS.fetch(request)
+    if (url.pathname === '/api/') return redirect('/api')
+
+    // Short API spellings at the root redirect to their /api equivalent.
+    if (ROOT_ALIASES.some((base) => url.pathname === base || url.pathname.startsWith(`${base}/`))) {
+      return redirect(`/api${url.pathname}${url.search}`)
+    }
 
     if (url.pathname.startsWith('/api/')) {
       // Rate limit before any D1 work. 120 requests a minute per client; the
