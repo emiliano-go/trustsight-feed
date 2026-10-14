@@ -85,6 +85,13 @@ export default {
   },
 
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil(pollNtfy(env))
+    ctx.waitUntil((async () => {
+      try {
+        const result = await pollNtfy(env)
+        console.log('poll result', JSON.stringify(result))
+      } catch (err) {
+        console.error('poll threw', err && err.stack ? err.stack : String(err))
+      }
+    })())
   },
 }

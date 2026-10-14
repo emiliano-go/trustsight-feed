@@ -34,7 +34,12 @@ resource, stop.
 
 - **Cloudflare Worker** on a Cron Trigger polls the ntfy JSON API every five
   minutes (`since=<cursor>`, so a cycle is one small request), parses each
-  `message` event, and upserts it into D1 keyed by the ntfy message id.
+  `message` event, and upserts it into D1 keyed by the ntfy message id. A
+  document larger than ntfy's body limit arrives as an attachment (the body
+  is "You received a file"), so the poller fetches the attachment JSON before
+  parsing; an off-host attachment URL is refused. A cycle that gets a 5xx or a
+  network error is retried once, and a miss is harmless because ntfy caches
+  the message for the next cycle.
 - **D1 (SQLite)** stores the notifications, with an FTS5 index over package
   names, rule ids, versions, titles and days for search.
 - **Static Assets** serve the Preact frontend from the same Worker. The

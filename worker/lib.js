@@ -97,8 +97,54 @@ export function buildSearchText({ event, title, day, payload }) {
   return [...new Set(parts.filter((p) => p !== undefined && p !== null && p !== ''))].join(' ')
 }
 
-/** A compact list-item projection derived from a stored row and its payload. */
-export function summarize(row) {
+//: A document larger than ntfy's message-body limit is delivered as an
+//: attachment; we fetch it, but never more than this, to bound a fetch.
+export const MAX_ATTACHMENT_BYTES = 1_000_000
+
+function looksLikeJson(text) {
+  const t = String(text || '').trim()
+  if (!t.startsWith('{') && !t.startsWith('[')) return false
+  try { JSON.parse(t); return true } catch { return false }
+}
+
+/**
+ * The attachment URL to fetch for a message whose body is not the document,
+ * or null. Only a URL on the configured ntfy host is accepted, so a forged
+ * message on the public topic cannot make the Worker fetch an arbitrary host.
+ */
+export function attachmentUrl(msg, serverHost) {
+  const body = typeof msg.message === 'string' ? msg.message : ''
+  if (looksLikeJson(body)) return null
+  const attachment = msg.attachment
+  if (!attachment || typeof attachment.url !== 'string') return null
+  let url
+  try { url = new URL(attachment.url) } catch { return null }
+  if (serverHost && url.host !== serverHost) return null
+  return url.toString()
+}
+
+/**
+ * The JSON document for a message: its body, or, for a large one, the
+ * attachment it points at. Never throws: on any failure the raw body is
+ * returned, so a bad attachment is stored as an unparsed document rather than
+ * dropped.
+ */
+export async function resolveDocumentBody(msg, serverHost, doFetch = fetch) {
+  const body = typeof msg.message === 'string' ? msg.message : ''
+  const url = attachmentUrl(msg, serverHost)
+  if (!url) return body
+  try {
+    const res = await doFetch(url)
+    if (!res.ok) return body
+    const text = await res.text()
+    if (text.length > MAX_ATTACHMENT_BYTES) return body
+    return looksLikeJson(text) ? text : body
+  } catch {
+    return body
+  }
+}
+
+/** A compact list-item projection derived from a stored row and its payload. */export function summarize(row) {
   let payload = {}
   try { payload = JSON.parse(row.payload || '{}') } catch { /* keep {} */ }
   const packages = []

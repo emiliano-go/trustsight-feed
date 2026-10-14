@@ -4,9 +4,13 @@
 // the last one stored, so a cycle costs one small request. Failures are always
 // swallowed - a notification pipeline must never wedge the cursor.
 
-import { isTrustSightNotification, parseNotification } from './lib.js'
+import { attachmentUrl, isTrustSightNotification, parseNotification, resolveDocumentBody } from './lib.js'
 
 const CURSOR_KEY = 'cursor'
+
+function serverHost(env) {
+  try { return new URL(env.NTFY_SERVER || 'https://ntfy.sh').host } catch { return 'ntfy.sh' }
+}
 
 async function getCursor(env) {
   const row = await env.DB.prepare('SELECT value FROM meta WHERE key = ?')
@@ -30,11 +34,18 @@ async function resolveSlug(env, base, id) {
   return base
 }
 
-async function storeNotification(env, msg) {
-  const row = parseNotification(msg)
+async function storeNotification(env, msg, host, headers) {
+  // A document over ntfy's message-body limit is delivered as an attachment;
+  // resolve it before parsing so a large document is not dropped.
+  const attach = attachmentUrl(msg, host)
+  const document = await resolveDocumentBody(msg, host, (url) => fetch(url, { headers }))
+  const row = parseNotification({ ...msg, message: document })
   if (!row.id) return false
   // The topic is public; only store documents the watcher marks as its own.
-  if (!isTrustSightNotification(row)) return false
+  if (!isTrustSightNotification(row)) {
+    console.warn('rejected', row.id, 'tool', JSON.stringify(row.tool), 'event', row.event, 'attach', attach || '')
+    return false
+  }
 
   const existing = await env.DB.prepare('SELECT id FROM notifications WHERE id = ?')
     .bind(row.id)
@@ -65,6 +76,24 @@ function ntfyUrl(env, since) {
 }
 
 /**
+ * One GET, retried once on a network error or a 5xx. ntfy.sh occasionally
+ * answers 522 (an edge timeout) under load; a retry usually clears it, and a
+ * miss is harmless because ntfy caches the message for the next cycle.
+ */
+async function fetchNtfy(url, headers) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await fetch(url, { headers })
+      if (response.status >= 500 && attempt === 0) continue
+      return response
+    } catch (err) {
+      if (attempt === 1) throw err
+    }
+  }
+  return fetch(url, { headers })
+}
+
+/**
  * One ingestion cycle. Returns { received, stored, cursor, truncated }.
  * Never throws for a downstream problem; a caller logging the result is enough.
  */
@@ -72,10 +101,11 @@ export async function pollNtfy(env) {
   const cursor = await getCursor(env)
   const headers = { accept: 'application/x-ndjson' }
   if (env.NTFY_TOKEN) headers.authorization = `Bearer ${env.NTFY_TOKEN}`
+  const host = serverHost(env)
 
   let response
   try {
-    response = await fetch(ntfyUrl(env, cursor), { headers })
+    response = await fetchNtfy(ntfyUrl(env, cursor), headers)
   } catch (err) {
     console.warn('ntfy fetch failed:', err)
     return { received: 0, stored: 0, cursor, error: 'fetch' }
@@ -109,7 +139,7 @@ export async function pollNtfy(env) {
     received += 1
     lastId = msg.id
     try {
-      if (await storeNotification(env, msg)) stored += 1
+      if (await storeNotification(env, msg, host, headers)) stored += 1
     } catch (err) {
       console.warn('store failed for', msg.id, err)
     }

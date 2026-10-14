@@ -1,6 +1,6 @@
 import { env, SELF } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { baseSlug, buildSearchText, ftsQuery, isTrustSightNotification, parseNotification, pickHeadline, summarize } from '../worker/lib.js'
+import { attachmentUrl, baseSlug, buildSearchText, ftsQuery, isTrustSightNotification, parseNotification, pickHeadline, resolveDocumentBody, summarize } from '../worker/lib.js'
 
 function messageEvent(overrides = {}) {
   return {
@@ -53,6 +53,28 @@ describe('lib parsing', () => {
   it('accepts only documents the watcher marks as its own', () => {
     expect(isTrustSightNotification(parseNotification(messageEvent()))).toBe(true)
     expect(isTrustSightNotification(parseNotification(messageEvent({ message: '{"nope":1}' })))).toBe(false)
+  })
+
+  it('fetches a document delivered as an ntfy attachment', async () => {
+    const withAttachment = { message: 'You received a file: attachment.json', attachment: { url: 'https://ntfy.sh/file/x.json' } }
+    expect(attachmentUrl({ message: '{"a":1}' }, 'ntfy.sh')).toBeNull()
+    expect(attachmentUrl(withAttachment, 'ntfy.sh')).toBe('https://ntfy.sh/file/x.json')
+    // An off-host URL is refused, so a forged topic message cannot SSRF.
+    expect(attachmentUrl({ message: 'x', attachment: { url: 'https://evil.example/x' } }, 'ntfy.sh')).toBeNull()
+
+    const calls = []
+    const body = await resolveDocumentBody(withAttachment, 'ntfy.sh', async (url) => {
+      calls.push(url)
+      return { ok: true, text: async () => '{"tool":"trustsight","event":"trustsight.alerts","alerts":[]}' }
+    })
+    expect(calls).toEqual(['https://ntfy.sh/file/x.json'])
+    expect(body).toContain('trustsight.alerts')
+  })
+
+  it('falls back to the raw body when an attachment cannot be fetched', async () => {
+    const msg = { message: 'You received a file: attachment.json', attachment: { url: 'https://ntfy.sh/file/x.json' } }
+    expect(await resolveDocumentBody(msg, 'ntfy.sh', async () => ({ ok: false, text: async () => '' }))).toBe(msg.message)
+    expect(await resolveDocumentBody(msg, 'ntfy.sh', async () => { throw new Error('boom') })).toBe(msg.message)
   })
 
   it('builds an AND-of-prefixes FTS query', () => {
