@@ -209,6 +209,14 @@ describe('api endpoints', () => {
     expect(none.count).toBe(0)
   })
 
+  it('redirects the docs spellings to the reference page', async () => {
+    for (const path of ['/api/docs', '/api/docs/', '/api/reference']) {
+      const res = await SELF.fetch(`https://example.com${path}`, { redirect: 'manual' })
+      expect(res.status).toBe(308)
+      expect(res.headers.get('location')).toBe('/api')
+    }
+  })
+
   it('handles CORS preflight', async () => {
     const res = await SELF.fetch('https://example.com/api/latest', { method: 'OPTIONS' })
     expect(res.status).toBe(204)

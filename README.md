@@ -66,7 +66,8 @@ hover box, and every control is sized for touch.
 
 A read-only JSON API over the same store, with an OpenAPI 3.1 description:
 
-- `/api` the styled reference page (rendered from the spec).
+- `/api` the styled reference page (rendered from the spec). `/api/docs` and
+  `/api/reference` redirect there.
 - `/api/openapi.json` the OpenAPI document.
 - `/api/feed` search, with `q`, `event`, `day`, `from`, `to`, `limit` and a
   keyset cursor.

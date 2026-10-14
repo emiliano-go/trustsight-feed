@@ -10,6 +10,7 @@ const SECONDS_PER_DAY = 86400
 
 const ENDPOINTS = [
   'GET /api',
+  'GET /api/docs (redirects to /api)',
   'GET /api/openapi.json',
   'GET /api/feed?q=&event=&day=&from=&to=&limit=&before=&beforeRow=',
   'GET /api/latest',
@@ -40,6 +41,13 @@ function json(data, status = 200) {
       'cache-control': 'public, max-age=30',
       ...CORS,
     },
+  })
+}
+
+function redirect(location) {
+  return new Response(null, {
+    status: 308,
+    headers: { location, 'cache-control': 'public, max-age=3600', ...CORS },
   })
 }
 
@@ -221,6 +229,8 @@ export async function handleApi(request, env, url) {
 
   const path = url.pathname.replace(/\/+$/, '') || '/api'
   if (path === '/api') return index()
+  // The reference page lives in the SPA at /api; send both docs spellings there.
+  if (path === '/api/docs' || path === '/api/reference') return redirect('/api')
   if (path === '/api/openapi.json') return json(openapiSpec)
   if (path === '/api/feed') return feed(env, url)
   if (path === '/api/stats') return stats(env)
