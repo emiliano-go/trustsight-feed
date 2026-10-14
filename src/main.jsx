@@ -68,6 +68,10 @@ function setA11yOpen(open, focus = false) {
 
 render(<Router />, document.getElementById('root'))
 
+// Drop the instant-paint skeleton now that the app is mounted.
+const boot = document.getElementById('boot')
+if (boot) boot.remove()
+
 // The inline bootstrap already set data-theme before paint; these lines make
 // the controls, the stored preference and the system listener agree with it.
 setTheme(root.dataset.theme === 'light' ? 'light' : 'dark', false)

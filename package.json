@@ -6,7 +6,7 @@
   "description": "Searchable feed of TrustSight ntfy notifications, hosted at watcher.trustsight.org.",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/optimize.mjs",
     "preview": "vite preview",
     "worker:dev": "wrangler dev",
     "test": "vitest run",

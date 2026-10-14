@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0D1117" />
+    <link rel="preload" href="/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
     <script>
       (function () {
         var d = document.documentElement
@@ -41,6 +42,19 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   </head>
   <body>
+    <div id="boot" class="page">
+      <header class="topbar">
+        <span class="wordmark">TRUST<span>SIGHT</span></span>
+      </header>
+      <main id="content" class="detail" aria-busy="true">
+        <p class="feed-empty">Loading…</p>
+      </main>
+    </div>
+    <noscript>
+      <div class="page">
+        <p class="feed-empty">This feed needs JavaScript to search the watcher alerts.</p>
+      </div>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
