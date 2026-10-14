@@ -4,6 +4,7 @@ import { RuleCard, RuleChip, RuleHighlight } from './RuleChip.jsx'
 import { AUR_PACKAGE, eventBadgeClass, eventLabel, formatUtc, relative } from './util.js'
 
 const SECURITY = 'https://docs.trustsight.org/security/'
+const NTFY = 'https://ntfy.sh/trustsight-aur-1d8a3fd2'
 
 // One-line explanations of the kinds of entry a document can carry, so a
 // reader knows what they are looking at before the list.
@@ -183,6 +184,7 @@ export function Message({ slug }) {
               <span>{relative(data.time)}</span>
               <span className={eventBadgeClass(data.event)}>{eventLabel(data.event)}</span>
               {data.day ? <span>day {data.day}</span> : null}
+              <a href={NTFY} target="_blank" rel="noreferrer">ntfy channel ↗</a>
             </div>
 
             {payload.cycle ? (

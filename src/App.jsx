@@ -7,6 +7,7 @@ const DOCS = 'https://docs.trustsight.org'
 const SECURITY = `${DOCS}/security/`
 const GITHUB = 'https://github.com/emiliano-go/trustsight'
 const FEED_REPO = 'https://github.com/emiliano-go/trustsight-feed'
+const NTFY = 'https://ntfy.sh/trustsight-aur-1d8a3fd2'
 const SITE = 'https://trustsight.org'
 
 const FILTERS = [
@@ -111,6 +112,7 @@ export function App() {
         <nav className="masthead-links" aria-label="Primary">
           <a href={DOCS} target="_blank" rel="noreferrer">Docs ↗</a>
           <a href={SECURITY} target="_blank" rel="noreferrer">Security model ↗</a>
+          <a href={NTFY} target="_blank" rel="noreferrer">ntfy channel ↗</a>
           <a href={SITE} target="_blank" rel="noreferrer">trustsight.org ↗</a>
           <a href={GITHUB} target="_blank" rel="noreferrer">Tool source ↗</a>
           <a href={FEED_REPO} target="_blank" rel="noreferrer">Feed source ↗</a>
@@ -188,6 +190,7 @@ export function App() {
             <li><a href={SITE} target="_blank" rel="noreferrer">trustsight.org ↗</a></li>
             <li><a href={DOCS} target="_blank" rel="noreferrer">Documentation ↗</a></li>
             <li><a href={`${DOCS}/reference/rules/`} target="_blank" rel="noreferrer">Rules reference ↗</a></li>
+            <li><a href={NTFY} target="_blank" rel="noreferrer">ntfy channel ↗</a></li>
             <li><a href={GITHUB} target="_blank" rel="noreferrer">Tool source on GitHub ↗</a></li>
             <li><a href={FEED_REPO} target="_blank" rel="noreferrer">Feed source on GitHub ↗</a></li>
           </ul>
