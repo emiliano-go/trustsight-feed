@@ -24,6 +24,7 @@
   ],
   // Per client the public API is capped at 120 requests a minute. The free
   // Workers rate limiting binding; no request reaches D1 past the cap.
+  // (Windows are 10s or 60s only, so this is 120 per 60s, not per second.)
   "ratelimits": [
     {
       "name": "API_LIMITER",
