@@ -107,17 +107,28 @@ function ntfyUrl(env, since) {
  * answers 522 (an edge timeout) under load; a retry usually clears it, and a
  * miss is harmless because ntfy caches the message for the next cycle.
  */
+const POLL_TIMEOUT_MS = 8_000
+const POLL_ATTEMPTS = 3
+
 async function fetchNtfy(url, headers) {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  let last
+  for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt += 1) {
+    if (attempt) await new Promise((resolve) => setTimeout(resolve, 400 * attempt))
     try {
-      const response = await fetch(url, { headers })
-      if (response.status >= 500 && attempt === 0) continue
-      return response
-    } catch (err) {
-      if (attempt === 1) throw err
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), POLL_TIMEOUT_MS)
+      try {
+        last = await fetch(url, { headers, signal: controller.signal })
+      } finally {
+        clearTimeout(timer)
+      }
+      if (last.status < 500) return last
+    } catch {
+      last = undefined
     }
   }
-  return fetch(url, { headers })
+  if (last) return last
+  throw new Error('ntfy poll failed after retries')
 }
 
 /**
@@ -126,7 +137,11 @@ async function fetchNtfy(url, headers) {
  */
 export async function pollNtfy(env) {
   const cursor = await getCursor(env)
-  const headers = { accept: 'application/x-ndjson' }
+  const headers = {
+    accept: 'application/x-ndjson',
+    // Some ntfy edge nodes 522 a request with no user agent.
+    'user-agent': 'trustsight-feed/0.1 (+https://watcher.trustsight.org)',
+  }
   if (env.NTFY_TOKEN) headers.authorization = `Bearer ${env.NTFY_TOKEN}`
   const host = serverHost(env)
 
