@@ -89,7 +89,10 @@ A read-only JSON API over the same store, with an OpenAPI 3.1 description:
 - `/api/source/{package}?file=PKGBUILD` the analysed AUR file, unmodified, so a
   client can show the flagged lines. Only AUR repository files resolve; the
   host is fixed and the path is validated, so a finding cannot make the Worker
-  fetch an arbitrary URL.
+  fetch an arbitrary URL. When a finding names a file the repository holds under
+  another name (for example `<pkgname>.install` against an actual `.install`) the
+  same-extension file is served, and on a miss the repository's file list is
+  returned so the client can offer it.
 - `/health` (and `/healthz`) liveness and readiness: `ok` with the schema
   version and the time of the most recent notification, or `503` when the
   database is unreachable. Not rate limited.

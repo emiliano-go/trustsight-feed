@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { DOCS_RULES, ruleInfo, severityClass } from './RuleChip.jsx'
+import { renderMarkdown } from './markdown.jsx'
 
 /**
  * The mobile rule explanation. Mounted once by the router and opened by a
@@ -55,7 +56,7 @@ export function RuleModal() {
               {sev ? <span className={`sev ${severityClass(sev)}`}>{sev}</span> : null}
               <span className="modal__cat">{rule.categoryTitle}</span>
             </div>
-            <p className="modal__desc">{rule.description || 'This rule has no published description.'}</p>
+            <p className="modal__desc">{rule.description ? renderMarkdown(rule.description, rule.docsUrl) : 'This rule has no published description.'}</p>
             <a className="modal__link" href={rule.docsUrl} target="_blank" rel="noreferrer">Open in the rules reference ↗</a>
           </>
         ) : (

@@ -3,6 +3,7 @@ import { AccessibilityMenu, ThemeSwitch, Wordmark } from './Controls.jsx'
 import { RuleCard, RuleChip, RuleHighlight, ruleInfo } from './RuleChip.jsx'
 import { AUR_PACKAGE, AUR_PKGBUILD, eventBadgeClass, eventLabel, formatTime, locationLabel, relative } from './util.js'
 import { alertingClusters } from '../worker/lib.js'
+import { renderMarkdown } from './markdown.jsx'
 
 const SECURITY = 'https://docs.trustsight.org/security/'
 const NTFY = 'https://ntfy.sh/trustsight-aur-1d8a3fd2'
@@ -64,7 +65,7 @@ function campaignType(id) {
   if (CAMPAIGN_TYPES[id]) return CAMPAIGN_TYPES[id]
   const rule = ruleInfo(id)
   return rule
-    ? { label: rule.name, means: rule.description }
+    ? { label: rule.name, means: rule.description, docsUrl: rule.docsUrl }
     : { label: `Rule ${id}`, means: '' }
 }
 
@@ -170,14 +171,17 @@ function SourceView({ packageName, files, findings }) {
     fetch(`/api/source/${encodeURIComponent(packageName)}?file=${encodeURIComponent(file)}`)
       .then(async (res) => {
         const body = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(body.error === 'not_found' ? 'Not in the AUR repository.' : `HTTP ${res.status}`)
-        return body
+        if (res.ok) return { content: String(body.content || ''), actualFile: body.file || file }
+        if (body.error === 'not_found') return { notFound: true, available: Array.isArray(body.available) ? body.available : [] }
+        return { error: body.error ? `Could not load (${body.error}).` : `HTTP ${res.status}` }
       })
-      .then((body) => { if (live) setState({ content: String(body.content || '') }) })
+      .then((next) => { if (live) setState(next) })
       .catch((err) => { if (live) setState({ error: String(err && err.message ? err.message : err) }) })
     return () => { live = false }
   }, [packageName, file])
 
+  // Highlight the findings for the requested file name, even when the
+  // repository holds the same file under a different name.
   const byLine = new Map()
   for (const f of findings) {
     if (f.file !== file || !f.line) continue
@@ -185,12 +189,13 @@ function SourceView({ packageName, files, findings }) {
     byLine.get(f.line).push(f)
   }
   const lines = state.content === undefined ? [] : state.content.split('\n')
+  const pickerFiles = state.available && state.available.length ? state.available : files
 
   return (
     <div className="source">
-      {files.length > 1 ? (
+      {pickerFiles.length > 1 ? (
         <div className="source__files">
-          {files.map((name) => (
+          {pickerFiles.map((name) => (
             <button
               type="button"
               key={name}
@@ -206,9 +211,18 @@ function SourceView({ packageName, files, findings }) {
 
       {state.loading ? <p className="pkg__meta">Loading {file}…</p> : null}
       {state.error ? <p className="feed-error">Could not load {file}: {state.error}</p> : null}
+      {state.notFound ? (
+        <p className="feed-error">
+          {file} is not in the AUR repository.
+          {pickerFiles.length ? ' Pick another file above.' : ''}
+        </p>
+      ) : null}
 
       {state.content !== undefined ? (
         <>
+          {state.actualFile && state.actualFile !== file ? (
+            <p className="source__note">Showing {state.actualFile}, the matching file in the repository.</p>
+          ) : null}
           <div className="source__code">
             {lines.map((text, i) => {
               const lineNo = i + 1
@@ -367,7 +381,7 @@ function Campaigns({ payload }) {
               <RuleChip id={cluster.rule_id} />
               <span className="pkg__version">{type.label} · {members.length} packages</span>
             </header>
-            {type.means ? <p className="detail__explain">{type.means}</p> : null}
+            {type.means ? <p className="detail__explain">{renderMarkdown(type.means, type.docsUrl)}</p> : null}
             <h3 className="campaign__subhead">Affected packages ({members.length})</h3>
             <MemberList names={members} />
           </article>

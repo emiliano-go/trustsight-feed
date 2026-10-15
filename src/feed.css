@@ -260,6 +260,16 @@ a.chip:hover { border-color: var(--accent); color: var(--accent); }
 .rule-pop__desc { display: block; margin: 0 0 10px; color: var(--fg-muted); max-height: 55vh; overflow: auto; }
 .rule-pop__link { font-family: var(--font-mono); font-size: 0.7059rem; border-bottom: 0; }
 
+/* Inline code inside a rendered rule description. */
+.md-code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  color: var(--fg);
+  background: color-mix(in srgb, var(--fg) 8%, transparent);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
 .sev {
   padding: 1px 7px;
   border-radius: 3px;

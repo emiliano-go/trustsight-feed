@@ -224,9 +224,51 @@ function index() {
 // the detail page can show the source with the flagged lines highlighted. The
 // host is fixed (never a package-declared URL) and the size is capped.
 const AUR_CGIT = 'https://aur.archlinux.org/cgit/aur.git/plain'
+const AUR_TREE = 'https://aur.archlinux.org/cgit/aur.git/tree/'
 const MAX_SOURCE_BYTES = 512 * 1024
 const PACKAGE_RE = /^[A-Za-z0-9@._+-]{1,255}$/
 const SOURCE_FILE_RE = /^[A-Za-z0-9@._+/-]{1,255}$/
+
+/** Fetch one file from the AUR repository. `{ text }`, `{ missing }` or `{ error }`. */
+async function fetchAurFile(name, file) {
+  let res
+  try {
+    res = await fetch(`${AUR_CGIT}/${encodeURIComponent(file)}?h=${encodeURIComponent(name)}`, {
+      headers: { 'user-agent': 'trustsight-feed/1.0' },
+    })
+  } catch {
+    return { error: 'upstream_unreachable' }
+  }
+  if (res.status === 404) return { missing: true }
+  if (!res.ok) return { error: `upstream_${res.status}` }
+  const text = await res.text()
+  if (text.length > MAX_SOURCE_BYTES) return { error: 'too_large' }
+  return { text }
+}
+
+/** The file names in the repository, read from the cgit tree listing. */
+async function fetchRepoFiles(name) {
+  try {
+    const res = await fetch(`${AUR_TREE}?h=${encodeURIComponent(name)}`, {
+      headers: { 'user-agent': 'trustsight-feed/1.0' },
+    })
+    if (!res.ok) return []
+    const html = await res.text()
+    const names = [...html.matchAll(/\/cgit\/aur\.git\/tree\/([^'"?]+)\?h=/g)].map((m) => decodeURIComponent(m[1]))
+    return [...new Set(names)]
+  } catch {
+    return []
+  }
+}
+
+function sourceResponse(name, file, content, requested) {
+  const body = { package: name, file, content }
+  if (requested && requested !== file) body.requested = requested
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'public, max-age=300', ...CORS },
+  })
+}
 
 async function source(env, url, name) {
   if (!PACKAGE_RE.test(name)) return json({ error: 'bad_package' }, 400)
@@ -234,22 +276,24 @@ async function source(env, url, name) {
   if (!SOURCE_FILE_RE.test(file) || file.includes('..') || file.startsWith('/')) {
     return json({ error: 'bad_file' }, 400)
   }
-  let upstream
-  try {
-    upstream = await fetch(`${AUR_CGIT}/${encodeURIComponent(file)}?h=${encodeURIComponent(name)}`, {
-      headers: { 'user-agent': 'trustsight-feed/1.0' },
-    })
-  } catch {
-    return json({ error: 'upstream_unreachable' }, 502)
+
+  const direct = await fetchAurFile(name, file)
+  if (direct.text !== undefined) return sourceResponse(name, file, direct.text)
+  if (direct.error) return json({ error: direct.error }, 502)
+
+  // Missing: a finding may name a file differently than the repository does,
+  // for example `<pkgname>.install` where the repository holds a differently
+  // named `.install`. Offer the repository's files and serve the same-extension
+  // one, so the source view still opens.
+  const available = await fetchRepoFiles(name)
+  const dot = file.lastIndexOf('.')
+  const ext = dot > 0 ? file.slice(dot) : ''
+  const match = ext ? available.find((candidate) => candidate.endsWith(ext) && candidate !== file) : null
+  if (match) {
+    const alt = await fetchAurFile(name, match)
+    if (alt.text !== undefined) return sourceResponse(name, match, alt.text, file)
   }
-  if (upstream.status === 404) return json({ error: 'not_found', package: name, file }, 404)
-  if (!upstream.ok) return json({ error: `upstream_${upstream.status}` }, 502)
-  const text = await upstream.text()
-  if (text.length > MAX_SOURCE_BYTES) return json({ error: 'too_large', package: name, file }, 413)
-  return new Response(JSON.stringify({ package: name, file, content: text }), {
-    status: 200,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'public, max-age=300', ...CORS },
-  })
+  return json({ error: 'not_found', package: name, file, available }, 404)
 }/** Dispatch an API request, or return null when the path is not ours. */
 export async function handleApi(request, env, url) {
   if (request.method === 'OPTIONS') {

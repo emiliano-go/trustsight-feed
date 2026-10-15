@@ -1,4 +1,5 @@
 import catalog from './rule-catalog.generated.json'
+import { renderMarkdown } from './markdown.jsx'
 
 export const DOCS_RULES = 'https://docs.trustsight.org/reference/rules/'
 
@@ -74,7 +75,7 @@ export function RuleChip({ id }) {
         {rule ? (
           <>
             <span className="rule-pop__cat">{rule.categoryTitle}</span>
-            {rule.description ? <span className="rule-pop__desc">{rule.description}</span> : null}
+            {rule.description ? <span className="rule-pop__desc">{renderMarkdown(rule.description, rule.docsUrl)}</span> : null}
             <a className="rule-pop__link" href={rule.docsUrl} target="_blank" rel="noreferrer">
               rules reference ↗
             </a>
@@ -131,7 +132,7 @@ export function RuleCard({ id }) {
       </header>
       <p className="rule-card__desc">
         {rule && rule.description
-          ? rule.description
+          ? renderMarkdown(rule.description, rule.docsUrl)
           : 'This rule is not in the catalog. It may be reserved or added since the catalog was generated.'}
       </p>
       <a className="rule-card__link" href={rule ? rule.docsUrl : DOCS_RULES} target="_blank" rel="noreferrer">
