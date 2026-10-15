@@ -25,3 +25,49 @@ jobs:
       - run: npm run verify:csp
       - run: npm run build
       - run: npm test
+
+  # Deploy to Cloudflare on every push to the default branch, once the checks
+  # pass. Needs the repo secrets CLOUDFLARE_API_TOKEN (Workers Scripts:Edit and
+  # D1:Edit) and CLOUDFLARE_ACCOUNT_ID. If the token is not configured the
+  # deploy steps are skipped with a warning rather than failing the run, so a
+  # push is never red just for a missing credential. Pull requests never deploy.
+  deploy:
+    needs: checks
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    env:
+      TRUSTSIGHT_SRC: ${{ github.workspace }}/vendor/trustsight/src
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: emiliano-go/trustsight
+          path: vendor/trustsight
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # Secrets cannot be read in a job-level `if`, so resolve presence here and
+      # gate the deploy steps on the output.
+      - name: Check Cloudflare credentials
+        id: cf
+        run: echo "have=${{ secrets.CLOUDFLARE_API_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+      - name: No Cloudflare token configured
+        if: steps.cf.outputs.have != 'true'
+        run: echo "::warning::CLOUDFLARE_API_TOKEN is not set; skipping deploy. Add it (and CLOUDFLARE_ACCOUNT_ID) to enable automatic deploys."
+      - name: Apply D1 migrations
+        if: steps.cf.outputs.have == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 migrations apply trustsight-feed --remote
+      - name: Deploy the Worker
+        if: steps.cf.outputs.have == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
