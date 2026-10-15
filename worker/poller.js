@@ -1,8 +1,10 @@
 // Ingestion: poll the ntfy JSON API and persist every notification to D1.
 //
 // The poll is incremental: `since=<cursor>` returns only messages newer than
-// the last one stored, so a cycle costs one small request. Failures are always
-// swallowed - a notification pipeline must never wedge the cursor.
+// the last one stored, so a cycle costs one small request.  A message that
+// fails to store holds the cursor so it is retried, but only up to a bound;
+// after that it is dropped with a log, so one un-fetchable notification can
+// never wedge the feed.
 
 import { attachmentUrl, isTrustSightNotification, parseNotification, resolveDocumentBody } from './lib.js'
 
@@ -25,6 +27,30 @@ async function setCursor(env, value) {
     .run()
 }
 
+// The message a store keeps failing on, with how many cycles it has failed,
+// as "<id>:<attempts>". A poll holds the cursor so the message is retried, but
+// only up to a bound: one un-fetchable attachment must not hold the whole feed.
+const RETRY_KEY = 'retry'
+const MAX_RETRY_ATTEMPTS = 6
+
+async function bumpRetry(env, id) {
+  const row = await env.DB.prepare('SELECT value FROM meta WHERE key = ?')
+    .bind(RETRY_KEY)
+    .first()
+  const [prevId, prevN] = ((row && row.value) || '').split(':')
+  const attempts = (prevId === id ? Number(prevN) || 0 : 0) + 1
+  await env.DB.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+    .bind(RETRY_KEY, `${id}:${attempts}`)
+    .run()
+  return attempts
+}
+
+async function clearRetry(env) {
+  await env.DB.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+    .bind(RETRY_KEY, '')
+    .run()
+}
+
 /** Resolve the slug to store, appending the ntfy id on a same-second clash. */
 async function resolveSlug(env, base, id) {
   const clash = await env.DB.prepare('SELECT id FROM notifications WHERE slug = ?')
@@ -38,7 +64,8 @@ async function storeNotification(env, msg, host, headers) {
   // A document over ntfy's message-body limit is delivered as an attachment;
   // resolve it before parsing so a large document is not dropped.
   const attach = attachmentUrl(msg, host)
-  const document = await resolveDocumentBody(msg, host, (url) => fetch(url, { headers }))
+  const document = await resolveDocumentBody(msg, host,
+    (url, opts) => fetch(url, { ...(opts || {}), headers }))
   const row = parseNotification({ ...msg, message: document })
   if (!row.id) return false
   // The topic is public; only store documents the watcher marks as its own.
@@ -125,13 +152,14 @@ export async function pollNtfy(env) {
 
   let received = 0
   let stored = 0
-  // The cursor only ever moves to a message we actually *handled* - stored,
-  // skipped as a duplicate, or rejected as not-ours. A message whose store
-  // threw (a transient fetch or D1 error) stops the loop with the cursor left
-  // just before it, so the next poll fetches it again. Advancing past it, as
-  // this used to, dropped the notification forever: ntfy's `since=<id>` walks
-  // publication order, so a later poll returns only messages after the last one
-  // and never revisits the gap.
+  // The cursor moves to a message once it is *handled* - stored, skipped as a
+  // duplicate, or rejected as not-ours.  A message whose store threw (a
+  // transient fetch or D1 error) holds the cursor so the next poll retries it:
+  // ntfy's `since=<id>` walks publication order, so advancing past it would
+  // drop the notification forever.  But the hold is bounded - after
+  // MAX_RETRY_ATTEMPTS the message is dropped with a log and the cursor moves
+  // on, so one un-fetchable attachment cannot wedge the whole feed (it did:
+  // a hung fetch held ingestion for hours).
   let committed = ''
   for (const line of text.split('\n')) {
     const trimmed = line.trim()
@@ -147,8 +175,16 @@ export async function pollNtfy(env) {
     try {
       if (await storeNotification(env, msg, host, headers)) stored += 1
       committed = msg.id
+      await clearRetry(env)
     } catch (err) {
-      console.warn('store failed for', msg.id, '- holding the cursor to retry:', err)
+      const attempts = await bumpRetry(env, msg.id)
+      if (attempts >= MAX_RETRY_ATTEMPTS) {
+        console.warn('dropping', msg.id, 'after', attempts, 'failed attempts:', err)
+        committed = msg.id
+        await clearRetry(env)
+        continue
+      }
+      console.warn('store failed for', msg.id, `(attempt ${attempts}/${MAX_RETRY_ATTEMPTS}) - holding the cursor to retry:`, err)
       break
     }
   }

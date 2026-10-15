@@ -395,4 +395,44 @@ describe('poll cursor', () => {
     const rows = await env.DB.prepare('SELECT id FROM notifications ORDER BY time').all()
     expect(rows.results.map((r) => r.id)).toEqual(['attmsg', 'beatmsg'])
   })
+
+  it('drops a message it cannot store after a bounded number of retries', async () => {
+    // A hung/failed fetch must not hold the feed forever: after the retry bound
+    // the message is dropped with a log and the cursor moves on.
+    await env.DB.exec('DELETE FROM notifications')
+    await env.DB.prepare("UPDATE meta SET value='' WHERE key='cursor'").run()
+    await env.DB.prepare("INSERT INTO meta (key, value) VALUES ('retry', '') " +
+      'ON CONFLICT(key) DO UPDATE SET value = excluded.value').run()
+
+    const ndjson = [
+      {
+        id: 'badmsg', time: 1777723301, event: 'message', topic: 't', title: 'bad',
+        message: 'You received a file: attachment.json',
+        attachment: { url: 'https://ntfy.sh/file/bad.json' },
+      },
+      {
+        id: 'goodmsg', time: 1777723302, event: 'message', topic: 't',
+        title: 'TrustSight: alive',
+        message: JSON.stringify({ event: 'trustsight.heartbeat', tool: 'trustsight', title: 'TrustSight: alive' }),
+      },
+    ].map((m) => JSON.stringify(m)).join('\n') + '\n'
+
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      const u = String(url)
+      if (u.includes('/json?poll=1')) return new Response(ndjson, { status: 200 })
+      if (u === 'https://ntfy.sh/file/bad.json') throw new Error('hung or failed')
+      return new Response('', { status: 404 })
+    }))
+
+    // Held for MAX_RETRY_ATTEMPTS - 1 cycles, then dropped on the sixth.
+    for (let i = 0; i < 5; i += 1) {
+      const held = await pollNtfy(env)
+      expect(held.stored).toBe(0)
+      expect(held.cursor).toBe('')
+    }
+    const last = await pollNtfy(env)
+    expect(last.cursor).toBe('goodmsg')
+    const rows = await env.DB.prepare('SELECT id FROM notifications ORDER BY time').all()
+    expect(rows.results.map((r) => r.id)).toEqual(['goodmsg'])
+  })
 })

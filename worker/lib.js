@@ -121,6 +121,12 @@ export function alertingClusters(payload) {
 //: attachment; we fetch it, but never more than this, to bound a fetch.
 export const MAX_ATTACHMENT_BYTES = 1_000_000
 
+//: How long an attachment fetch may hang before it is abandoned and retried.
+//: Without this a fetch that never settles stalls the whole poll cycle (the
+//: scheduled handler is killed on the runtime's limit), so one attachment
+//: held the feed for hours.
+export const ATTACHMENT_TIMEOUT_MS = 10_000
+
 function looksLikeJson(text) {
   const t = String(text || '').trim()
   if (!t.startsWith('{') && !t.startsWith('[')) return false
@@ -172,7 +178,13 @@ export async function resolveDocumentBody(msg, serverHost, doFetch = fetch) {
   if (!url) return body
   let res
   try {
-    res = await doFetch(url)
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), ATTACHMENT_TIMEOUT_MS)
+    try {
+      res = await doFetch(url, { signal: controller.signal })
+    } finally {
+      clearTimeout(timer)
+    }
   } catch (err) {
     throw new RetryableIngestError(`attachment fetch failed: ${err && err.message ? err.message : err}`)
   }
