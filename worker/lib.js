@@ -1,5 +1,5 @@
-// Pure helpers shared by the poller and the API. No I/O here, so they are
-// cheap to unit-test.
+// Pure helpers shared by the ingest route and the API. No I/O here, so they
+// are cheap to unit-test.
 
 /** UTC slug for a notification: `YYYY-MM-DD/HHMMSS` (from the ntfy time). */
 export function baseSlug(time) {
@@ -115,91 +115,6 @@ export function alertingClusters(payload) {
     return rule.startsWith('G') && rule !== 'G006' &&
       Array.isArray(c.members) && c.members.length >= 2
   })
-}
-
-//: A document larger than ntfy's message-body limit is delivered as an
-//: attachment; we fetch it, but never more than this, to bound a fetch.
-export const MAX_ATTACHMENT_BYTES = 1_000_000
-
-//: How long an attachment fetch may hang before it is abandoned and retried.
-//: Without this a fetch that never settles stalls the whole poll cycle (the
-//: scheduled handler is killed on the runtime's limit), so one attachment
-//: held the feed for hours.
-export const ATTACHMENT_TIMEOUT_MS = 10_000
-
-function looksLikeJson(text) {
-  const t = String(text || '').trim()
-  if (!t.startsWith('{') && !t.startsWith('[')) return false
-  try { JSON.parse(t); return true } catch { return false }
-}
-
-/**
- * The attachment URL to fetch for a message whose body is not the document,
- * or null. Only a URL on the configured ntfy host is accepted, so a forged
- * message on the public topic cannot make the Worker fetch an arbitrary host.
- */
-export function attachmentUrl(msg, serverHost) {
-  const body = typeof msg.message === 'string' ? msg.message : ''
-  if (looksLikeJson(body)) return null
-  const attachment = msg.attachment
-  if (!attachment || typeof attachment.url !== 'string') return null
-  let url
-  try { url = new URL(attachment.url) } catch { return null }
-  if (serverHost && url.host !== serverHost) return null
-  return url.toString()
-}
-
-/**
- * A transient failure fetching a document. The caller must NOT advance its
- * cursor past the message: ntfy caches it for hours, so the next poll can
- * still retrieve it. See `resolveDocumentBody`.
- */
-export class RetryableIngestError extends Error {
-  constructor(message) {
-    super(message)
-    this.name = 'RetryableIngestError'
-  }
-}
-
-/**
- * The JSON document for a message: its body, or, for a large one, the
- * attachment it points at.
- *
- * A *transient* failure to fetch the attachment (a network error, a 429 or a
- * 5xx) throws `RetryableIngestError`, so the poller keeps its cursor and
- * retries the message instead of treating an unretrieved attachment as a
- * foreign body and dropping the whole document. A *definitive* answer (the
- * URL is off-host, the file is gone, the body is genuinely not JSON) returns
- * the raw body, which the caller then rejects as not-TrustSight.
- */
-export async function resolveDocumentBody(msg, serverHost, doFetch = fetch) {
-  const body = typeof msg.message === 'string' ? msg.message : ''
-  const url = attachmentUrl(msg, serverHost)
-  if (!url) return body
-  let res
-  try {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), ATTACHMENT_TIMEOUT_MS)
-    try {
-      res = await doFetch(url, { signal: controller.signal })
-    } finally {
-      clearTimeout(timer)
-    }
-  } catch (err) {
-    throw new RetryableIngestError(`attachment fetch failed: ${err && err.message ? err.message : err}`)
-  }
-  if (res.status === 429 || res.status >= 500) {
-    throw new RetryableIngestError(`attachment fetch transient status ${res.status}`)
-  }
-  if (!res.ok) return body
-  let text
-  try {
-    text = await res.text()
-  } catch (err) {
-    throw new RetryableIngestError(`attachment body failed: ${err && err.message ? err.message : err}`)
-  }
-  if (text.length > MAX_ATTACHMENT_BYTES) return body
-  return looksLikeJson(text) ? text : body
 }
 
 /** A compact list-item projection derived from a stored row and its payload. */export function summarize(row) {

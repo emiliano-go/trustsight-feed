@@ -1,7 +1,7 @@
 import { env, SELF } from 'cloudflare:test'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { alertingClusters, attachmentUrl, baseSlug, buildSearchText, ftsQuery, isTrustSightNotification, parseNotification, pickHeadline, resolveDocumentBody, RetryableIngestError, summarize } from '../worker/lib.js'
-import { pollNtfy } from '../worker/poller.js'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { alertingClusters, baseSlug, buildSearchText, ftsQuery, isTrustSightNotification, parseNotification, pickHeadline, summarize } from '../worker/lib.js'
+import { ingestDocument, REPLAY_WINDOW_SECONDS } from '../worker/ingest.js'
 
 function messageEvent(overrides = {}) {
   return {
@@ -54,39 +54,6 @@ describe('lib parsing', () => {
   it('accepts only documents the watcher marks as its own', () => {
     expect(isTrustSightNotification(parseNotification(messageEvent()))).toBe(true)
     expect(isTrustSightNotification(parseNotification(messageEvent({ message: '{"nope":1}' })))).toBe(false)
-  })
-
-  it('fetches a document delivered as an ntfy attachment', async () => {
-    const withAttachment = { message: 'You received a file: attachment.json', attachment: { url: 'https://ntfy.sh/file/x.json' } }
-    expect(attachmentUrl({ message: '{"a":1}' }, 'ntfy.sh')).toBeNull()
-    expect(attachmentUrl(withAttachment, 'ntfy.sh')).toBe('https://ntfy.sh/file/x.json')
-    // An off-host URL is refused, so a forged topic message cannot SSRF.
-    expect(attachmentUrl({ message: 'x', attachment: { url: 'https://evil.example/x' } }, 'ntfy.sh')).toBeNull()
-
-    const calls = []
-    const body = await resolveDocumentBody(withAttachment, 'ntfy.sh', async (url) => {
-      calls.push(url)
-      return { ok: true, text: async () => '{"tool":"trustsight","event":"trustsight.alerts","alerts":[]}' }
-    })
-    expect(calls).toEqual(['https://ntfy.sh/file/x.json'])
-    expect(body).toContain('trustsight.alerts')
-  })
-
-  it('returns the raw body when an attachment is definitively not a document', async () => {
-    const msg = { message: 'You received a file: attachment.json', attachment: { url: 'https://ntfy.sh/file/x.json' } }
-    // 404 (the file is gone) and a 2xx that is not JSON are definitive.
-    expect(await resolveDocumentBody(msg, 'ntfy.sh', async () => ({ ok: false, status: 404, text: async () => '' }))).toBe(msg.message)
-    expect(await resolveDocumentBody(msg, 'ntfy.sh', async () => ({ ok: true, status: 200, text: async () => 'not json' }))).toBe(msg.message)
-  })
-
-  it('throws a retryable error when the attachment fetch is transient', async () => {
-    // A transient failure must not degrade to "not ours" - that would advance
-    // the cursor past the message and lose it. It throws so the poller retries.
-    const msg = { message: 'You received a file: attachment.json', attachment: { url: 'https://ntfy.sh/file/x.json' } }
-    await expect(resolveDocumentBody(msg, 'ntfy.sh', async () => { throw new Error('boom') }))
-      .rejects.toThrow(RetryableIngestError)
-    await expect(resolveDocumentBody(msg, 'ntfy.sh', async () => ({ ok: false, status: 503, text: async () => '' })))
-      .rejects.toThrow(RetryableIngestError)
   })
 
   it('builds an AND-of-prefixes FTS query', () => {
@@ -341,98 +308,126 @@ describe('api endpoints', () => {
   })
 })
 
-describe('poll cursor', () => {
-  const ATTACH = 'https://ntfy.sh/file/att.json'
+describe('signed direct ingest', () => {
+  const enc = new TextEncoder()
 
-  // A large document (delivered as an attachment) followed by a heartbeat. The
-  // alert is published first, so it must be handled before the heartbeat.
-  function ndjson() {
-    const alert = {
-      id: 'attmsg', time: 1777723201, event: 'message', topic: 't', title: 'big',
-      message: 'You received a file: attachment.json', attachment: { url: ATTACH },
-    }
-    const beat = {
-      id: 'beatmsg', time: 1777723202, event: 'message', topic: 't',
-      title: 'TrustSight: alive',
-      message: JSON.stringify({ event: 'trustsight.heartbeat', tool: 'trustsight', title: 'TrustSight: alive' }),
-    }
-    return `${JSON.stringify(alert)}\n${JSON.stringify(beat)}\n`
+  function b64(bytes) {
+    return btoa(String.fromCharCode(...new Uint8Array(bytes)))
   }
 
-  afterEach(() => { vi.unstubAllGlobals() })
+  async function withKeys() {
+    const kp = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify'])
+    const spki = await crypto.subtle.exportKey('spki', kp.publicKey)
+    return {
+      privateKey: kp.privateKey,
+      env: { DB: env.DB, INGEST_PUBLIC_KEY: b64(spki), INGEST_KEY_ID: 'k1' },
+    }
+  }
 
-  it('does not advance the cursor past a message whose attachment fetch failed', async () => {
-    await env.DB.exec('DELETE FROM notifications')
-    await env.DB.prepare("UPDATE meta SET value='' WHERE key='cursor'").run()
+  async function sign(privateKey, id, ts, body) {
+    const material = enc.encode(`${id}.${ts}.${body}`)
+    const sig = await crypto.subtle.sign({ name: 'Ed25519' }, privateKey, material)
+    return `v1=${b64(sig)}`
+  }
 
-    let attachmentDown = true
-    vi.stubGlobal('fetch', vi.fn(async (url) => {
-      const u = String(url)
-      if (u.includes('/json?poll=1')) return new Response(ndjson(), { status: 200 })
-      if (u === ATTACH) {
-        if (attachmentDown) throw new Error('network down')
-        return new Response(JSON.stringify({
-          event: 'trustsight.alerts', tool: 'trustsight', title: 'big', alerts: [], over_threshold: [],
-        }), { status: 200 })
-      }
-      return new Response('', { status: 404 })
-    }))
+  function headersFor(id, ts, sig, extra = {}) {
+    const h = new Headers({
+      'webhook-id': id, 'webhook-timestamp': String(ts),
+      'webhook-key-id': 'k1', 'webhook-signature': sig,
+    })
+    for (const [k, v] of Object.entries(extra)) h.set(k, v)
+    return h
+  }
 
-    // First poll: the alert's attachment is unreachable, so the loop stops
-    // there and the cursor stays put. Nothing after it is committed either.
-    const first = await pollNtfy(env)
-    expect(first.stored).toBe(0)
-    expect(first.cursor).toBe('')
-    const afterFirst = await env.DB.prepare('SELECT COUNT(*) AS n FROM notifications').first()
-    expect(afterFirst.n).toBe(0)
+  beforeEach(async () => { await env.DB.exec('DELETE FROM notifications') })
 
-    // Second poll: the attachment is back. The alert is stored, then the
-    // heartbeat, and the cursor advances to the last handled id.
-    attachmentDown = false
-    const second = await pollNtfy(env)
-    expect(second.stored).toBe(2)
-    expect(second.cursor).toBe('beatmsg')
-    const rows = await env.DB.prepare('SELECT id FROM notifications ORDER BY time').all()
-    expect(rows.results.map((r) => r.id)).toEqual(['attmsg', 'beatmsg'])
+  it('stores a correctly signed document', async () => {
+    const { privateKey, env: e } = await withKeys()
+    const ts = Math.floor(Date.now() / 1000)
+    const doc = JSON.stringify({
+      event: 'trustsight.alerts', tool: 'trustsight', title: 'TrustSight: hot-pkg scored 45',
+      alerts: [], over_threshold: [{ package: 'hot-pkg', score: 45 }],
+    })
+    const sig = await sign(privateKey, 'webhook-1', ts, doc)
+    const res = await ingestDocument(e, doc, headersFor('webhook-1', ts, sig, { Title: 'TrustSight: hot-pkg scored 45' }))
+    expect(res.ok).toBe(true)
+    expect(res.stored).toBe(true)
+    const row = await env.DB.prepare('SELECT * FROM notifications WHERE id = ?').bind('webhook-1').first()
+    expect(row).toBeTruthy()
+    expect(row.slug).toBe(baseSlug(ts))
+    expect(row.title).toBe('TrustSight: hot-pkg scored 45')
   })
 
-  it('drops a message it cannot store after a bounded number of retries', async () => {
-    // A hung/failed fetch must not hold the feed forever: after the retry bound
-    // the message is dropped with a log and the cursor moves on.
-    await env.DB.exec('DELETE FROM notifications')
-    await env.DB.prepare("UPDATE meta SET value='' WHERE key='cursor'").run()
-    await env.DB.prepare("INSERT INTO meta (key, value) VALUES ('retry', '') " +
-      'ON CONFLICT(key) DO UPDATE SET value = excluded.value').run()
-
-    const ndjson = [
-      {
-        id: 'badmsg', time: 1777723301, event: 'message', topic: 't', title: 'bad',
-        message: 'You received a file: attachment.json',
-        attachment: { url: 'https://ntfy.sh/file/bad.json' },
-      },
-      {
-        id: 'goodmsg', time: 1777723302, event: 'message', topic: 't',
-        title: 'TrustSight: alive',
-        message: JSON.stringify({ event: 'trustsight.heartbeat', tool: 'trustsight', title: 'TrustSight: alive' }),
-      },
-    ].map((m) => JSON.stringify(m)).join('\n') + '\n'
-
-    vi.stubGlobal('fetch', vi.fn(async (url) => {
-      const u = String(url)
-      if (u.includes('/json?poll=1')) return new Response(ndjson, { status: 200 })
-      if (u === 'https://ntfy.sh/file/bad.json') throw new Error('hung or failed')
-      return new Response('', { status: 404 })
+  it('produces the same stored document as the ntfy route', async () => {
+    // The whole point: the signed ingest and the ntfy-shaped path are the same
+    // API. Only the row id (the source's identity) and the topic differ.
+    const { privateKey, env: e } = await withKeys()
+    const ts = Math.floor(Date.now() / 1000)
+    const doc = messageEvent().message
+    const ntfyRow = parseNotification({
+      id: 'ntfyid', time: ts, event: 'message', topic: 'trustsight',
+      title: 'TrustSight: 1 package(s) over threshold', message: doc,
+    })
+    const sig = await sign(privateKey, 'webhook-parity', ts, doc)
+    const res = await ingestDocument(e, doc, headersFor('webhook-parity', ts, sig, {
+      Title: 'TrustSight: 1 package(s) over threshold',
     }))
-
-    // Held for MAX_RETRY_ATTEMPTS - 1 cycles, then dropped on the sixth.
-    for (let i = 0; i < 5; i += 1) {
-      const held = await pollNtfy(env)
-      expect(held.stored).toBe(0)
-      expect(held.cursor).toBe('')
+    expect(res.ok).toBe(true)
+    const ingestRow = await env.DB.prepare('SELECT * FROM notifications WHERE id = ?').bind('webhook-parity').first()
+    for (const field of ['time', 'event', 'title', 'day', 'payload', 'slug',
+      'n_alerts', 'n_over_threshold', 'n_ioc', 'n_impersonation', 'search_text']) {
+      expect(ingestRow[field]).toEqual(ntfyRow[field])
     }
-    const last = await pollNtfy(env)
-    expect(last.cursor).toBe('goodmsg')
-    const rows = await env.DB.prepare('SELECT id FROM notifications ORDER BY time').all()
-    expect(rows.results.map((r) => r.id)).toEqual(['goodmsg'])
+  })
+
+  it('rejects a bad signature', async () => {
+    const { env: e } = await withKeys()
+    const ts = Math.floor(Date.now() / 1000)
+    const res = await ingestDocument(e, '{"event":"trustsight.alerts","tool":"trustsight"}',
+      headersFor('bad', ts, 'v1=AAAA'))
+    expect(res.ok).toBe(false)
+    expect(res.status).toBe(401)
+  })
+
+  it('rejects a stale timestamp', async () => {
+    const { privateKey, env: e } = await withKeys()
+    const old = Math.floor(Date.now() / 1000) - REPLAY_WINDOW_SECONDS - 10
+    const doc = '{"event":"trustsight.alerts","tool":"trustsight","title":"t"}'
+    const sig = await sign(privateKey, 'stale', old, doc)
+    const res = await ingestDocument(e, doc, headersFor('stale', old, sig))
+    expect(res.status).toBe(401)
+    expect(res.error).toBe('stale')
+  })
+
+  it('rejects a request missing the signature headers', async () => {
+    const { env: e } = await withKeys()
+    const res = await ingestDocument(e, '{}', new Headers({}))
+    expect(res.status).toBe(400)
+  })
+
+  it('is idempotent for a replayed id', async () => {
+    const { privateKey, env: e } = await withKeys()
+    const ts = Math.floor(Date.now() / 1000)
+    const doc = '{"event":"trustsight.alerts","tool":"trustsight","title":"t"}'
+    const sig = await sign(privateKey, 'replay', ts, doc)
+    const first = await ingestDocument(e, doc, headersFor('replay', ts, sig))
+    expect(first.stored).toBe(true)
+    const second = await ingestDocument(e, doc, headersFor('replay', ts, sig))
+    expect(second.ok).toBe(true)      // the signature is valid; it is deduped
+    expect(second.stored).toBe(false)
+    const n = await env.DB.prepare('SELECT COUNT(*) AS n FROM notifications').first()
+    expect(n.n).toBe(1)
+  })
+
+  it('refuses an unknown key id rather than falling back', async () => {
+    const { privateKey, env: e } = await withKeys()
+    const ts = Math.floor(Date.now() / 1000)
+    const doc = '{"event":"trustsight.alerts","tool":"trustsight"}'
+    const sig = await sign(privateKey, 'unknown', ts, doc)
+    const headers = headersFor('unknown', ts, sig)
+    headers.set('webhook-key-id', 'nope')
+    const res = await ingestDocument(e, doc, headers)
+    expect(res.status).toBe(401)
+    expect(res.error).toBe('unknown_key')
   })
 })

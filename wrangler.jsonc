@@ -37,10 +37,6 @@
       "simple": { "limit": 120, "period": 60 }
     }
   ],
-  "triggers": {
-    // Poll well under ntfy's ~12h message cache so nothing is missed.
-    "crons": ["*/5 * * * *"]
-  },
   "routes": [
     { "pattern": "watcher.trustsight.org", "custom_domain": true }
   ],

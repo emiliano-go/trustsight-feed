@@ -1,5 +1,5 @@
 import { handleApi } from './api.js'
-import { pollNtfy } from './poller.js'
+import { ingestDocument, MAX_BODY_BYTES } from './ingest.js'
 
 function rateLimited() {
   return new Response(JSON.stringify({ error: 'rate_limited' }), {
@@ -47,6 +47,22 @@ async function health(env) {
   }
 }
 
+/** POST /api/ingest: verify the Ed25519 signature, then store the document. */
+async function ingest(request, env) {
+  const json = { 'content-type': 'application/json; charset=utf-8' }
+  if (request.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'method_not_allowed' }), { status: 405, headers: json })
+  }
+  const raw = await request.text()
+  if (raw.length > MAX_BODY_BYTES) {
+    return new Response(JSON.stringify({ error: 'too_large' }), { status: 413, headers: json })
+  }
+  const result = await ingestDocument(env, raw, request.headers)
+  const status = result.status || (result.ok ? 200 : 401)
+  const body = result.ok ? { stored: result.stored, id: result.id } : { error: result.error }
+  return new Response(JSON.stringify(body), { status, headers: json })
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url)
@@ -71,6 +87,9 @@ export default {
         const { success } = await env.API_LIMITER.limit({ key })
         if (!success) return rateLimited()
       }
+      // The signed direct-ingest route. The watcher POSTs the alert document
+      // here (outbound), so the feed never polls ntfy.
+      if (url.pathname === '/api/ingest') return ingest(request, env)
       const response = await handleApi(request, env, url)
       if (response) return response
       return new Response(JSON.stringify({ error: 'not_found' }), {
@@ -82,16 +101,5 @@ export default {
     // Static frontend; `not_found_handling: single-page-application` turns
     // the detail routes (/<date>/<time>/) into the app shell.
     return env.ASSETS.fetch(request)
-  },
-
-  async scheduled(_event, env, ctx) {
-    ctx.waitUntil((async () => {
-      try {
-        const result = await pollNtfy(env)
-        console.log('poll result', JSON.stringify(result))
-      } catch (err) {
-        console.error('poll threw', err && err.stack ? err.stack : String(err))
-      }
-    })())
   },
 }
