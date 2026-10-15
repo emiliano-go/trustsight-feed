@@ -233,9 +233,11 @@ async function diff(env, url, name) {
   const cached = await cacheRead(env, 'diff', name, '')
   if (cached && !cached.stale) return done(cached.content)
 
+  // A split package's repository is its pkgbase, not its pkgname.
+  const repo = await resolvePkgbase(env, name)
   let res
   try {
-    res = await fetch(`${AUR_PATCH}?h=${encodeURIComponent(name)}`, {
+    res = await fetch(`${AUR_PATCH}?h=${encodeURIComponent(repo)}`, {
       headers: { 'user-agent': 'trustsight-feed/1.0' },
     })
   } catch {
@@ -365,8 +367,37 @@ async function fetchRepoFiles(name) {
   }
 }
 
-function sourceResponse(name, file, content, requested) {
-  const body = { package: name, file, content }
+/**
+ * The AUR pkgbase for a package name. A split package's pkgname differs from
+ * its repository name (the pkgbase), and cgit addresses the repository by
+ * pkgbase, so `h=<pkgname>` returns 404 for every package of a split. The
+ * mapping is read from the AUR RPC and cached.
+ */
+async function resolvePkgbase(env, name) {
+  const now = Math.floor(Date.now() / 1000)
+  const row = await env.DB.prepare('SELECT pkgbase, fetched_at FROM pkgbase_cache WHERE name = ?').bind(name).first()
+  if (row && now - row.fetched_at <= MAINTAINER_CACHE_TTL) return row.pkgbase
+  let pkgbase = name
+  try {
+    const res = await fetch(`${AUR_RPC_INFO}?arg[]=${encodeURIComponent(name)}`, {
+      headers: { 'user-agent': 'trustsight-feed/1.0' },
+    })
+    if (res.ok) {
+      const body = await res.json()
+      const entry = (body.results || [])[0]
+      if (entry && entry.PackageBase) pkgbase = entry.PackageBase
+    }
+  } catch {
+    /* keep the name */
+  }
+  await env.DB.prepare(
+    `INSERT INTO pkgbase_cache (name, pkgbase, fetched_at) VALUES (?, ?, ?)
+     ON CONFLICT(name) DO UPDATE SET pkgbase = excluded.pkgbase, fetched_at = excluded.fetched_at`
+  ).bind(name, pkgbase, now).run()
+  return pkgbase
+}
+
+function sourceResponse(name, file, content, requested) {  const body = { package: name, file, content }
   if (requested && requested !== file) body.requested = requested
   return new Response(JSON.stringify(body), {
     status: 200,
@@ -385,7 +416,8 @@ async function source(env, url, name) {
   const cached = await cacheRead(env, 'source', name, file)
   if (cached && !cached.stale) return sourceResponse(name, cached.actualFile || file, cached.content, file)
 
-  const direct = await fetchAurFile(name, file)
+  const repo = await resolvePkgbase(env, name)
+  const direct = await fetchAurFile(repo, file)
   if (direct.text !== undefined) {
     await cacheWrite(env, 'source', name, file, direct.text, file)
     return sourceResponse(name, file, direct.text)
@@ -399,12 +431,12 @@ async function source(env, url, name) {
   // for example `<pkgname>.install` where the repository holds a differently
   // named `.install`. Offer the repository's files and serve the same-extension
   // one, so the source view still opens.
-  const available = await fetchRepoFiles(name)
+  const available = await fetchRepoFiles(repo)
   const dot = file.lastIndexOf('.')
   const ext = dot > 0 ? file.slice(dot) : ''
   const match = ext ? available.find((candidate) => candidate.endsWith(ext) && candidate !== file) : null
   if (match) {
-    const alt = await fetchAurFile(name, match)
+    const alt = await fetchAurFile(repo, match)
     if (alt.text !== undefined) {
       await cacheWrite(env, 'source', name, file, alt.text, match)
       return sourceResponse(name, match, alt.text, file)
