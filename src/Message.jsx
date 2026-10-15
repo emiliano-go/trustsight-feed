@@ -36,7 +36,7 @@ function Refusals({ refusals }) {
             {findings.length ? (
               <>
                 <p className="pkg__meta">What the analysis could not resolve:</p>
-                <Findings findings={findings} />
+                <FindingsOrSource packageName={refusal.package} findings={findings} />
               </>
             ) : (
               <p className="pkg__meta">A construct in this recipe could not be resolved, so part of the change was not read.</p>
@@ -140,15 +140,131 @@ function Findings({ findings }) {
         const loc = locationLabel(f)
         return (
           <li className="finding" key={`${f.rule_id}-${i}`}>
-            <RuleChip id={f.rule_id} />
-            {loc
-              ? <code className="finding__loc">{loc}</code>
-              : <span className="finding__loc finding__loc--none" title="This signal names a fact about the change, not a line">no line</span>}
-            {f.reason ? <span className="finding__reason">{f.reason}</span> : null}
+            <div className="finding__head">
+              <RuleChip id={f.rule_id} />
+              {loc
+                ? <pre className="finding__loc">{loc}</pre>
+                : <span className="finding__loc finding__loc--none" title="This signal names a fact about the change, not a line">no line</span>}
+            </div>
+            {f.reason ? <p className="finding__reason">{f.reason}</p> : null}
           </li>
         )
       })}
     </ul>
+  )
+}
+
+/**
+ * The source of the artifact the findings fired on, read from the AUR
+ * repository and shown with the flagged lines highlighted. The line numbers
+ * are from the analysed revision; a newer revision may have moved them, which
+ * the note under the code says.
+ */
+function SourceView({ packageName, files, findings }) {
+  const [file, setFile] = useState(files[0])
+  const [state, setState] = useState({ loading: true })
+
+  useEffect(() => {
+    let live = true
+    setState({ loading: true })
+    fetch(`/api/source/${encodeURIComponent(packageName)}?file=${encodeURIComponent(file)}`)
+      .then(async (res) => {
+        const body = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(body.error === 'not_found' ? 'Not in the AUR repository.' : `HTTP ${res.status}`)
+        return body
+      })
+      .then((body) => { if (live) setState({ content: String(body.content || '') }) })
+      .catch((err) => { if (live) setState({ error: String(err && err.message ? err.message : err) }) })
+    return () => { live = false }
+  }, [packageName, file])
+
+  const byLine = new Map()
+  for (const f of findings) {
+    if (f.file !== file || !f.line) continue
+    if (!byLine.has(f.line)) byLine.set(f.line, [])
+    byLine.get(f.line).push(f)
+  }
+  const lines = state.content === undefined ? [] : state.content.split('\n')
+
+  return (
+    <div className="source">
+      {files.length > 1 ? (
+        <div className="source__files">
+          {files.map((name) => (
+            <button
+              type="button"
+              key={name}
+              className={`source__file${name === file ? ' is-on' : ''}`}
+              aria-pressed={name === file}
+              onClick={() => setFile(name)}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {state.loading ? <p className="pkg__meta">Loading {file}…</p> : null}
+      {state.error ? <p className="feed-error">Could not load {file}: {state.error}</p> : null}
+
+      {state.content !== undefined ? (
+        <>
+          <div className="source__code">
+            {lines.map((text, i) => {
+              const lineNo = i + 1
+              const hits = byLine.get(lineNo)
+              return (
+                <div
+                  className={`source__line${hits ? ' source__line--hit' : ''}`}
+                  key={lineNo}
+                  title={hits ? hits.map((h) => h.reason).filter(Boolean).join(' | ') : undefined}
+                >
+                  <span className="source__no">{lineNo}</span>
+                  <span className="source__text">
+                    {text || ' '}
+                    {hits ? (
+                      <span className="source__hits">
+                        {hits.map((h, j) => <RuleChip key={`${h.rule_id}-${j}`} id={h.rule_id} />)}
+                      </span>
+                    ) : null}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+          <p className="source__note">
+            Read from the AUR repository as it is now. The line numbers are from the revision the
+            watcher analysed, so a newer revision may have moved them.
+          </p>
+        </>
+      ) : null}
+    </div>
+  )
+}
+
+function ViewToggle({ view, onChange }) {
+  return (
+    <div className="view-switch" role="group" aria-label="Findings or source">
+      <button type="button" className={view === 'findings' ? 'is-on' : ''} aria-pressed={view === 'findings'} onClick={() => onChange('findings')}>Findings</button>
+      <button type="button" className={view === 'source' ? 'is-on' : ''} aria-pressed={view === 'source'} onClick={() => onChange('source')}>Source</button>
+    </div>
+  )
+}
+
+/** The findings list, with a switch to the highlighted source beside it. */
+function FindingsOrSource({ packageName, findings }) {
+  const [view, setView] = useState('findings')
+  const files = [...new Set(findings.map((f) => f.file).filter(Boolean))]
+  if (!files.length) return <Findings findings={findings} />
+  return (
+    <>
+      <div className="pkg__viewrow">
+        <ViewToggle view={view} onChange={setView} />
+      </div>
+      {view === 'source'
+        ? <SourceView packageName={packageName} files={files} findings={findings} />
+        : <Findings findings={findings} />}
+    </>
   )
 }
 
@@ -178,7 +294,7 @@ function PackageSections({ packages }) {
             {findings.length ? (
               <>
                 <p className="pkg__meta">What fired, and the line that triggered it:</p>
-                <Findings findings={findings} />
+                <FindingsOrSource packageName={pkg.package} findings={findings} />
               </>
             ) : (
               <p className="pkg__meta">No located findings in this entry.</p>

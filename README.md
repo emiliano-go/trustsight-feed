@@ -61,8 +61,11 @@ page is one compressed HTML response; the app then fetches `/api/feed`.
 - `/` the feed, newest first, with search and event filters.
 - `/<YYYY-MM-DD>/<HHMMSS>/` one notification, split into explained sections:
   new alerts, packages over threshold (each with its rule breakdown), IOC
-  matches, and campaigns. The full JSON is hidden behind a Show JSON button.
-  A same-second collision appends the ntfy id to keep the slug unique.
+  matches, and campaigns. Each flagged package has a Findings/Source switch:
+  Source shows the analysed file from the AUR repository with the flagged lines
+  highlighted and the rule named on each one. The full JSON is hidden behind a
+  Show JSON button. A same-second collision appends the ntfy id to keep the slug
+  unique.
 
 On a phone, a rule explanation opens as a modal (a bottom sheet) rather than a
 hover box, and every control is sized for touch.
@@ -83,6 +86,10 @@ A read-only JSON API over the same store, with an OpenAPI 3.1 description:
 - `/api/package/{name}` and `/api/rule/{id}` everything mentioning a package or
   fired by a rule.
 - `/api/messages/{slug}`, `/api/stats`.
+- `/api/source/{package}?file=PKGBUILD` the analysed AUR file, unmodified, so a
+  client can show the flagged lines. Only AUR repository files resolve; the
+  host is fixed and the path is validated, so a finding cannot make the Worker
+  fetch an arbitrary URL.
 - `/health` (and `/healthz`) liveness and readiness: `ok` with the schema
   version and the time of the most recent notification, or `503` when the
   database is unreachable. Not rate limited.

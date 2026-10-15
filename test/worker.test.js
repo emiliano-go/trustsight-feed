@@ -290,6 +290,14 @@ describe('api endpoints', () => {
     }
   })
 
+  it('validates a source request before fetching upstream', async () => {
+    // A traversal, an absolute path or an off-pattern name never reaches the
+    // upstream fetch.
+    expect((await SELF.fetch('https://example.com/api/source/pkg?file=../etc/passwd')).status).toBe(400)
+    expect((await SELF.fetch('https://example.com/api/source/pkg?file=/etc/passwd')).status).toBe(400)
+    expect((await SELF.fetch('https://example.com/api/source/bad%20name')).status).toBe(400)
+  })
+
   it('handles CORS preflight', async () => {
     const res = await SELF.fetch('https://example.com/api/latest', { method: 'OPTIONS' })
     expect(res.status).toBe(204)

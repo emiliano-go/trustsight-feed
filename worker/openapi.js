@@ -246,10 +246,38 @@ export const openapiSpec = {
         },
       },
     },
+    '/api/source/{package}': {
+      get: {
+        tags: ['Facets'],
+        summary: 'The analysed source file',
+        description: 'The AUR repository file the findings point at (PKGBUILD by default), returned unmodified so a client can show the flagged lines. Only files in the AUR repository resolve; a file inside a downloaded source tarball does not.',
+        parameters: [
+          { name: 'package', in: 'path', required: true, schema: { type: 'string' }, example: 'yay' },
+          { name: 'file', in: 'query', schema: { type: 'string', default: 'PKGBUILD' }, example: 'PKGBUILD', description: 'A file path in the AUR repository.' },
+        ],
+        responses: {
+          200: {
+            description: 'The file.',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    package: { type: 'string' },
+                    file: { type: 'string' },
+                    content: { type: 'string' },
+                  },
+                },
+              },
+            },
+          },
+          400: BAD_REQUEST, 404: NOT_FOUND, 429: RATE_LIMITED,
+        },
+      },
+    },
     '/api/stats': {
       get: {
-        tags: ['Meta'],
-        summary: 'Aggregate counts',
+        tags: ['Meta'],        summary: 'Aggregate counts',
         description: 'Totals over alert documents.',
         responses: {
           200: {

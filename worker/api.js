@@ -21,6 +21,7 @@ const ENDPOINTS = [
   'GET /api/package/{name}',
   'GET /api/rule/{id}',
   'GET /api/messages/{slug}',
+  'GET /api/source/{package}?file=PKGBUILD',
   'GET /api/stats',
 ]
 
@@ -219,7 +220,37 @@ function index() {
   return json({ name: 'trustsight-feed', endpoints: ENDPOINTS })
 }
 
-/** Dispatch an API request, or return null when the path is not ours. */
+// The AUR artifact the analysis read. The feed serves it back, unmodified, so
+// the detail page can show the source with the flagged lines highlighted. The
+// host is fixed (never a package-declared URL) and the size is capped.
+const AUR_CGIT = 'https://aur.archlinux.org/cgit/aur.git/plain'
+const MAX_SOURCE_BYTES = 512 * 1024
+const PACKAGE_RE = /^[A-Za-z0-9@._+-]{1,255}$/
+const SOURCE_FILE_RE = /^[A-Za-z0-9@._+/-]{1,255}$/
+
+async function source(env, url, name) {
+  if (!PACKAGE_RE.test(name)) return json({ error: 'bad_package' }, 400)
+  const file = url.searchParams.get('file') || 'PKGBUILD'
+  if (!SOURCE_FILE_RE.test(file) || file.includes('..') || file.startsWith('/')) {
+    return json({ error: 'bad_file' }, 400)
+  }
+  let upstream
+  try {
+    upstream = await fetch(`${AUR_CGIT}/${encodeURIComponent(file)}?h=${encodeURIComponent(name)}`, {
+      headers: { 'user-agent': 'trustsight-feed/1.0' },
+    })
+  } catch {
+    return json({ error: 'upstream_unreachable' }, 502)
+  }
+  if (upstream.status === 404) return json({ error: 'not_found', package: name, file }, 404)
+  if (!upstream.ok) return json({ error: `upstream_${upstream.status}` }, 502)
+  const text = await upstream.text()
+  if (text.length > MAX_SOURCE_BYTES) return json({ error: 'too_large', package: name, file }, 413)
+  return new Response(JSON.stringify({ package: name, file, content: text }), {
+    status: 200,
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'public, max-age=300', ...CORS },
+  })
+}/** Dispatch an API request, or return null when the path is not ours. */
 export async function handleApi(request, env, url) {
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS })
@@ -252,6 +283,9 @@ export async function handleApi(request, env, url) {
   }
   if ((match = path.match(/^\/api\/rule\/(.+)$/))) {
     return bySearch(env, url, decodeURIComponent(match[1]))
+  }
+  if ((match = path.match(/^\/api\/source\/(.+)$/))) {
+    return source(env, url, decodeURIComponent(match[1]))
   }
   if (path.startsWith('/api/messages/')) {
     const slug = decodeURIComponent(path.slice('/api/messages/'.length))
