@@ -322,7 +322,7 @@
   "d001": {
     "id": "D001",
     "name": "Novel Dependency Added",
-    "severity": "HIGH",
+    "severity": "MEDIUM",
     "categoryTitle": "Naming and Dependencies",
     "description": "A dependency name appears that has never been observed anywhere in the AUR. Either a typo or a package created specifically to be pulled in.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/naming-and-dependency/#d001"
