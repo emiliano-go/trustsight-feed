@@ -46,36 +46,13 @@ function unresolvedNames(findings) {
 }
 
 /**
- * Map a unified diff onto the current file: the set of added line numbers, and
- * the removed lines keyed by the line number they precede. This is what lets
- * the source view show the change in place.
+ * True when *text* contains *name* as a whole shell token, not as a
+ * substring: an unresolved `owner` must not match `ownership`.
  */
-function parseFileDiff(diffText, names) {
-  const added = new Set()
-  const delsBefore = new Map()
-  if (!diffText) return { added, delsBefore }
-  let inFile = false
-  let newLine = 0
-  for (const line of diffText.split('\n')) {
-    if (line.startsWith('diff --git ')) {
-      const m = line.match(/ b\/(.+)$/)
-      inFile = Boolean(m) && names.includes(m[1])
-      continue
-    }
-    if (!inFile) continue
-    if (line.startsWith('@@')) {
-      const m = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
-      newLine = m ? Number(m[1]) : 0
-      continue
-    }
-    if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('index ') || line.startsWith('\\')) continue
-    if (line.startsWith('+')) { added.add(newLine); newLine += 1 }
-    else if (line.startsWith('-')) {
-      if (!delsBefore.has(newLine)) delsBefore.set(newLine, [])
-      delsBefore.get(newLine).push(line.slice(1))
-    } else if (line.startsWith(' ')) { newLine += 1 }
-  }
-  return { added, delsBefore }
+function containsToken(text, name) {
+  if (!text || !name) return false
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`(?:^|[^A-Za-z0-9_])${escaped}(?:$|[^A-Za-z0-9_])`).test(text)
 }
 
 /** The maintainer and upstream URLs a PKGBUILD declares. */
@@ -515,7 +492,7 @@ function SourceView({ packageName, files, findings }) {
   if (names.size) {
     const carriers = findings.filter((f) => parseUnresolved(f.reason).length)
     lines.forEach((text, i) => {
-      if (!text || ![...names].some((name) => text.includes(name))) return
+      if (!text || ![...names].some((name) => containsToken(text, name))) return
       const lineNo = i + 1
       unresolvedLines.add(lineNo)
       if (!byLine.has(lineNo)) byLine.set(lineNo, [])
@@ -524,17 +501,6 @@ function SourceView({ packageName, files, findings }) {
       }
     })
   }
-
-  // Merge the diff in place: added lines get a green row, removed lines are
-  // inserted red before the line they preceded.
-  const diffInfo = parseFileDiff(state.diff, [file, state.actualFile].filter(Boolean))
-  const rows = []
-  lines.forEach((text, i) => {
-    const lineNo = i + 1
-    for (const removed of diffInfo.delsBefore.get(lineNo) || []) rows.push({ kind: 'del', text: removed, no: null })
-    rows.push({ kind: diffInfo.added.has(lineNo) ? 'add' : 'ctx', text, no: lineNo })
-  })
-  for (const removed of diffInfo.delsBefore.get(lines.length + 1) || []) rows.push({ kind: 'del', text: removed, no: null })
 
   return (
     <div className="source">
@@ -569,14 +535,15 @@ function SourceView({ packageName, files, findings }) {
             <p className="source__note">Showing {state.actualFile}, the matching file in the repository.</p>
           ) : null}
           <div className="source__code">
-            {rows.map((row, i) => {
-              const hits = row.no ? byLine.get(row.no) : null
-              const cls = `source__line${row.kind !== 'ctx' ? ` source__line--${row.kind}` : ''}${hits ? ' source__line--hit' : ''}${row.no && unresolvedLines.has(row.no) ? ' source__line--unresolved' : ''}`
+            {lines.map((text, i) => {
+              const lineNo = i + 1
+              const hits = byLine.get(lineNo)
+              const cls = `source__line${hits ? ' source__line--hit' : ''}${unresolvedLines.has(lineNo) ? ' source__line--unresolved' : ''}`
               return (
-                <div className={cls} key={i} title={hits ? hits.map((h) => h.reason).filter(Boolean).join(' | ') : undefined}>
-                  <span className="source__no">{row.no || ''}</span>
+                <div className={cls} key={lineNo} title={hits ? hits.map((h) => h.reason).filter(Boolean).join(' | ') : undefined}>
+                  <span className="source__no">{lineNo}</span>
                   <span className="source__text">
-                    {row.text || ' '}
+                    {text || ' '}
                     {hits ? (
                       <span className="source__hits">
                         {hits.map((h, j) => <RuleChip key={`${h.rule_id}-${j}`} id={h.rule_id} />)}

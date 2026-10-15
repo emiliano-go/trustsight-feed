@@ -496,11 +496,6 @@ a.chip:hover { border-color: var(--accent); color: var(--accent); }
 .diff__line--add { background: color-mix(in srgb, var(--plate-green) 18%, transparent); }
 .diff__line--del { background: color-mix(in srgb, var(--plate-red) 20%, transparent); }
 
-/* The diff merged into the source view: added rows green, removed rows red. */
-.source__line--add { background: color-mix(in srgb, var(--plate-green) 18%, transparent); }
-.source__line--del { background: color-mix(in srgb, var(--plate-red) 20%, transparent); }
-.source__line--del .source__no { color: var(--plate-red); }
-
 /* A severity edge on every finding, so each rule is visually distinct. */
 .finding { border-left: 3px solid var(--rule); }
 .finding--critical, .finding--fatal, .finding--high { border-left-color: var(--plate-red); }
