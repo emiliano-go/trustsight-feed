@@ -502,6 +502,10 @@ function SourceView({ packageName, files, findings }) {
     })
   }
 
+  // Findings on this file with no line to point at (a missing checksum, an
+  // unread construct): named here, since the code cannot highlight them.
+  const fileNoLine = findings.filter((f) => f.file === file && !f.line)
+
   return (
     <div className="source">
       {pickerFiles.length > 1 ? (
@@ -554,6 +558,12 @@ function SourceView({ packageName, files, findings }) {
               )
             })}
           </div>
+          {fileNoLine.length ? (
+            <p className="source__note">
+              Flagged in this file, with no single line to point at:
+              {' '}<span className="source__hits">{fileNoLine.map((f, i) => <RuleChip key={`${f.rule_id}-${i}`} id={f.rule_id} />)}</span>
+            </p>
+          ) : null}
           <p className="source__note">
             Read from the AUR repository as it is now. The line numbers are from the revision the
             watcher analysed, so a newer revision may have moved them.
