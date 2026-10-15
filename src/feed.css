@@ -361,25 +361,43 @@ a.chip:hover { border-color: var(--accent); color: var(--accent); }
 
 .rule-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 12px;
   margin: 14px 0 0;
 }
 
 .rule-card {
-  display: block;
-  padding: 15px 17px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 18px;
   border: 1px solid var(--rule);
   border-left: 3px solid var(--accent);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--bg) 60%, var(--fg) 3%);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg) 58%, var(--fg) 3%);
 }
+.rule-card--critical, .rule-card--fatal, .rule-card--high { border-left-color: var(--plate-red); }
+.rule-card--medium { border-left-color: var(--plate-amber); }
+.rule-card--low, .rule-card--info { border-left-color: var(--fg-muted); }
 
-.rule-card__head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
-.rule-card__id { font-family: var(--font-mono); font-size: 0.7647rem; font-weight: 700; color: var(--accent); }
-.rule-card__name { font-size: 0.9412rem; font-weight: 700; color: var(--fg); }
-.rule-card__desc { margin: 0 0 12px; color: var(--fg-muted); font-size: 0.8824rem; line-height: 1.6; }
-.rule-card__link { font-family: var(--font-mono); font-size: 0.7647rem; }
+.rule-card__head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.rule-card__id {
+  font-family: var(--font-mono);
+  font-size: 0.7059rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+}
+.rule-card__name { flex: 1; font-size: 0.9412rem; font-weight: 700; color: var(--fg); }
+.rule-card__cat {
+  font-family: var(--font-mono);
+  font-size: 0.6471rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.rule-card__desc { margin: 4px 0 2px; color: var(--fg-muted); font-size: 0.8824rem; line-height: 1.6; }
+.rule-card__link { margin-top: 4px; font-family: var(--font-mono); font-size: 0.7059rem; }
 .rule-card__tap { display: block; margin-top: 4px; color: var(--fg-muted); font-family: var(--font-mono); font-size: 0.7059rem; }
 
 .rule-card--compact {

@@ -109,7 +109,7 @@ export function RuleCard({ id }) {
     return (
       <button
         type="button"
-        className="rule-card rule-card--compact"
+        className={`rule-card rule-card--compact rule-card--${sev ? sev.toLowerCase() : 'info'}`}
         onClick={() => openRuleExplanation(id)}
         aria-label={`Rule ${id}${rule ? `: ${rule.name}` : ''}. Tap for the full explanation.`}
       >
@@ -124,12 +124,13 @@ export function RuleCard({ id }) {
   }
 
   return (
-    <article className="rule-card">
+    <article className={`rule-card rule-card--${sev ? sev.toLowerCase() : 'info'}`}>
       <header className="rule-card__head">
         <span className="rule-card__id">{id}</span>
         <span className="rule-card__name">{rule ? rule.name : 'Unknown rule'}</span>
         {sev ? <span className={`sev ${severityClass(sev)}`}>{sev}</span> : null}
       </header>
+      {rule && rule.categoryTitle ? <span className="rule-card__cat">{rule.categoryTitle}</span> : null}
       <p className="rule-card__desc">
         {rule && rule.description
           ? renderMarkdown(rule.description, rule.docsUrl)
