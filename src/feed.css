@@ -491,26 +491,39 @@ a.chip:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ---------- context cards (maintainer, upstream, manifests) ---------- */
 
-.context { margin: 14px 0 0; }
-.context__cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.context { margin: 16px 0 0; }
+
+/* Two equal cards side by side; the manifest card spans the full row. */
+.context__cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .context__card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px;
+  gap: 8px;
+  min-width: 0;
+  padding: 16px 18px;
   border: 1px solid var(--rule);
   border-left: 3px solid var(--accent);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--bg) 60%, var(--fg) 3%);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg) 55%, var(--fg) 4%);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
+.context__card:hover { background: color-mix(in srgb, var(--bg) 50%, var(--fg) 6%); }
+
 .context__title {
   font-family: var(--font-mono);
   font-size: 0.6471rem;
-  letter-spacing: 0.1em;
+  font-weight: 600;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--fg-muted);
 }
-.context__value { font-size: 0.8824rem; color: var(--fg); word-break: break-word; }
+.context__value { font-size: 0.9412rem; line-height: 1.4; color: var(--fg); overflow-wrap: anywhere; }
+
 .context__card--add {
   border-left-color: var(--plate-green);
   background: color-mix(in srgb, var(--plate-green) 10%, var(--bg));
@@ -519,6 +532,7 @@ a.chip:hover { border-color: var(--accent); color: var(--accent); }
   border-left-color: var(--plate-red);
   background: color-mix(in srgb, var(--plate-red) 10%, var(--bg));
 }
+.context__card--wide { grid-column: 1 / -1; }
 
 /* ---------- maintainers ---------- */
 
@@ -528,8 +542,9 @@ a.chip:hover { border-color: var(--accent); color: var(--accent); }
 .maintainer__count { font-family: var(--font-mono); font-size: 0.7647rem; color: var(--fg-muted); }
 .maintainer__pkgs { display: flex; flex-wrap: wrap; gap: 8px; flex: 1 1 240px; }
 .maintainer__pkgs a { font-family: var(--font-mono); font-size: 0.7647rem; color: var(--accent); }
-.context__note { font-size: 0.7647rem; color: var(--fg-muted); }
+.context__note { margin-top: auto; font-size: 0.7647rem; color: var(--fg-muted); }
 .context__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-family: var(--font-mono); font-size: 0.7059rem; }
+.context__list li { overflow-wrap: anywhere; }
 .context__list a { word-break: break-all; }
 
 .refresh-button { white-space: nowrap; }

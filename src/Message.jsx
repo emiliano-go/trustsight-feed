@@ -170,7 +170,7 @@ function ContextBlock({ packageName, findings }) {
             : null}
         </article>
         {manifestFiles.length ? (
-          <article className="context__card">
+          <article className="context__card context__card--wide">
             <span className="context__title">Upstream manifests</span>
             <ul className="context__list">
               {manifestFiles.map((f) => <li key={f}><code className="md-code">{f}</code></li>)}
