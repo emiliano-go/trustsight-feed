@@ -15,6 +15,37 @@ export const ENTRY_TYPES = {
   ioc: 'A match against signed, federated known-bad indicators. Reported outside the heuristic score, so it is shown whatever the package scored.',
   campaign_cluster: 'A pattern shared across packages in a window (a host, a literal, an adopter). A campaign invisible in any single diff becomes visible in the set.',
   impersonation: 'Many name-clones of a popular package published under one account. The one alert a reviewer must not skim past.',
+  refusal: 'A construct the analysis could not resolve, so part of this change was not read. The run is not a clean read; the finding names what was unresolved and where.',
+}
+
+/** Packages the analysis could not fully read, with what it could not resolve. */
+function Refusals({ refusals }) {
+  if (!refusals.length) return null
+  return (
+    <section className="detail__section">
+      <h2>Could not fully read ({refusals.length})</h2>
+      <p className="detail__explain">{ENTRY_TYPES.refusal}</p>
+      {refusals.map((refusal, i) => {
+        const findings = refusal.findings || []
+        return (
+          <article className="pkg" key={`${refusal.package}-${i}`}>
+            <header className="pkg__head">
+              <a className="pkg__name" href={AUR_PACKAGE(refusal.package)} target="_blank" rel="noreferrer">{refusal.package}</a>
+              {refusal.reason ? <span className="pkg__version">{refusal.reason}</span> : null}
+            </header>
+            {findings.length ? (
+              <>
+                <p className="pkg__meta">What the analysis could not resolve:</p>
+                <Findings findings={findings} />
+              </>
+            ) : (
+              <p className="pkg__meta">A construct in this recipe could not be resolved, so part of the change was not read.</p>
+            )}
+          </article>
+        )
+      })}
+    </section>
+  )
 }
 
 // What each campaign kind means, in one line, so a reader knows the shape
@@ -306,12 +337,13 @@ export function Message({ slug }) {
               </div>
             ) : null}
 
+            <Refusals refusals={payload.refusals || []} />
             <AlertList alerts={alerts} overPackages={overPackages} />
             <PackageSections packages={packages} />
             <IocSection matches={ioc} />
             <Campaigns payload={payload} />
 
-            {!alerts.length && !packages.length && !ioc.length && !alertingClusters(payload).length && !(payload.impersonation || []).length ? (
+            {!alerts.length && !packages.length && !ioc.length && !alertingClusters(payload).length && !(payload.impersonation || []).length && !(payload.refusals || []).length ? (
               <p className="feed-empty">This document carries no alerts, packages, indicators or campaigns.</p>
             ) : null}
 
