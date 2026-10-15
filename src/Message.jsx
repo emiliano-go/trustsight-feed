@@ -19,6 +19,32 @@ export const ENTRY_TYPES = {
   refusal: 'A construct the analysis could not resolve, so part of this change was not read. The run is not a clean read; the finding names what was unresolved and where.',
 }
 
+/**
+ * The unresolved constructs a finding names, e.g. X026's
+ * `... functions: _uid <- package` becomes `{ name: '_uid', func: 'package' }`.
+ * Empty for a finding that is not about an unresolved construct.
+ */
+function parseUnresolved(reason) {
+  if (!reason || !/unresolved/i.test(reason)) return []
+  const tail = reason.slice(reason.lastIndexOf(':') + 1).trim()
+  return tail
+    .split(/[,;]+/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((pair) => {
+      const [name, fn] = pair.split('<-').map((part) => part.trim())
+      return { name, func: fn ? fn.replace(/\(\)$/, '') : '' }
+    })
+    .filter((entry) => entry.name)
+}
+
+/** The unresolved names across a set of findings, for the source highlight. */
+function unresolvedNames(findings) {
+  const names = new Set()
+  for (const f of findings) for (const entry of parseUnresolved(f.reason)) names.add(entry.name)
+  return names
+}
+
 /** Packages the analysis could not fully read, with what it could not resolve. */
 function Refusals({ refusals }) {
   if (!refusals.length) return null
@@ -28,12 +54,28 @@ function Refusals({ refusals }) {
       <p className="detail__explain">{ENTRY_TYPES.refusal}</p>
       {refusals.map((refusal, i) => {
         const findings = refusal.findings || []
+        const unresolved = findings.flatMap((f) => parseUnresolved(f.reason))
         return (
           <article className="pkg" key={`${refusal.package}-${i}`}>
             <header className="pkg__head">
               <a className="pkg__name" href={AUR_PACKAGE(refusal.package)} target="_blank" rel="noreferrer">{refusal.package}</a>
-              {refusal.reason ? <span className="pkg__version">{refusal.reason}</span> : null}
             </header>
+            {refusal.reason ? <p className="pkg__meta">{refusal.reason}</p> : null}
+            {unresolved.length ? (
+              <div className="unresolved">
+                <span className="pkg__label">Not resolved</span>
+                <ul className="unresolved__list">
+                  {unresolved.map((entry, j) => (
+                    <li key={`${entry.name}-${j}`}>
+                      <code className="md-code">{entry.name}</code>
+                      {entry.func
+                        ? <span className="unresolved__from">referenced from <code className="md-code">{entry.func}()</code></span>
+                        : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             {findings.length ? (
               <>
                 <p className="pkg__meta">What the analysis could not resolve:</p>
@@ -123,8 +165,8 @@ function AlertList({ alerts, overPackages }) {
             <a className="pkg__name" href={AUR_PACKAGE(group.package)} target="_blank" rel="noreferrer">{group.package}</a>
             <span className="pkg__version">{group.rules.length} rule{group.rules.length === 1 ? '' : 's'}</span>
           </header>
-          <div className="rule-cards">
-            {group.rules.map((id) => <RuleCard key={id} id={id} />)}
+          <div className="ref-list">
+            {group.rules.map((id) => <RuleChip key={id} id={id} />)}
           </div>
         </article>
       ))}
@@ -139,6 +181,8 @@ function Findings({ findings }) {
     <ul className="findings">
       {findings.map((f, i) => {
         const loc = locationLabel(f)
+        const rule = ruleInfo(f.rule_id)
+        const unresolved = parseUnresolved(f.reason)
         return (
           <li className="finding" key={`${f.rule_id}-${i}`}>
             <div className="finding__head">
@@ -148,6 +192,20 @@ function Findings({ findings }) {
                 : <span className="finding__loc finding__loc--none" title="This signal names a fact about the change, not a line">no line</span>}
             </div>
             {f.reason ? <p className="finding__reason">{f.reason}</p> : null}
+            {unresolved.length ? (
+              <p className="finding__unresolved">
+                Not resolved:
+                {unresolved.map((entry, j) => (
+                  <span key={`${entry.name}-${j}`}>
+                    {' '}<code className="md-code">{entry.name}</code>
+                    {entry.func
+                      ? <span className="unresolved__from"> referenced from <code className="md-code">{entry.func}()</code></span>
+                      : null}
+                  </span>
+                ))}
+              </p>
+            ) : null}
+            {rule && rule.description ? <p className="finding__explain">{renderMarkdown(rule.description, rule.docsUrl)}</p> : null}
           </li>
         )
       })}
@@ -180,6 +238,9 @@ function SourceView({ packageName, files, findings }) {
     return () => { live = false }
   }, [packageName, file])
 
+  const lines = state.content === undefined ? [] : state.content.split('\n')
+  const pickerFiles = state.available && state.available.length ? state.available : files
+
   // Highlight the findings for the requested file name, even when the
   // repository holds the same file under a different name.
   const byLine = new Map()
@@ -188,8 +249,22 @@ function SourceView({ packageName, files, findings }) {
     if (!byLine.has(f.line)) byLine.set(f.line, [])
     byLine.get(f.line).push(f)
   }
-  const lines = state.content === undefined ? [] : state.content.split('\n')
-  const pickerFiles = state.available && state.available.length ? state.available : files
+  // An unresolved construct has no line in the finding, so find it by name in
+  // the source and flag the line that references it.
+  const names = unresolvedNames(findings)
+  const unresolvedLines = new Set()
+  if (names.size) {
+    const carriers = findings.filter((f) => parseUnresolved(f.reason).length)
+    lines.forEach((text, i) => {
+      if (!text || ![...names].some((name) => text.includes(name))) return
+      const lineNo = i + 1
+      unresolvedLines.add(lineNo)
+      if (!byLine.has(lineNo)) byLine.set(lineNo, [])
+      for (const f of carriers) {
+        if (!byLine.get(lineNo).some((h) => h.rule_id === f.rule_id)) byLine.get(lineNo).push(f)
+      }
+    })
+  }
 
   return (
     <div className="source">
@@ -229,7 +304,7 @@ function SourceView({ packageName, files, findings }) {
               const hits = byLine.get(lineNo)
               return (
                 <div
-                  className={`source__line${hits ? ' source__line--hit' : ''}`}
+                  className={`source__line${hits ? ' source__line--hit' : ''}${unresolvedLines.has(lineNo) ? ' source__line--unresolved' : ''}`}
                   key={lineNo}
                   title={hits ? hits.map((h) => h.reason).filter(Boolean).join(' | ') : undefined}
                 >
@@ -257,27 +332,90 @@ function SourceView({ packageName, files, findings }) {
 }
 
 function ViewToggle({ view, onChange }) {
+  const views = [['findings', 'Findings'], ['source', 'Source'], ['diff', 'Diff']]
   return (
-    <div className="view-switch" role="group" aria-label="Findings or source">
-      <button type="button" className={view === 'findings' ? 'is-on' : ''} aria-pressed={view === 'findings'} onClick={() => onChange('findings')}>Findings</button>
-      <button type="button" className={view === 'source' ? 'is-on' : ''} aria-pressed={view === 'source'} onClick={() => onChange('source')}>Source</button>
+    <div className="view-switch" role="group" aria-label="Findings, source or diff">
+      {views.map(([value, label]) => (
+        <button key={value} type="button" className={view === value ? 'is-on' : ''} aria-pressed={view === value} onClick={() => onChange(value)}>{label}</button>
+      ))}
     </div>
   )
 }
 
-/** The findings list, with a switch to the highlighted source beside it. */
+/**
+ * The latest AUR commit as a unified diff. This is where a removed construct
+ * shows: the deleted lines are rendered red and the added ones green, so what
+ * disappeared from the recipe is visible even when the current file no longer
+ * contains it.
+ */
+function DiffView({ packageName }) {
+  const [state, setState] = useState({ loading: true })
+
+  useEffect(() => {
+    let live = true
+    setState({ loading: true })
+    fetch(`/api/diff/${encodeURIComponent(packageName)}`)
+      .then(async (res) => {
+        const body = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(body.error ? `Could not load (${body.error}).` : `HTTP ${res.status}`)
+        return body
+      })
+      .then((body) => { if (live) setState({ diff: String(body.diff || '') }) })
+      .catch((err) => { if (live) setState({ error: String(err && err.message ? err.message : err) }) })
+    return () => { live = false }
+  }, [packageName])
+
+  const text = state.diff || ''
+  const start = text.indexOf('diff --git')
+  const body = start >= 0 ? text.slice(start) : text
+  const lines = body ? body.split('\n') : []
+
+  function lineClass(line) {
+    if (line.startsWith('diff --git') || line.startsWith('index ') || line.startsWith('---') ||
+        line.startsWith('+++') || line.startsWith('@@') || line.startsWith('new file') ||
+        line.startsWith('deleted file') || line.startsWith('similarity') || line.startsWith('rename ') ||
+        line.startsWith('old mode') || line.startsWith('new mode')) {
+      return 'diff__line diff__line--meta'
+    }
+    if (line.startsWith('+')) return 'diff__line diff__line--add'
+    if (line.startsWith('-')) return 'diff__line diff__line--del'
+    return 'diff__line'
+  }
+
+  return (
+    <div className="diff">
+      {state.loading ? <p className="pkg__meta">Loading diff…</p> : null}
+      {state.error ? <p className="feed-error">Could not load the diff: {state.error}</p> : null}
+      {state.diff !== undefined && !lines.length ? <p className="pkg__meta">No diff for the latest commit.</p> : null}
+      {lines.length ? (
+        <>
+          <div className="diff__code">
+            {lines.map((line, i) => <div className={lineClass(line)} key={i}>{line || ' '}</div>)}
+          </div>
+          <p className="source__note">
+            Diff of the latest AUR commit, the change the watcher alerted on. Removed lines are red;
+            added lines are green.
+          </p>
+        </>
+      ) : null}
+    </div>
+  )
+}
+
+/** The findings list, with a switch to the highlighted source or the diff. */
 function FindingsOrSource({ packageName, findings }) {
   const [view, setView] = useState('findings')
   const files = [...new Set(findings.map((f) => f.file).filter(Boolean))]
-  if (!files.length) return <Findings findings={findings} />
   return (
     <>
       <div className="pkg__viewrow">
         <ViewToggle view={view} onChange={setView} />
       </div>
       {view === 'source'
-        ? <SourceView packageName={packageName} files={files} findings={findings} />
-        : <Findings findings={findings} />}
+        ? <SourceView packageName={packageName} files={files.length ? files : ['PKGBUILD']} findings={findings} />
+        : view === 'diff'
+          ? <DiffView packageName={packageName} />
+          : <Findings findings={findings} />}
     </>
   )
 }

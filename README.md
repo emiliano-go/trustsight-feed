@@ -93,6 +93,14 @@ A read-only JSON API over the same store, with an OpenAPI 3.1 description:
   another name (for example `<pkgname>.install` against an actual `.install`) the
   same-extension file is served, and on a miss the repository's file list is
   returned so the client can offer it.
+- `/api/diff/{package}` the latest AUR commit as a unified diff, so the page can
+  show what changed, including the removed lines.
+
+Source and diff are fetched from the AUR at most once per day per file and then
+served from the `source_cache` table, so a page view never reaches the AUR. The
+exact revision the watcher analysed is not stored; the current repository file
+is served, and the newest diff, which is usually the change that triggered the
+alert.
 - `/health` (and `/healthz`) liveness and readiness: `ok` with the schema
   version and the time of the most recent notification, or `503` when the
   database is unreachable. Not rate limited.

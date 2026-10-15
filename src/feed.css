@@ -436,6 +436,47 @@ a.chip:hover { border-color: var(--accent); color: var(--accent); }
   font-style: italic;
 }
 .finding__reason { display: block; margin: 8px 0 0; color: var(--fg-muted); font-size: 0.8529rem; }
+.finding__unresolved { margin: 8px 0 0; color: var(--fg-muted); font-size: 0.8235rem; }
+.finding__explain {
+  margin: 8px 0 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--rule);
+  color: var(--fg-muted);
+  font-size: 0.8235rem;
+  line-height: 1.6;
+}
+
+.pkg__label {
+  display: block;
+  margin: 0 0 6px;
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6471rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.unresolved { margin: 12px 0 0; }
+.unresolved__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.unresolved__list li { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.unresolved__from { color: var(--fg-muted); font-size: 0.8235rem; }
+
+/* ---------- diff viewer ---------- */
+
+.diff { margin: 12px 0 0; }
+.diff__code {
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--bg) 60%, var(--fg) 4%);
+  font-family: var(--font-mono);
+  font-size: 0.7647rem;
+  line-height: 1.55;
+}
+.diff__line { padding: 0 12px; white-space: pre-wrap; word-break: break-word; }
+.diff__line--meta { color: var(--fg-muted); background: color-mix(in srgb, var(--fg) 5%, transparent); }
+.diff__line--add { background: color-mix(in srgb, var(--plate-green) 18%, transparent); }
+.diff__line--del { background: color-mix(in srgb, var(--plate-red) 20%, transparent); }
 
 /* ---------- findings / source switch ---------- */
 
@@ -508,6 +549,8 @@ a.chip:hover { border-color: var(--accent); color: var(--accent); }
 .source__text { padding: 0 12px; white-space: pre-wrap; word-break: break-word; }
 .source__line--hit { background: color-mix(in srgb, var(--plate-amber) 15%, transparent); }
 .source__line--hit .source__no { color: var(--plate-amber); font-weight: 700; }
+.source__line--unresolved { background: color-mix(in srgb, var(--plate-red) 16%, transparent); }
+.source__line--unresolved .source__no { color: var(--plate-red); font-weight: 700; }
 .source__hits { display: inline-flex; gap: 6px; flex-wrap: wrap; margin-left: 8px; vertical-align: middle; }
 .source__note { margin: 8px 0 0; color: var(--fg-muted); font-size: 0.7647rem; }
 

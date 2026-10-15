@@ -22,6 +22,7 @@ const ENDPOINTS = [
   'GET /api/rule/{id}',
   'GET /api/messages/{slug}',
   'GET /api/source/{package}?file=PKGBUILD',
+  'GET /api/diff/{package}',
   'GET /api/stats',
 ]
 
@@ -220,12 +221,61 @@ function index() {
   return json({ name: 'trustsight-feed', endpoints: ENDPOINTS })
 }
 
+/** The latest AUR commit as a unified diff, so the page can show what was removed. */
+async function diff(env, url, name) {
+  if (!PACKAGE_RE.test(name)) return json({ error: 'bad_package' }, 400)
+  const done = (text) => new Response(JSON.stringify({ package: name, diff: text }), {
+    status: 200,
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'public, max-age=3600', ...CORS },
+  })
+
+  const cached = await cacheRead(env, 'diff', name, '')
+  if (cached && !cached.stale) return done(cached.content)
+
+  let res
+  try {
+    res = await fetch(`${AUR_PATCH}?h=${encodeURIComponent(name)}`, {
+      headers: { 'user-agent': 'trustsight-feed/1.0' },
+    })
+  } catch {
+    return cached ? done(cached.content) : json({ error: 'upstream_unreachable' }, 502)
+  }
+  if (!res.ok) return cached ? done(cached.content) : json({ error: `upstream_${res.status}` }, 502)
+  const text = await res.text()
+  if (text.length > MAX_DIFF_BYTES) return json({ error: 'too_large', package: name }, 413)
+  await cacheWrite(env, 'diff', name, '', text, '')
+  return done(text)
+}
+
 // The AUR artifact the analysis read. The feed serves it back, unmodified, so
 // the detail page can show the source with the flagged lines highlighted. The
 // host is fixed (never a package-declared URL) and the size is capped.
 const AUR_CGIT = 'https://aur.archlinux.org/cgit/aur.git/plain'
 const AUR_TREE = 'https://aur.archlinux.org/cgit/aur.git/tree/'
+const AUR_PATCH = 'https://aur.archlinux.org/cgit/aur.git/patch/'
 const MAX_SOURCE_BYTES = 512 * 1024
+const MAX_DIFF_BYTES = 1024 * 1024
+//: How long a fetched AUR file is served from the store before it is fetched
+//: again. A page view never reaches the AUR; only the first view after this.
+const SOURCE_CACHE_TTL = 86400
+
+async function cacheRead(env, kind, name, file) {
+  const row = await env.DB.prepare(
+    'SELECT content, actual_file, fetched_at FROM source_cache WHERE package = ? AND file = ? AND kind = ?'
+  ).bind(name, file, kind).first()
+  if (!row) return null
+  const age = Math.floor(Date.now() / 1000) - row.fetched_at
+  return { content: row.content, actualFile: row.actual_file, stale: age > SOURCE_CACHE_TTL }
+}
+
+async function cacheWrite(env, kind, name, file, content, actualFile) {
+  await env.DB.prepare(
+    `INSERT INTO source_cache (package, file, kind, actual_file, content, fetched_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(package, file, kind) DO UPDATE SET
+       content = excluded.content, actual_file = excluded.actual_file, fetched_at = excluded.fetched_at`
+  ).bind(name, file, kind, actualFile || '', content, Math.floor(Date.now() / 1000)).run()
+}
 const PACKAGE_RE = /^[A-Za-z0-9@._+-]{1,255}$/
 const SOURCE_FILE_RE = /^[A-Za-z0-9@._+/-]{1,255}$/
 
@@ -266,7 +316,7 @@ function sourceResponse(name, file, content, requested) {
   if (requested && requested !== file) body.requested = requested
   return new Response(JSON.stringify(body), {
     status: 200,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'public, max-age=300', ...CORS },
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'public, max-age=3600', ...CORS },
   })
 }
 
@@ -277,9 +327,19 @@ async function source(env, url, name) {
     return json({ error: 'bad_file' }, 400)
   }
 
+  // Serve from the store first, so a page view never reaches the AUR.
+  const cached = await cacheRead(env, 'source', name, file)
+  if (cached && !cached.stale) return sourceResponse(name, cached.actualFile || file, cached.content, file)
+
   const direct = await fetchAurFile(name, file)
-  if (direct.text !== undefined) return sourceResponse(name, file, direct.text)
-  if (direct.error) return json({ error: direct.error }, 502)
+  if (direct.text !== undefined) {
+    await cacheWrite(env, 'source', name, file, direct.text, file)
+    return sourceResponse(name, file, direct.text)
+  }
+  if (direct.error) {
+    if (cached) return sourceResponse(name, cached.actualFile || file, cached.content, file)
+    return json({ error: direct.error }, 502)
+  }
 
   // Missing: a finding may name a file differently than the repository does,
   // for example `<pkgname>.install` where the repository holds a differently
@@ -291,10 +351,16 @@ async function source(env, url, name) {
   const match = ext ? available.find((candidate) => candidate.endsWith(ext) && candidate !== file) : null
   if (match) {
     const alt = await fetchAurFile(name, match)
-    if (alt.text !== undefined) return sourceResponse(name, match, alt.text, file)
+    if (alt.text !== undefined) {
+      await cacheWrite(env, 'source', name, file, alt.text, match)
+      return sourceResponse(name, match, alt.text, file)
+    }
   }
+  if (cached) return sourceResponse(name, cached.actualFile || file, cached.content, file)
   return json({ error: 'not_found', package: name, file, available }, 404)
-}/** Dispatch an API request, or return null when the path is not ours. */
+}
+
+/** Dispatch an API request, or return null when the path is not ours. */
 export async function handleApi(request, env, url) {
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS })
@@ -330,6 +396,9 @@ export async function handleApi(request, env, url) {
   }
   if ((match = path.match(/^\/api\/source\/(.+)$/))) {
     return source(env, url, decodeURIComponent(match[1]))
+  }
+  if ((match = path.match(/^\/api\/diff\/(.+)$/))) {
+    return diff(env, url, decodeURIComponent(match[1]))
   }
   if (path.startsWith('/api/messages/')) {
     const slug = decodeURIComponent(path.slice('/api/messages/'.length))

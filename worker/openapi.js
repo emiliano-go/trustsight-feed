@@ -275,6 +275,25 @@ export const openapiSpec = {
         },
       },
     },
+    '/api/diff/{package}': {
+      get: {
+        tags: ['Facets'],
+        summary: 'The latest AUR commit as a diff',
+        description: 'The unified diff of the package\'s latest AUR commit, so a client can show what changed, including removed lines. These are the changes the watcher alerts on.',
+        parameters: [{ name: 'package', in: 'path', required: true, schema: { type: 'string' }, example: 'inkdrop' }],
+        responses: {
+          200: {
+            description: 'The diff.',
+            content: {
+              'application/json': {
+                schema: { type: 'object', properties: { package: { type: 'string' }, diff: { type: 'string' } } },
+              },
+            },
+          },
+          400: BAD_REQUEST, 429: RATE_LIMITED,
+        },
+      },
+    },
     '/api/stats': {
       get: {
         tags: ['Meta'],        summary: 'Aggregate counts',
