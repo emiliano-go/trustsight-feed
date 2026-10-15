@@ -74,7 +74,7 @@ describe('lib parsing', () => {
       ],
     }
     expect(alertingClusters(payload).map((c) => c.rule_id)).toEqual(['G002'])
-    expect(pickHeadline(payload)).toBe('campaign across 2 packages (G002)')
+    expect(pickHeadline(payload)).toBe('Campaign across 2 packages (G002)')
     // With nothing left, the headline falls through, not to a fake campaign.
     expect(pickHeadline({ campaign_cluster: [{ rule_id: 'H061', members: ['sdl2'], count: 1 }] }, 'TrustSight: alive'))
       .toBe('TrustSight: alive')

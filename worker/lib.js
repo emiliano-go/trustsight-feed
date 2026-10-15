@@ -191,7 +191,7 @@ export function pickHeadline(payload, fallback = '') {
   if (clusters.length) {
     const top = clusters.reduce((a, b) =>
       (b.count > a.count || (b.count === a.count && String(b.rule_id) > String(a.rule_id))) ? b : a)
-    return `campaign across ${top.count} packages (${top.rule_id})`
+    return `Campaign across ${top.count} packages (${top.rule_id})`
   }
 
   const refusals = payload.refusals || []
