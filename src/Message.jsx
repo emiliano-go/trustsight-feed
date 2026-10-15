@@ -364,6 +364,10 @@ function AlertList({ alerts, overPackages }) {
   const all = groupAlerts(alerts)
   const groups = all.filter((group) => !overPackages.has(group.package))
   const alsoOver = all.length - groups.length
+  // Explain each rule once for the whole batch. A campaign fires the same rule
+  // on many packages, so a card per package repeated the same text dozens of
+  // times; the legend explains it once and the packages stay compact.
+  const distinctRules = [...new Set(groups.flatMap((group) => group.rules))].sort()
   return (
     <section className="detail__section">
       <h2>New alerts ({alerts.length})</h2>
@@ -373,6 +377,14 @@ function AlertList({ alerts, overPackages }) {
           {alsoOver} of these package{alsoOver === 1 ? '' : 's'} {alsoOver === 1 ? 'is' : 'are'} also
           over threshold, shown in full below.
         </p>
+      ) : null}
+      {distinctRules.length ? (
+        <>
+          <span className="pkg__label">Rules in this batch ({distinctRules.length})</span>
+          <div className="rule-cards">
+            {distinctRules.map((id) => <RuleCard key={id} id={id} />)}
+          </div>
+        </>
       ) : null}
       {groups.map((group) => (
         <article className="pkg" key={group.package}>

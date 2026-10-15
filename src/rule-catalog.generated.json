@@ -4,7 +4,7 @@
     "name": "Setuid File In Artifact",
     "severity": "HIGH",
     "categoryTitle": "Artifact",
-    "description": "A setuid/setgid file the recipe cannot justify (justification is a documented mode intent).",
+    "description": "The conservative default fires and the reviewer decides.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/artifact/#a001"
   },
   "a002": {
@@ -36,7 +36,7 @@
     "name": "Unusual Artifact Mode",
     "severity": "INFO",
     "categoryTitle": "Artifact",
-    "description": "World-writable files or executables in unusual paths.",
+    "description": "The L1 C018 rule's artifact twin.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/artifact/#a005"
   },
   "a006": {
@@ -60,7 +60,7 @@
     "name": "eBPF Artifact In Package",
     "severity": "HIGH",
     "categoryTitle": "Artifact",
-    "description": "An eBPF object or loader shipped in the package - the Atomic Arch rootkit's artifact shape.",
+    "description": "Inspection only; nothing is loaded or executed.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/artifact/#a008"
   },
   "c001": {
@@ -124,7 +124,7 @@
     "name": "Unread Content Moved Under A Stable Version",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "A submodule gitlink, Git-LFS object id, or committed opaque/binary member changed, and `pkgver`/`pkgrel`/`epoch` did not.",
+    "description": "The [upstream-payload gap](../../explanation/what-trustsight-cannot-see.md) is real: a checksummed tarball's bytes are not in the diff, so a recipe can look untouched while the code it builds is replaced. What *is* in the diff is the carrier's **identity** - the checksum, the commit, the object id - and a change to that with no version change is the same event [H033](#h033) already claims for a git ref and [C001](#c001) for a checksum.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c008"
   },
   "c009": {
@@ -132,7 +132,7 @@
     "name": "Unread Content Moved With The Version",
     "severity": "INFO",
     "categoryTitle": "Integrity and Verification",
-    "description": "The same carriers as [C008](#c008), moving alongside a version bump.",
+    "description": "The ordinary reading, reported so that the pair is visible rather than only the alarming half. A reader comparing two revisions can see that the bytes behind the pointer changed even though no content appears in the diff.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c009"
   },
   "c010": {
@@ -140,7 +140,7 @@
     "name": "Binary Metadata File",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "A `PKGBUILD`, `.SRCINFO`, or `*.install` file is binary, so git emitted no diff body for it.",
+    "description": "A binary metadata file is never legitimate, and it is the most direct way to skip the analysis: git emits only `Binary files ... differ`, so every rule sees an empty change, while the shell still sources the file normally and `bash -c 'source PKGBUILD'` reads it byte for byte. A single NUL byte is enough, and a `.gitattributes` `-diff` or `binary` marker does the same without one.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c010"
   },
   "c011": {
@@ -148,7 +148,7 @@
     "name": "Prebuilt Binary From Non-Upstream Host",
     "severity": "MEDIUM",
     "categoryTitle": "Integrity and Verification",
-    "description": "A package whose name ends in `-bin` declares an added",
+    "description": "A `-bin` package ships a prebuilt binary, so the PKGBUILD is not the thing that runs: whatever the source URL serves is. When that URL is on a host unrelated to the project's declared upstream, the only evidence available is the host itself, and the reviewer has to decide whether the mirror is trustworthy.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c011"
   },
   "c012": {
@@ -156,7 +156,7 @@
     "name": "Source Domain Resembles Declared Upstream",
     "severity": "MEDIUM",
     "categoryTitle": "Deception and Anti-Analysis",
-    "description": "The recipe's declared `url=` is on a trusted forge or official",
+    "description": "[R013b](system.md#r013) catches only mixed-script homoglyph domains, and the package/dependency typosquat never looks at domains, so a pure-ASCII mis-spell of the upstream's own host was invisible. The `url=` is declared by the same party under review, so this is a heuristic: it names a near-miss for a reviewer to judge. Eligibility is limited to a trusted-forge or official upstream, which keeps the near-miss meaningful - a source host resembling an *unknown* upstream is not evidence of impersonation.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/deception/#c012"
   },
   "c013": {
@@ -164,7 +164,7 @@
     "name": "Source Fork Diverges From Declared Upstream",
     "severity": "MEDIUM",
     "categoryTitle": "Integrity and Verification",
-    "description": "The recipe's `url=` names a trusted-forge project",
+    "description": "The recipe says the upstream is one project and the code comes from a fork of it. That is the shape of a maintainer fork, which is a legitimate `-git` packaging choice, so the rule names the divergence rather than asserting intent: a reviewer sees that the bytes built are not the ones the declared upstream publishes. The same repository name is required, which keeps an unrelated package by the same owner quiet, and a cross-forge source is deliberately not claimed - a mirror on another forge is common and is not evidence on its own. `url=` is declared by the same party under review, so the rule is a heuristic, not proof.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c013"
   },
   "c014": {
@@ -172,7 +172,7 @@
     "name": "Array Order Manipulation",
     "severity": "MEDIUM",
     "categoryTitle": "Integrity and Verification",
-    "description": "A checksum array's entries change relative order while the",
+    "description": "Set semantics discard position, so a hash shuffled away from the slot a reviewer checks was invisible. A pure reformat - reorder with no content change and no `SKIP` movement - stands down via `[thresholds] c014.require_content_change` (default true). Measured on the locked benign corpus: 0/3,739.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c014"
   },
   "c015": {
@@ -180,7 +180,7 @@
     "name": "Fetch In package()",
     "severity": "HIGH",
     "categoryTitle": "Fetch and Execution",
-    "description": "A fetch client at a command position in the `package()`",
+    "description": "Reads `RecipeDoc.functions[\"package\"]` only. A client name inside a quoted dependency list or a comment is not a fetch, and `python -m pip install .` (a local install) stands down because the interpreter arm requires a scheme-bearing address on the line. Measured on the locked benign corpus: 7/3,739 (0.19%).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#c015"
   },
   "c016": {
@@ -188,7 +188,7 @@
     "name": "Interpreter Invocation In Install Hook",
     "severity": "HIGH",
     "categoryTitle": "Fetch and Execution",
-    "description": "An interpreter or explicit shell (`bash -c`, `sh`,",
+    "description": "Only complete `.install` files are read (see the `partial_file_analysis` coverage gap). Measured on the locked benign corpus: 0/3,739.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#c016"
   },
   "c017": {
@@ -196,7 +196,7 @@
     "name": "Install Hook Writes To A User-Writable Location",
     "severity": "HIGH",
     "categoryTitle": "Install and Persistence",
-    "description": "A hook writes to `$HOME`/`~`, `/root`, `/tmp`,",
+    "description": "System destinations (`/etc/skel`, `/usr/...`) are not this rule's business; the S-series and H032/H038 own hook writes to system paths. Measured on the locked benign corpus: 0/3,739.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#c017"
   },
   "c018": {
@@ -204,7 +204,7 @@
     "name": "Executable File Committed",
     "severity": "MEDIUM",
     "categoryTitle": "Integrity and Verification",
-    "description": "An added file carries git's executable mode",
+    "description": "A projection of the typed `DiffFile.new_mode`; no new walker. Measured on the locked benign corpus: 0/3,739.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c018"
   },
   "c019": {
@@ -212,7 +212,7 @@
     "name": "File Renamed",
     "severity": "INFO",
     "categoryTitle": "Integrity and Verification",
-    "description": "The diff declares a `rename from`/`rename to` pair.",
+    "description": "A projection of the typed `DiffFile.rename_from`/`rename_to`. A pure rename carries no hunk, so the parser materialises the file from its rename metadata alone. Measured on the locked benign corpus: 0/3,739.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c019"
   },
   "c020": {
@@ -220,7 +220,7 @@
     "name": "Credentials In A Source URL",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "A gained `source=()` entry carries userinfo before the",
+    "description": "The evidence names the host only; the credential value itself is never printed. Measured on the locked benign corpus: 0/3,739.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c020"
   },
   "c021": {
@@ -228,7 +228,7 @@
     "name": "Dependency Removal During A Build Change",
     "severity": "HIGH",
     "categoryTitle": "Composition",
-    "description": "`checkdepends` or `optdepends` loses an entry while",
+    "description": "Dropping `checkdepends` eliminates the test-suite execution that would catch a payload; the conjunction with a build change is what makes the removal suspicious rather than hygienic. `optdepends` removal is far more often ordinary cleanup, so it stays MEDIUM. Measured on the locked benign corpus: 27/3,739 (0.72%) combined, the published calibration floor; the fire-rate gate clears `checkdepends` for HIGH.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/composition/#c021"
   },
   "c022": {
@@ -236,7 +236,7 @@
     "name": "Checksum Strength Downgraded",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "The strongest checksum array a recipe carried has its",
+    "description": "Stands down when every checksum array was removed together - H002 owns that shape. Measured on the locked benign corpus: 43/3,739 (1.15%), every firing a declared strongest-array removal; the rate is published as the calibration floor.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c022"
   },
   "c023": {
@@ -244,7 +244,7 @@
     "name": "IP-Literal Source Host",
     "severity": "MEDIUM",
     "categoryTitle": "Integrity and Verification",
-    "description": "A gained source host parses as an IPv4 or IPv6 literal",
+    "description": "Direct-IP fetches are a C2 shape that generic novelty under-weights. Measured on the locked benign corpus: 0/3,739.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c023"
   },
   "c024": {
@@ -252,7 +252,7 @@
     "name": "Install Script Not Declared",
     "severity": "MEDIUM",
     "categoryTitle": "Composition",
-    "description": "A diff adds or modifies a `*.install` file while the",
+    "description": "The dangling-declaration half (an `install=` naming an absent file) needs tree knowledge and is not yet filed. Measured on the locked benign corpus: 12/3,739 (0.32%).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/composition/#c024"
   },
   "c025": {
@@ -260,7 +260,7 @@
     "name": "Hardening Option Disabled",
     "severity": "LOW",
     "categoryTitle": "Staging and Reconnaissance",
-    "description": "`options=()` gains a hardening-disabling entry",
+    "description": "Debug packages set these routinely, so the benign fire rate is the published number that decides this rule's weight. Measured on the locked benign corpus: 20/3,739 (0.53%).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/staging-and-recon/#c025"
   },
   "c026": {
@@ -268,7 +268,7 @@
     "name": "Empty File Added",
     "severity": "INFO",
     "categoryTitle": "Integrity and Verification",
-    "description": "An added file has no hunks. Marker files and placeholder",
+    "description": "A projection of the typed `DiffFile` status and hunk count. Measured on the locked benign corpus: 0/3,739.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c026"
   },
   "c027": {
@@ -276,13 +276,13 @@
     "name": "Declared Install Script Is Absent",
     "severity": "INFO",
     "categoryTitle": "Integrity and Verification",
-    "description": "The `install=` scalar names a file the diff and the tree do",
+    "description": "Almost always benign (recipe drift, a reverted declaration), so it is INFO. Requires tree knowledge: without the manifest, the file's absence could just be an unchanged file outside the hunk, so the rule never fires on a bare diff (never guess). The inverse of C024, which owns an `.install` shipped without a declaration.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c027"
   },
   "c028": {
     "id": "C028",
     "name": "Build Cache Outside The Build Trees",
-    "severity": "",
+    "severity": "INFO",
     "categoryTitle": "Staging and Reconnaissance",
     "description": "Fires when the diff adds a build step (`go build`, `cargo fetch`, `npm ci`, ...) that will cache outside `$srcdir`/`$pkgdir` (Go module cache, Cargo registry, npm cache) and the recipe does not override the cache directory. This is a failure by omission, not malice, so it is INFO and weight 0; it reports that the build will write outside the build trees.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/staging-and-recon/#c028"
@@ -292,7 +292,7 @@
     "name": "Backup Array Gains Entries",
     "severity": "INFO",
     "categoryTitle": "Install and Persistence",
-    "description": "`backup=()` gains at least one entry. backup-listed",
+    "description": "Annotation-tier by default: adding a backup entry is a deliberate, usually legitimate declaration, so it carries no score and is recorded for the reader rather than treated as suspicion.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#c029"
   },
   "c030": {
@@ -300,7 +300,7 @@
     "name": "Epoch Removed With Version Unchanged",
     "severity": "INFO",
     "categoryTitle": "Maintainer and Metadata",
-    "description": "A diff drops `epoch=` while `pkgver` and `pkgrel` are",
+    "description": "Removing an epoch is usually legitimate, so this is annotation-tier: it carries no score and only records that the version-ordering override silently disappeared. `H063` owns the introduction; `C030` the removal.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#c030"
   },
   "c031": {
@@ -308,7 +308,7 @@
     "name": "Boot Or System Image Tool Run During Build",
     "severity": "HIGH",
     "categoryTitle": "Install and Persistence",
-    "description": "A build-time function (`prepare`/`build`/`check`/",
+    "description": "H095 covers the same tools when they name a path from the source tree; this covers the tool run against the live host (`mkinitcpio -P`, `grub-install /dev/sda`, `update-initramfs -u`), which names no build path. A package that builds must not rewrite the builder's boot configuration. Install hooks are where these legitimately run, so `post_upgrade() { mkinitcpio -P; }` stays silent; only the build-time functions are in scope. Measured on the locked benign corpus: 0/3,739.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#c031"
   },
   "coverage": {
@@ -356,7 +356,7 @@
     "name": "Added-Text Compression Ratio",
     "severity": "MEDIUM",
     "categoryTitle": "Entropy",
-    "description": "The added lines compress below `[thresholds] e001.max_ratio`.",
+    "description": "A highly compressible addition is repetitive, the shape of a packed or padded payload. Silent unless the threshold is set.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/entropy/#e001"
   },
   "e002": {
@@ -364,7 +364,7 @@
     "name": "Encoded-Alphabet Fraction",
     "severity": "MEDIUM",
     "categoryTitle": "Entropy",
-    "description": "At least `[thresholds] e002.min_fraction` of the added tokens are base64/base32/hex runs of at least `e002.min_length` (default 64) characters.",
+    "description": "The alphabet sets are X029's, applied as a statistic rather than a staging predicate.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/entropy/#e002"
   },
   "e003": {
@@ -372,7 +372,7 @@
     "name": "Identifier Entropy",
     "severity": "MEDIUM",
     "categoryTitle": "Entropy",
-    "description": "The entropy of newly assigned variable/function names falls outside the configured band - unigram Shannon entropy (`e003.min_entropy`..`e003.max_entropy`) or **bigram** entropy (`e003.min_bigram`..`e003.max_bigram`).",
+    "description": "The second-order statistic keeps the structure a unigram distribution flattens, so it separates generated names (`a`, `b`, `x1` - few bigrams) from packed names more reliably.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/entropy/#e003"
   },
   "g001": {
@@ -380,7 +380,7 @@
     "name": "Shared Gained Host",
     "severity": "HIGH",
     "categoryTitle": "Correlation",
-    "description": "The same gained canonical host appears in `[thresholds] g_host.min_packages` (default 5) distinct packages within the cycle window.",
+    "description": "atomic-arch's signature: a new CDN added by many unrelated packages at once.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g001"
   },
   "g002": {
@@ -388,7 +388,7 @@
     "name": "Shared Added Literal",
     "severity": "HIGH",
     "categoryTitle": "Correlation",
-    "description": "An identical added literal above `[thresholds] g_blob.min_length` (default 256) characters appears in `g_blob.min_packages` (default 2) unrelated packages in the window.",
+    "description": "The literal's content is never printed - only its length and the members.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g002"
   },
   "g003": {
@@ -396,7 +396,7 @@
     "name": "Coordinated Adoption",
     "severity": "MEDIUM",
     "categoryTitle": "Correlation",
-    "description": "One maintainer key adopts at least `[thresholds] g_adopt.min_members` (default 3) packages in the window.",
+    "description": "Adoption is the temporal engine's own predicate - H044 (ownership transition) or H086 (orphan-to-maintained) - recorded per package, not a bare maintainer-change. The finding's `predicates` names which T instance the group joined on; H074 (mass adoption) is the cross-package aggregation this rule performs.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g003"
   },
   "g004": {
@@ -404,7 +404,7 @@
     "name": "Shared Upstream Dependency",
     "severity": "HIGH",
     "categoryTitle": "Correlation",
-    "description": "The same upstream dependency (and host), added to a committed manifest, appears in at least `[thresholds] g_dep.min_packages` (default 2) packages in the window.",
+    "description": "The committed-manifest counterpart to G001: a dependency name and remote host that many packages gain in the same window is the same-new-upstream-dependency campaign shape. It reads the recorded `upstream_dep_additions` view (the U-series dependency additions); the engine ships and is unit-tested, and the corpus feed that fills the view is the same pending work G002's literal feed is.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g004"
   },
   "g005": {
@@ -412,7 +412,7 @@
     "name": "Impersonation Campaign",
     "severity": "HIGH",
     "categoryTitle": "Correlation",
-    "description": "One maintainer publishes at least `[thresholds] g_impersonation.min_members` (default 3) packages in the window whose names resemble a *far* more popular AUR package (the corpus H029 check over AUR vote counts).",
+    "description": "The registry-impersonation campaign shape: many near-identical name-clones of popular packages under a fresh account (`yyay`/`yay`, `parru`/`paru`, …). Where H029 reports one clone, G005 names the campaign - its maintainer, the member count, and the impersonated targets - so a flood of typosquats reads as one alert, not N. It fires only on the per-package impersonation evidence, so a maintainer updating their own legitimate variant family is not a campaign.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g005"
   },
   "g006": {
@@ -420,15 +420,15 @@
     "name": "Neighborhood Under Campaign Alert",
     "severity": "INFO",
     "categoryTitle": "Correlation",
-    "description": "While a campaign is active (see [Campaign Alert Mode](../../explanation/campaign-alert-mode.md)), a package in the window *gains* a host or domain in that campaign's scope, without itself being corroborated.",
+    "description": "The cytokine effect: an alerted neighborhood raises the surrounding tissue's readiness. It is reported, never scored, in v1 - \"touches an alerted neighborhood\" names a context, not a behaviour - and it never forbids a clean verdict. Only *gained* hosts count.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g006"
   },
   "g007": {
     "id": "G007",
     "name": "Campaign Corroboration",
-    "severity": "INFO",
+    "severity": "INFO,",
     "categoryTitle": "Correlation",
-    "description": "A review run whose package, or a host it newly gained, stands in the scope of an active campaign.",
+    "description": "Trained immunity, scored: while a campaign is primed, a package in its scope earns `+min(5, corroboration_count)` points, once, as one attributable breakdown entry carrying `campaign_id`. Bounded so a wide campaign cannot inflate a run, and inert when no campaign is active (the calibration corpus carries none). See [Campaign Alert Mode](../../explanation/campaign-alert-mode.md).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g007"
   },
   "h001": {
@@ -588,7 +588,7 @@
     "name": "Very Recent Update",
     "severity": "INFO",
     "categoryTitle": "Temporal Context",
-    "description": "AUR HEAD commit is less than 72 hours old.",
+    "description": "Packages updated moments ago have not been visible to the community long enough for anyone to vet them. Combined with other signals - maintainer change, new source domains - recency escalates suspicion.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#h020"
   },
   "h021": {
@@ -596,7 +596,7 @@
     "name": "Brand New Package",
     "severity": "INFO",
     "categoryTitle": "Temporal Context",
-    "description": "The package's first commit on AUR is less than 30 days old.",
+    "description": "A package that barely exists has no reputation. An established package with a recent update is routine; a package uploaded last week has zero track record.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#h021"
   },
   "h022": {
@@ -604,7 +604,7 @@
     "name": "Stale Package Revived",
     "severity": "MEDIUM",
     "categoryTitle": "Temporal Context",
-    "description": "The previously analyzed commit is more than 365 days older than",
+    "description": "Account takeovers happen on stale packages: a maintainer stops responding, someone else adopts the AUR record, and the new maintainer may be malicious. A gap of a year or more between the version you already have and the one being offered is worth a medium-weight flag, independent of any diff signal.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#h022"
   },
   "h023": {
@@ -612,7 +612,7 @@
     "name": "Install Hook Present",
     "severity": "INFO",
     "categoryTitle": "Install and Persistence",
-    "description": "The PKGBUILD declares an `install=` file, or the diff touches",
+    "description": "An `.install` scriptlet runs code **as root** at install time. H023 is pure context - \"this package has a root-time hook\" - not an accusation. It is the metadata a human wants when weighing other signals.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#h023"
   },
   "h024": {
@@ -620,7 +620,7 @@
     "name": "GPG Verification Removed",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "`validpgpkeys` was **populated before** the diff and is",
+    "description": "This is the exact inverse of the declared evidence. `detect_verification_evidence` emits `P002` at weight 0 when signatures are present, reporting the claim without crediting it; H024 adds a scoring signal when that protection is **removed**. The asymmetry is deliberate: declaring verification costs an attacker nothing, but removing it is a change to the recipe's own prior behaviour, which is evidence. Dropping GPG verification is a strong supply-chain signal with near-zero benign rate: maintainers almost never remove working signature verification.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h024"
   },
   "h025": {
@@ -628,7 +628,7 @@
     "name": "Build Environment Subversion",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "The diff **modifies** `LD_PRELOAD`, `LD_LIBRARY_PATH`,",
+    "description": "Injecting a malicious object via `LD_PRELOAD`/`LDFLAGS`, or redirecting the compiler/linker via `PATH`, is a classic build-time attack - the untrusted input silently subverts the build.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h025"
   },
   "h026": {
@@ -636,7 +636,7 @@
     "name": "Untrusted Maintainer Takeover (corpus path)",
     "severity": "HIGH",
     "categoryTitle": "Maintainer and Metadata",
-    "description": "An ownership transition whose incoming maintainer maintained no package at all in the previous snapshot.",
+    "description": "The per-package H026 asks the observation database whether an account has been seen. On the corpus path the snapshot is the better witness: it names the maintainer of every package in the AUR. H026 ships alongside H044 on the same transition, as two findings on two pieces of evidence, so a handover between established packagers carries H044 alone.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#h026-corpus"
   },
   "h027": {
@@ -644,7 +644,7 @@
     "name": "Capability Density Anomaly",
     "severity": "INFO",
     "categoryTitle": "Composition",
-    "description": "A single diff has rule hits in **3+ distinct capability",
+    "description": "Most updates change one thing. A diff that *simultaneously* adds a network fetch, writes a file, and base64-decodes a payload is disproportionate; the co-occurrence is more suspicious than the sum of its parts.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/composition/#h027"
   },
   "h028": {
@@ -660,7 +660,7 @@
     "name": "Package-Name Typosquat",
     "severity": "HIGH",
     "categoryTitle": "Naming and Dependencies",
-    "description": "The package's own name is Damerau-Levenshtein distance ≤2 of an **established, far-more-popular** package - AND is not an expected variant (`-git`, `-bin`, `-debug`, `-lts`, etc.) of that package.",
+    "description": "This is the AUR equivalent of the `python-sqlite` vs `pysqlite`, `electron` vs `electorn`, and trailing-space/separator-swap attacks that have hit every other registry. The AUR has **zero** typosquat defense; D002 already covers *dependency* names, but nothing covers the package's **own name** impersonating a popular one.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/naming-and-dependency/#h029-rule"
   },
   "h030": {
@@ -668,7 +668,7 @@
     "name": "Dependency-Set Expansion",
     "severity": "MEDIUM",
     "categoryTitle": "Count-Based",
-    "description": "A single diff adds 3+ `depends`/`makedepends`/`optdepends`/`checkdepends` entries whose **count × mean rarity** exceeds the expansion gate (≥1.5, tuned on corpus).",
+    "description": "**Why not count alone:** Adding 5 deps that are all common (`glibc`, `qt6-base`, `cmake`) is a normal heavy build and should not fire. The signal is count **weighted by how rare/novel each added dep is**, reusing D001's `dependency_observation_count` as a rarity proxy. Novel/obscure deps push the magnitude up; common deps contribute near zero.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/count-based/#h030-rule"
   },
   "h031": {
@@ -676,7 +676,7 @@
     "name": "Version-In-URL Injection",
     "severity": "MEDIUM",
     "categoryTitle": "Fetch and Execution",
-    "description": "`pkgver` or `_pkgver` is assigned a literal containing characters outside `[A-Za-z0-9._+-]`, and that variable is interpolated (braced or bare) into a source URL.",
+    "description": "Both halves are required. An unsafe version string that is never interpolated stays quiet, and an interpolated version made only of version characters is ordinary packaging. What the rule describes is a value carrying delimiters (`;`, whitespace, `/`) being substituted into something the build fetches.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h031"
   },
   "h032": {
@@ -684,7 +684,7 @@
     "name": "Write To User Home Or RC",
     "severity": "HIGH",
     "categoryTitle": "Install and Persistence",
-    "description": "A build or install function writes into `$HOME`, `.bashrc`, `.zshrc`, `.profile` or `.config`, outside `$pkgdir` staging.",
+    "description": "The severity is contextual. A write into a user's home during `build()` is HIGH; the same write from an **install scriptlet** is CRITICAL, because pacman runs scriptlets as root during the transaction. Nothing a package installs belongs in somebody's home directory, and root reaching into one is categorical rather than suspicious.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#h032"
   },
   "h033": {
@@ -692,7 +692,7 @@
     "name": "Moved Git Ref",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "Either the repository's commit pin moved while the declared version did not, or a digest `#commit=` was replaced by a movable `#tag=`/`#branch=`.",
+    "description": "A tag is a name upstream can repoint at will, so \"the same tag\" is not the same code twice. TrustSight never resolves a tag against the network (see [the security model](../../security.md#the-invariants)), so the rule works from declared facts: the commit a recipe pins, and the version it claims.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h033"
   },
   "h034": {
@@ -700,7 +700,7 @@
     "name": "Exotic Source Protocol",
     "severity": "MEDIUM",
     "categoryTitle": "Fetch and Execution",
-    "description": "A `source=` entry uses a scheme outside the `[hosts] source_schemes` allowlist. The base of a `transport+base` token is what is judged, so `git+https://` is read as `https`.",
+    "description": "`data:` URIs carry no `://` and are not scheme tokens, which is an accepted gap rather than a silent pass.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h034"
   },
   "h035": {
@@ -708,7 +708,7 @@
     "name": "Foreign Package Manager In Install Hook",
     "severity": "HIGH",
     "categoryTitle": "Install and Persistence",
-    "description": "An added line inside an install hook body (`post_install`, `post_upgrade`, `pre_install`, `pre_upgrade`, `pre_remove`, `post_remove`) invokes a foreign package manager: `pip install`, `npm install`, `cargo install`, `gem install`, `go install`, `dnf install`, `yum install`, `apt-get install`, `pacman -S`/`-U`, or `make install` without `DESTDIR`.",
+    "description": "Install hooks run as root at install time. Invoking another package manager from inside an AUR package's install hook modifies system state outside pacman's control, creating untracked dependencies and potential conflicts.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#h035"
   },
   "h036": {
@@ -716,7 +716,7 @@
     "name": "Shell Obfuscation Density",
     "severity": "MEDIUM",
     "categoryTitle": "Count-Based",
-    "description": "A single added line inside a critical build function (`build()`, `prepare()`, `check()`, `package()`) contains **3 or more** distinct obfuscation indicators:",
+    "description": "| Indicator | Pattern | |-----------|---------| | Base64 decode | `base64 -d` / `base64 --decode` | | Hex escape | `printf '\\x...'` | | Command substitution | `$(` or `` ` `` | | Eval | `eval` | | Pipe to shell | `\\| bash` / `\\| sh` / `\\| zsh` | | URL shortener | `bit.ly`, `t.co`, `tinyurl`, `shorturl`, `ow.ly`, `is.gd` | | Quiet wget pipe | `wget -q -O - \\|` | | Variable expansion with network/shell | `${var}...curl` / `${var}...bash` | | ANSI-C quoting (June-W3) | `$'...'` | | Variable indirection (June-W3) | `${!var}` | | Empty-quote concatenation (June-W3) | `word''word` |",
     "docsUrl": "https://docs.trustsight.org/reference/rules/count-based/#h036"
   },
   "h037": {
@@ -740,7 +740,7 @@
     "name": "Systemd ExecStart From Runtime-Writable Path",
     "severity": "HIGH",
     "categoryTitle": "Install and Persistence",
-    "description": "A systemd unit the package installs has an `ExecStart` pointing into a runtime-writable path (`/tmp`, `/var/tmp`, `/dev/shm`, `$HOME`, `/run`).",
+    "description": "The rule reads the unit's *content*, including a heredoc body, not the unit's filename. A name proves nothing; the `ExecStart` line is the fact.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#h039"
   },
   "h040": {
@@ -748,7 +748,7 @@
     "name": "Host Reconnaissance",
     "severity": "INFO",
     "categoryTitle": "Staging and Reconnaissance",
-    "description": "Host-profiling commands from `[patterns] recon_commands` run at a command position inside a build or install function.",
+    "description": "A lone `uname -m` is an architecture check and is reported at INFO by design. `env`, `dmidecode` and `systemd-detect-virt` are deliberately absent: the first produced a false positive on a `sed` expression, and the other two are H067's.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/staging-and-recon/#h040"
   },
   "h041": {
@@ -756,7 +756,7 @@
     "name": "Upload To Paste Or File-Drop Host",
     "severity": "HIGH",
     "categoryTitle": "Fetch and Execution",
-    "description": "A build or install function invokes `curl`/`wget` with a request body (an upload flag from `[patterns] upload_flags`) against a host in `[hosts] paste_hosts`.",
+    "description": "Direction is the entire rule. The same host list also feeds the `raw_hosting` source bucket, so a paste host in `source=()` is already carried at +15 and a rule that fired on it would double-count that weight. What no bucket can see is the other direction: a request leaving a build with a body attached, addressed to a host whose purpose is to accept an anonymous drop and hand back a link.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h041"
   },
   "h042": {
@@ -764,7 +764,7 @@
     "name": "Hidden Drop",
     "severity": "HIGH",
     "categoryTitle": "Staging and Reconnaissance",
-    "description": "A leading-dot (hidden) executable is written outside `$srcdir` and `$pkgdir`.",
+    "description": "H042 is deliberately the quietest rule in the group so that one payload does not fire three times: a hidden write that is later executed belongs to H069/H072, one in a world-writable directory to H038, one in the user's home to H032. H042 claims only the hidden drop none of those own.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/staging-and-recon/#h042"
   },
   "h043": {
@@ -772,7 +772,7 @@
     "name": "Attack-Chain Composition",
     "severity": "INFO",
     "categoryTitle": "Composition",
-    "description": "The findings on one package span at least `[thresholds] h043.attack_chain_stages` (default 3) distinct kill-chain stages.",
+    "description": "Stages: takeover (H026, H044, H074), mass adoption (H045, H073), install hook (H023, H017), foreign fetch (R001, H035, H066, H034), payload (H068, H069), obfuscation (H036, H065), anti-analysis (H067), write-then-execute (H072), staging (H038), recon (H040), persistence (H039, H062, H076), exfil (H041, H071), hidden drop (H042), integrity removed (H091) and sabotage (S001-S008). Later rules also map onto these stages, including R041, R054, R144, the H080-H083/H089-H091 additions and the X001-X033 crossfire rules; the authoritative rule-to-stage map is `_STAGE_OF` in `analysis/composition.py`.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/composition/#h043"
   },
   "h044": {
@@ -780,7 +780,7 @@
     "name": "Ownership Transition",
     "severity": "MEDIUM",
     "categoryTitle": "Maintainer and Metadata",
-    "description": "A package that existed in the previous snapshot changed to a different, non-empty maintainer.",
+    "description": "A move to an empty maintainer is abandonment, which H046 and H060 handle as orphan state rather than as a takeover.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#h044"
   },
   "h045": {
@@ -804,7 +804,7 @@
     "name": "Security-Relevant Build Flag Change",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "A long-stable `configure_flags` set changed, and the change touches `[patterns] security_relevant_flags`.",
+    "description": "Dropping a hardening flag is the weightier direction, because it removes a mitigation the package had.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h047"
   },
   "h048": {
@@ -812,7 +812,7 @@
     "name": "Dependency Vendored Into Source",
     "severity": "HIGH",
     "categoryTitle": "Naming and Dependencies",
-    "description": "A dependency was removed and a new source entry appeared whose project name matches the removed dependency name.",
+    "description": "Narrowed to that mechanical case on purpose. Vendoring a library bypasses the distribution's security updates for it, and `[patterns] security_relevant_libraries` is what raises the severity.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/naming-and-dependency/#h048"
   },
   "h049": {
@@ -868,7 +868,7 @@
     "name": "Attribute Burst",
     "severity": "MEDIUM",
     "categoryTitle": "Count-Based",
-    "description": "At least `[thresholds] h055.min_packages` (default 5) packages sharing a maintainer were modified within `h055.window_hours` (default 24).",
+    "description": "Only modified packages count. H045 already claims the added-package clusters, so counting additions here would report the same maintainer twice.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/count-based/#h055"
   },
   "h056": {
@@ -876,7 +876,7 @@
     "name": "Known Indicator of Compromise",
     "severity": "TIERED",
     "categoryTitle": "Indicators",
-    "description": "A declared surface exactly matches an entry in `iocs.toml`, or an added line matches a `pkgbuild_pattern` entry.",
+    "description": "Five surfaces are read: the package's own name; names added to `depends`/`makedepends`/`optdepends`/`checkdepends`/`provides`/`replaces`/ `conflicts`; the host of any URL and any bare host token; any hex digest of digest length; and a file the diff added or modified, or the recipe names via `install=` or a local `source=()` entry. A `pkgbuild_pattern` entry is matched as a regular expression against added lines; an invalid or catastrophic-backtracking pattern is refused at load rather than run. The IOC federation stage is separate and reports attributed matches through `PackageFact.ioc_matches`; see [IOC Federation](../ioc.md).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/indicator/#h056"
   },
   "h057": {
@@ -924,7 +924,7 @@
     "name": "Pacman Hook Installed",
     "severity": "MEDIUM",
     "categoryTitle": "Install and Persistence",
-    "description": "A file is placed under `/usr/share/libalpm/hooks/`.",
+    "description": "A pacman hook runs on every later transaction, which is why it is reported; packages legitimately ship them, which is why it is MEDIUM.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#h062"
   },
   "h063": {
@@ -932,7 +932,7 @@
     "name": "Epoch Introduced",
     "severity": "MEDIUM",
     "categoryTitle": "Maintainer and Metadata",
-    "description": "A diff introduces `epoch=` where the previous revision had none. Under `--full-recipe` there is no previous revision, so the finding says `epoch=N present` rather than claiming the field is new.",
+    "description": "An epoch overrides normal version comparison, so introducing one forces an upgrade regardless of what the version numbers say. A pre-existing epoch never surfaces in a hunk, so bumping one is quiet. `epoch=0` is INFO: it initialises the field without changing the ordering.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#h063"
   },
   "h064": {
@@ -940,7 +940,7 @@
     "name": "Provides/Replaces Scope Expansion",
     "severity": "HIGH",
     "categoryTitle": "Naming and Dependencies",
-    "description": "A newly claimed `provides` or `replaces` names an established package (official repo or fallback observations) or a widely-provided one (observation count at or above `[h064] widely_provided_observations`, default 25).",
+    "description": "Claiming another project's name redirects installs of that name to this package. Relatedness suppresses the obvious false positive: variant, companion and sibling stems of the package's own name never fire. Cold start cannot fire either branch, since neither corpus nor pacman data exists to establish what is established. H064 always runs; D004 covers the same ground and may double-report when it is enabled (it is, by default).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/naming-and-dependency/#h064"
   },
   "h065": {
@@ -948,7 +948,7 @@
     "name": "Obfuscated Literal Reconstructed",
     "severity": "INFO",
     "categoryTitle": "Obfuscation",
-    "description": "An added line changes under literal reconstruction (ANSI-C hex `$'\\x62\\x75\\x6e'`, ANSI-C octal, empty-quote concatenation `b''u''n`, `$(printf '\\x62...')`) and the reconstruction reveals a word the raw line did not carry, or an ANSI-C quote survives reconstruction.",
+    "description": "The tokenizer rebuilds these forms so that H035, R003 and R039 match on what a line *means* rather than how it is spelled. H065 is what tells the reader that this happened: without it the report quotes text the file does not contain. It carries no weight, so it cannot move a score; it changes what the reader is looking at.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/obfuscation/#h065"
   },
   "h066": {
@@ -956,7 +956,7 @@
     "name": "Embedded Binary In Tree",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "A file in the repository tree carries ELF magic (`\\x7fELF`) and is not a declared `source=` filename.",
+    "description": "H066 has two variants that split by evidence and never double-fire. **H066-tree** is this one: it needs the file manifest, so it runs on the git path, where the clone is always available, and on the corpus path when the AUR snapshot tarball was fetched. When the corpus path has no snapshot, the result reports `tree_analyzed = false` rather than reading as a full-coverage UNFLAGGED result.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h066"
   },
   "h067": {
@@ -964,7 +964,7 @@
     "name": "Anti-Analysis Check",
     "severity": "HIGH",
     "categoryTitle": "Deception and Anti-Analysis",
-    "description": "A build or install function probes for a debugger (`TracerPid`), a VM (`systemd-detect-virt`, DMI or hypervisor strings), a sandbox, or CI (`$CI`, `$GITHUB_ACTIONS`, `$CONTAINER`, `/.dockerenv`), from `[patterns] anti_analysis_probes`.",
+    "description": "A build script checking whether it is being watched has no legitimate purpose. Architecture and feature detection (`uname -m`, `getconf`) is not a probe and does not fire.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/deception/#h067"
   },
   "h068": {
@@ -972,7 +972,7 @@
     "name": "Reconstructed Executable Payload",
     "severity": "HIGH",
     "categoryTitle": "Fetch and Execution",
-    "description": "Text on an added line (base64, hex, uuencode, or an H065 reconstruction) decodes to bytes carrying ELF, shebang, PE or Mach-O magic.",
+    "description": "This is a type check on the decoder's output, which is why one rule covers every encoded-payload variant without naming the encoding. Encoded text assets, checksums and keys decode to none of those magics.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h068"
   },
   "h069": {
@@ -980,7 +980,7 @@
     "name": "Build-time Generation Then Execution",
     "severity": "HIGH",
     "categoryTitle": "Fetch and Execution",
-    "description": "A heredoc, `printf` or `cat >` writes a script or source file that the same function then compiles or executes.",
+    "description": "Writing a config file, a `.desktop` entry or a patch that a declared build step consumes is not generation-then-execution and does not fire.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h069"
   },
   "h070": {
@@ -988,7 +988,7 @@
     "name": "Archive Trailer Anomaly",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "An archive carries data past its declared trailer (gzip, tar or zip).",
+    "description": "H070 is a pure function over bytes (`check_archive_trailer`). It is wired on the corpus-side AUR snapshot path, where `fetch_pkgbuild_with_tree` already has the tarball bytes and the analysis pipeline can surface the finding without fetching any PKGBUILD-supplied URL.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h070"
   },
   "h071": {
@@ -996,7 +996,7 @@
     "name": "Covert Egress",
     "severity": "HIGH",
     "categoryTitle": "Fetch and Execution",
-    "description": "An added line references a `.onion`/`.i2p` host, issues a DNS-over-HTTPS query or names a configured DoH endpoint, or invokes a tunnelling client (`torsocks`, `socat`, `ngrok`, `chisel`, `frpc`, ...) at a command position inside a build or install function.",
+    "description": "The command-position anchor is what separates use from mention: a client named in a string or listed in `makedepends` never fires.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h071"
   },
   "h072": {
@@ -1004,7 +1004,7 @@
     "name": "Write Then Execute",
     "severity": "HIGH",
     "categoryTitle": "Fetch and Execution",
-    "description": "A path the recipe writes is then executed by the same function.",
+    "description": "The execution side counts interpreters, `source`, `.`, compilers and a plain absolute path at a command position, with or without arguments. Files that arrived through a declared `source=` and the project's own configure/make artefacts are exempt.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h072"
   },
   "h073": {
@@ -1020,7 +1020,7 @@
     "name": "Adopt-then-Modify",
     "severity": "MEDIUM",
     "categoryTitle": "Maintainer and Metadata",
-    "description": "A package adopted this cycle also changed version in the same cycle, within `[thresholds] h074.window_days` (default 14).",
+    "description": "H074 is the exception to the novelty ceiling described in [what TrustSight cannot see](../../explanation/what-trustsight-cannot-see.md): it fires on the **first** package of a campaign, from the maintainer field and commit times alone, before any payload shape exists to recognise. Adoption without a version change is quiet, and so is a change outside the window.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#h074"
   },
   "h075": {
@@ -1028,7 +1028,7 @@
     "name": "Remote Script Via Process Substitution",
     "severity": "CRITICAL",
     "categoryTitle": "Fetch and Execution",
-    "description": "A fetched script reaches a shell by a path the pipe-to-shell rules do not see: process substitution (`bash <(curl ...)`), `xargs` (`curl ... | xargs bash`), or a here-string fed by command substitution (`bash <<< \"$(curl ...)\"`). The finding is named `Remote Script Via Process Substitution`, `Remote Script Via xargs`, or `Remote Script Via Here-String` according to the path matched.",
+    "description": "Each still executes remote code at build time, so it belongs with R001/R002 rather than at R010/R011's \"uses curl\" LOW.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h075"
   },
   "h076": {
@@ -1036,7 +1036,7 @@
     "name": "Build Writes Outside Staging Root",
     "severity": "HIGH",
     "categoryTitle": "Staging and Reconnaissance",
-    "description": "`prepare`, `build`, `check`, `package` or a top-level line writes to a plain absolute path outside `$srcdir`/`$pkgdir`.",
+    "description": "Rather than a list of interesting directories, the rule is the shape: a packaging step may only write inside the staging roots. An absolute system path changes the machine doing the build, and pacman tracks none of it. Top level is the worse case, because it runs when makepkg sources the file. Install hooks are excluded, since H032/H038/H039/H062 own the target system. Devices (`> /dev/null`) and extractor artefacts are excluded by requiring a plain absolute path.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/staging-and-recon/#h076"
   },
   "h077": {
@@ -1044,7 +1044,7 @@
     "name": "Parse-time Network Fetch",
     "severity": "HIGH",
     "categoryTitle": "Fetch and Execution",
-    "description": "A network client from `[patterns] parse_time_fetch` runs at a command position **outside every function**, in the PKGBUILD or an install file.",
+    "description": "Everything at the top level executes as soon as makepkg sources the recipe, which happens on `makepkg --printsrcinfo`, on an AUR helper's metadata refresh, and on anything else that reads the file. That is before a build step runs and before the checksum array covers anything. R010 and R011 report a downloader inside a build function at LOW; running one at parse time is a different claim, so it is a different rule.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h077"
   },
   "h078": {
@@ -1052,7 +1052,7 @@
     "name": "Signing Key Set Changed",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "`validpgpkeys` gains a fingerprint.",
+    "description": "Whoever holds a key in `validpgpkeys` can ship code to every user of the package, so the set changing is a trust change that the diff states outright. H024 owns the removal case, verification being taken away. H078 owns the other two: a key **replaced** (one fingerprint out, a different one in) means the same sources are now trusted under a different holder, and a key **added** to an existing set widens who may sign. Introducing `validpgpkeys` where there was none is signature checking being switched on, so it is reported as a neutral fact rather than as a finding against the package.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h078"
   },
   "h079": {
@@ -1060,7 +1060,7 @@
     "name": "Build Flags Weakened",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "A recipe line assigns `CFLAGS`, `CXXFLAGS`, `CPPFLAGS`, `LDFLAGS`, `RUSTFLAGS` or `MAKEFLAGS` either to a value naming a disabling flag (`-fno-stack-protector`, `-D_FORTIFY_SOURCE=0`, `-U_FORTIFY_SOURCE`, `-no-pie`, `-Wl,-z,norelro`, ...) or, at the top level, to a literal set that does not reference the variable it replaces.",
+    "description": "makepkg exports a hardened flag set. A recipe that appends to it keeps those mitigations; one that assigns over it drops every mitigation the distribution configured, and one that spells out a disabling flag drops a named one. Either way the installed binary is built with weaker mitigations than the same source built through the normal path, and no package metadata says so.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h079"
   },
   "h080": {
@@ -1068,7 +1068,7 @@
     "name": "Indirect Command Expansion",
     "severity": "CRITICAL",
     "categoryTitle": "Obfuscation",
-    "description": "An added line contains the indirect-expansion form `${!name}` where `name` is a plain (non-subscripted) variable name. The rule flags the form itself, on any added line, without requiring the expanded fragment to reach a shell.",
+    "description": "`${!C}` expands to the *value of the variable whose name is held in `C`*, so `C=curl; ${!C} URL | bash` executes `curl` while the recipe carries no literal `curl` and no literal shell on the line R001/R002/H077/H069 read. The tokenizer refuses to evaluate indirection statically, so the obfuscated line reaches the rules verbatim and every literal-match rule steps over it: flagging the indirection itself closes that whole family at once.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/obfuscation/#h080"
   },
   "h081": {
@@ -1076,7 +1076,7 @@
     "name": "Committed File Executed Without Declaration",
     "severity": "HIGH",
     "categoryTitle": "Fetch and Execution",
-    "description": "An executed path is not a declared `source=()` basename, not a file the recipe wrote earlier in the same function, and not an H072-exempt build artifact, and either the path references `${startdir}`/`$startdir` or walks `../`, or the executed basename is present in the repository tree manifest under a relative path. A build tool (`make`, `cmake`, `ninja`, `meson`) whose *implicit* input file is in the manifest and undeclared counts as executing it.",
+    "description": "H069/H072 own files the recipe itself writes; H066 owns committed ELF binaries. Between them sat the cleartext helper script: committed to the AUR repository, never named in `source=()` (so makepkg never copies it into `$srcdir` and its bytes never reach the differ), and executed through `$startdir` or a `../` climb. Two signals, either sufficient: the `$startdir` or `../` path reference (available even without a manifest), or the basename in the tree manifest (only when a manifest was supplied - without one the rule never guesses). An absolute `/usr/share/...` target cannot be a repository file, however its basename collides, so the manifest signal requires a relative path.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h081"
   },
   "h082": {
@@ -1084,7 +1084,7 @@
     "name": "Fetch Then Execute",
     "severity": "CRITICAL",
     "categoryTitle": "Fetch and Execution",
-    "description": "Inside a build/package/check/prepare function (install hooks already have H017), a line downloads to a file with `curl`/`wget`/`aria2c`/`axel` (`-o`, `--output`, `--output-document`, glued or spaced, a `>` redirect, or a stdout-dash piped to `tee`), or with an interpreter one-liner (`python3 -c ... urlretrieve`, `perl -e ... getstore`, and the rest), and the same scope later executes that file. \"The same scope\" follows the call graph: a fetch in a helper and the execution in the `build()` that calls it are one operation.",
+    "description": "The **unattributed arm** covers the clients whose output grammar names no file: `sftp`/`ftp`/`ssh`/`nc`, `git fetch`/`pull`, `rclone moveto`/`move`/`bisync`/`copyurl`, `ipfs get`, `aws s3 cp`, `gsutil cp`, `b2 download`, `cvs`, `tftp`, `openssl s_client`, `npx`, a glued or server-decided flag, and a fetch-spec-in-file (`wget -i`, `aria2c -i`, `lftp -f`, `curl --config`). A later execution of an undeclared, non-benign file in the same reachable scope pairs with it; pairing crosses makepkg phases in order (`prepare` -> `build` -> `check` -> `package`), treats a loop variable (`bash \"$f\"`) as an unknown path, and follows a rename of a fetched file (`awk '1' repo/x.sh > run.me; escript run.me`). Executions under `$pkgdir` are the package's own output and are exempt. A scheme-bearing URL is left to H016 and the attributed arm, so one command is not scored twice.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h082"
   },
   "h083": {
@@ -1092,7 +1092,7 @@
     "name": "Downloaded Source File Executed",
     "severity": "HIGH",
     "categoryTitle": "Fetch and Execution",
-    "description": "An interpreter (`bash`/`sh`/`zsh`/`dash`/`ksh`/`python`/`perl`/`ruby`), `source`, `.` or `./` form executes a file whose basename is declared in the `source=()` array.",
+    "description": "Checksums protect integrity, not intent: a `source=(... stage.sh)` followed by `bash \"$srcdir/stage.sh\"` is remote code execution just like `curl | bash`, only hidden behind the ordinary download path. The name does not matter: a downloaded `configure`, `make` or `Makefile` executed as a script fires too. `url=` is attacker-declared, so a host that matches it is not provenance, and a `name::url` rename that ships a payload under a benign name fires for the same reason. Detected by `edge_source_file_execution()` in `src/trustsight/analysis/delivery.py`.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h083"
   },
   "h084": {
@@ -1100,7 +1100,7 @@
     "name": "Service ExecStart Targets Undeclared Binary",
     "severity": "HIGH",
     "categoryTitle": "Install and Persistence",
-    "description": "A systemd service unit's `ExecStart` points at an absolute path, and the recipe installs an executable to that path whose source is neither declared in `source=()` nor present in the repository manifest.",
+    "description": "Service units are read from the tree manifest when one is supplied, and from added diff lines otherwise (a whole service file in the diff, parsed by heuristic). The installed executable must come from an `install` with an explicit `7xx` mode or no `-m` flag (install's default is 755). Such files arrive through the unseen source tarball, so their content cannot be audited. Detected by `_service_binary_findings()` in `src/trustsight/analysis/delivery.py`.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#h084"
   },
   "h085": {
@@ -1108,7 +1108,7 @@
     "name": "PATH Injection With Undeclared Directory",
     "severity": "HIGH",
     "categoryTitle": "Staging and Reconnaissance",
-    "description": "Inside a build/package/check/prepare function, a `PATH=` assignment adds a single-level `$srcdir/<subdir>` directory that is neither a declared `source=()` basename nor a repository manifest member.",
+    "description": "`PATH=$srcdir/tools:$PATH make` lets the recipe smuggle a binary into a standard command's search path. Adding the plain source root is common enough that it stays silent; deeper paths are more likely to be legitimate project layouts, so only single-level subdirectories are flagged. Detected by `_path_injection_findings()` in `src/trustsight/analysis/delivery.py`.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/staging-and-recon/#h085"
   },
   "h086": {
@@ -1116,7 +1116,7 @@
     "name": "Adopted From Orphan",
     "severity": "MEDIUM",
     "categoryTitle": "Maintainer and Metadata",
-    "description": "The AUR reported this package as orphaned on a previous run, and now reports a maintainer.",
+    "description": "This is H074's property on the **single-package path**. H045, H046, H057, H060 and H074 all describe adoption, and every one of them needs a `full-aur` cycle: somebody running `trustsight review` over their installed packages saw none of them, and those are the people the June 2026 campaign hit. H086 needs only the AUR metadata the review path already fetches.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#h086"
   },
   "h087": {
@@ -1124,7 +1124,7 @@
     "name": "Recipe Changed Without Upstream",
     "severity": "MEDIUM",
     "categoryTitle": "Integrity and Verification",
-    "description": "A dependency array changed **and** a build function changed, while `source=`, every `*sums=` array and `pkgver` did not.",
+    "description": "The June 2026 AUR campaign did not touch the upstream software. It edited the build recipe and nothing else, so a reviewer reading source URLs and checksums - the fields that usually carry a supply-chain change - saw a package whose upstream was provably identical to the version they already trusted.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h087"
   },
   "h088": {
@@ -1132,7 +1132,7 @@
     "name": "Adopted, Recipe Rewritten, Unpinned Fetch",
     "severity": "HIGH",
     "categoryTitle": "Maintainer and Metadata",
-    "description": "All three of [H086](#h086) (adopted from orphan), [H087](integrity.md#h087) (recipe changed without upstream) and a build-time registry resolution (the `unpinned_build_deps` coverage gap's trigger) hold for the same diff.",
+    "description": "This is the June 2026 campaign's chain in one rule, and it exists because none of its three members can carry the weight alone.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#h088"
   },
   "h089": {
@@ -1140,7 +1140,7 @@
     "name": "Packaged File Names A Build-Only Path",
     "severity": "HIGH",
     "categoryTitle": "Install and Persistence",
-    "description": "Content written into `$pkgdir` - a heredoc body or a",
+    "description": "The audit's largest silent family is a configuration file the recipe *generates* into the package root whose exec slot names a script: an i3 `bindsym … exec`, a polybar `exec =`, a udev `RUN+=`, an acme `RELOADCMD=`, a mutt `macro … !bash`. Every rule that looks for execution reads the recipe's own commands, and none of these lines is a command the recipe runs - they are text, and what runs them is the user's session, later, on a different machine.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#h089"
   },
   "h090": {
@@ -1148,7 +1148,7 @@
     "name": "Committed Companion Carries A Fetch-Execute Payload",
     "severity": "CRITICAL",
     "categoryTitle": "Fetch and Execution",
-    "description": "A committed `.service`, `.socket`, `.timer`, `.path`,",
+    "description": "A `.service` whose `ExecStart=` pipes a download into a shell is the payload, and until now nothing read it. The diff shows the recipe staging the file, which is ordinary packaging and scored as such; the bytes that matter live in a file the diff does not touch.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h090"
   },
   "h091": {
@@ -1156,7 +1156,7 @@
     "name": "Checksum Array Shorter Than Source Array",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "`source=()` declares more elements than a `*sums=()`.",
+    "description": "makepkg pairs `source=()` with each `*sums=()` by position, and no rule looked at the two lengths together. A source slipped in beside a checksum list nobody recounted scored nothing but priors - the array declares verification for the entries it covers and says nothing about the one added past its end.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h091"
   },
   "h092": {
@@ -1164,7 +1164,7 @@
     "name": "Metadata Names A Source The Recipe Does Not",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "A URL host appearing in `.SRCINFO` that appears nowhere in",
+    "description": "`.SRCINFO` is *generated from* the PKGBUILD, and the analysis prefers it wherever it is richer - structured `depends`, expanded sources. That preference is trust, and nothing compared the two. A `.SRCINFO` naming a source the recipe does not was simply believed, and an AUR helper resolving dependencies from the metadata while makepkg builds from the recipe are reading two different descriptions of the same package.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h092"
   },
   "h093": {
@@ -1172,7 +1172,7 @@
     "name": "Committed Config Points At A Build-Only Path",
     "severity": "HIGH",
     "categoryTitle": "Install and Persistence",
-    "description": "A committed `.service`, `.desktop`, `.rules`, `.conf` (and",
+    "description": "The symmetric half of [H089](#h089). That rule reads content the recipe *generates* into `$pkgdir`; this one reads content the recipe *committed* and then ships. The observable is identical and so is the reasoning: those directories exist only while the package is being built, so a shipped file naming one is either broken on arrival or aimed at a directory whoever wrote it expects to control when it is read.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#h093"
   },
   "h094": {
@@ -1180,7 +1180,7 @@
     "name": "Unread Script Executed During Packaging",
     "severity": "HIGH",
     "categoryTitle": "Fetch and Execution",
-    "description": "The W001 observable - a script neither declared nor",
+    "description": "`package()` stages files into `$pkgdir`. It is not where software gets built, and its output *is* the package. Running an unaudited script there is a different act from running one in `build()`.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h094"
   },
   "h095": {
@@ -1188,7 +1188,7 @@
     "name": "Boot Or Image Artifact Built From The Source Tree",
     "severity": "HIGH",
     "categoryTitle": "Install and Persistence",
-    "description": "`dracut`, `mkinitcpio`, `update-initramfs`,",
+    "description": "`dracut --include \"$srcdir/x\" /x` injects a path from the build tree into the initramfs, which runs before userspace exists and before any filesystem the user can inspect is mounted. `grub-mkconfig` writes the boot menu. `guestfish` and `virt-customize` edit a disk image's contents.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#h095"
   },
   "h096": {
@@ -1196,7 +1196,7 @@
     "name": "Download Agent Override",
     "severity": "MEDIUM",
     "categoryTitle": "Integrity and Verification",
-    "description": "`DLAGENTS` is assigned or appended to.",
+    "description": "`DLAGENTS` controls how makepkg fetches sources for each protocol. Overriding it in a PKGBUILD redirects all source downloads through the attacker's chosen binary. Any change to DLAGENTS is flagged: legitimate recipes do not modify it.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h096"
   },
   "h097": {
@@ -1204,7 +1204,7 @@
     "name": "Function Shadowing",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "A function or variable is redefined that suppresses or",
+    "description": "Redefining `msg()`, `error()`, or `die()` suppresses build output. Redefining `cd()` hijacks the working directory. Redefining `.()` redirects file inclusion. No benign PKGBUILD does any of these.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h097"
   },
   "h098": {
@@ -1212,7 +1212,7 @@
     "name": "Naming/Deception Cluster",
     "severity": "HIGH",
     "categoryTitle": "Composition",
-    "description": "The findings on one package carry at least `[thresholds] h098.min_signals` (default 2) distinct naming/deception signals.",
+    "description": "Members, each one independent:",
     "docsUrl": "https://docs.trustsight.org/reference/rules/composition/#h098"
   },
   "h099": {
@@ -1220,7 +1220,7 @@
     "name": "Source Host Swapped Under A Kept Local Name",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "A `source` entry's local name is unchanged while the",
+    "description": "makepkg's source cache keys on the local name (the `name::url` rename, or the URL's basename), so swapping the server under a kept name refetches nothing and shows a reviewer a familiar filename: the quiet swap. The comparison is by registered domain, so a move between subdomains or CDNs of the same registrable domain (`cdn.example.org` to `dl.example.org`) is not a swap. A version bump suppresses the rule: a new release moving to a new host is the ordinary shape of an upstream that relocated, and C003 already records the URL change there.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h099"
   },
   "h100": {
@@ -1228,7 +1228,7 @@
     "name": "Install Hook Added Or Retargeted",
     "severity": "HIGH",
     "categoryTitle": "Install and Persistence",
-    "description": "The `install=` scalar appears, or points at a different",
+    "description": "A `.install` hook runs as root on the installer's machine. H017 inspects hook *content*; nothing watched the declaration itself, so a package that never had a hook could gain one without a finding. The two severities separate the shapes: a hook script arriving in the same diff as its declaration is the attack's committed form, while a declaration moving to an existing script is weaker (the script may predate the diff) and reads as MEDIUM.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#h100"
   },
   "h101": {
@@ -1236,7 +1236,7 @@
     "name": "Source Pinning Lost",
     "severity": "MEDIUM",
     "categoryTitle": "Integrity and Verification",
-    "description": "A `source` entry moves from pinned (a `#commit=`/`#tag=`",
+    "description": "P008 reports a floating source wherever one stands; H101 catches the *moment* a verifiable package becomes upstream-controlled, which in a watch replay is the signal that matters: the package that was pinned yesterday and tracks a branch today changed who decides what it builds. Only same-name entries on both sides of the diff compare, the H099 keying, so a partially shown array cannot mis-pair an entry.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h101"
   },
   "h102": {
@@ -1244,7 +1244,7 @@
     "name": "Maintainer Change With Signing Key Change",
     "severity": "HIGH",
     "categoryTitle": "Composition",
-    "description": "The maintainer changed and `validpgpkeys` moved (H078)",
+    "description": "The xz shape: a new maintainer plus a keyring change means the person now able to sign the sources is not the person the keyring was built for. Each fact scores on its own (H078, the maintainer tier); the conjunction is the attack, so it stacks the way X007 stacks its members. H078's own detection stands in for the keyring delta, the same member-rule composition H098 uses.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/composition/#h102"
   },
   "h103": {
@@ -1252,7 +1252,7 @@
     "name": "Metadata And Recipe Disagree",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "`.SRCINFO` and the PKGBUILD disagree on the `install=` hook,",
+    "description": "H092 compares the hosts the two documents name. This rule compares the fields that decide what the build installs, fetches and verifies: a metadata file that names a different install hook, a different set of checksums, or a different dependency list describes a build other than the one makepkg will run, and an AUR helper reading the metadata may resolve a different closure than the recipe builds.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h103"
   },
   "m001": {
@@ -1260,29 +1260,29 @@
     "name": "Claim Contradicted By Structure",
     "severity": "HIGH",
     "categoryTitle": "Meta and Confluence",
-    "description": "The recipe's declared practice contradicts a structural finding in the same run.",
+    "description": "It joins the *real* claims ledger - the P-series ids the run's declared facts imply (`trustsight.scoring.declared_claims`) - against the structural findings: checksums declared (P001) while H091 reports the arrays do not cover every source, GPG verification declared (P002) while H024 reports it removed, a source pinned (P005) while H101 reports the pinning lost, a trusted forge declared (P007) while H099 reports the host swapped.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/meta/#m001"
   },
   "m002": {
     "id": "M002",
     "name": "Weak Signal Across Layers",
-    "severity": "MEDIUM",
+    "severity": "MEDIUM,",
     "categoryTitle": "Meta and Confluence",
-    "description": "Three or more distinct assurance layers fired, none above the alert bar (`[thresholds] m002.min_layers`, default 3).",
+    "description": "An attacker who spreads weak signals across layers stays under any single threshold; the span is only visible from the whole profile. It adds no points but raises the reported band one step: a spread across layers is exactly the case a single-signal threshold cannot see. Measured on the locked benign corpus: 112/3,739 (3.0%).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/meta/#m002"
   },
   "m003": {
     "id": "M003",
     "name": "Composition Not Owned Elsewhere",
-    "severity": "MEDIUM",
+    "severity": "MEDIUM,",
     "categoryTitle": "Meta and Confluence",
-    "description": "Two or more distinct capability families co-occur while none of the cluster owners (H027, H098, X007) recorded the composition - typically because the owner is disabled.",
+    "description": "The composition is never lost. It adds no points but raises the reported band one step. Measured on the locked benign corpus: 316/3,739 (8.5%).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/meta/#m003"
   },
   "m004": {
     "id": "M004",
     "name": "Expected Co-fire Absent",
-    "severity": "INFO",
+    "severity": "INFO,",
     "categoryTitle": "Meta and Confluence",
     "description": "A construct that historically co-fires with another rule appeared without it. A hit means the **tool**, not the package, needs attention, so this is never added to a package's finding list: it rides the report's `cofire_health` channel for the harness and calibration.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/meta/#m004"
@@ -1290,7 +1290,7 @@
   "m005": {
     "id": "M005",
     "name": "Licensor Absent On Licensed Shape",
-    "severity": "INFO",
+    "severity": "INFO,",
     "categoryTitle": "Meta and Confluence",
     "description": "A rule declaring `escalates_when` fired while none of its declared licensors did - the detector travelled without its usual company. Like M004 this is a sensor-health observation, not evidence about the package, so it goes to the `cofire_health` channel and never scores. See [Escalation Licensing](../../explanation/escalation-licensing.md).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/meta/#m005"
@@ -1612,7 +1612,7 @@
     "name": "Compression Command Override",
     "severity": "MEDIUM",
     "categoryTitle": "Integrity and Verification",
-    "description": "Assignment to any `COMPRESS*` variable (`COMPRESSZST`,",
+    "description": "These variables control makepkg's archive compression command. Overriding them can pipe decompressed content through an arbitrary binary. Legitimate uses are rare (custom compression tuning for size/performance).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#r078"
   },
   "r091": {
@@ -1620,7 +1620,7 @@
     "name": "Privilege Escalation Override",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "Assignment to `PACMAN_AUTH`.",
+    "description": "This variable controls how pacman gains elevated privileges during `makepkg -S`. Overriding it in a PKGBUILD means the package is trying to control privilege escalation on the builder's machine.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#r091"
   },
   "r099": {
@@ -1628,7 +1628,7 @@
     "name": "Trap Statement",
     "severity": "MEDIUM",
     "categoryTitle": "Integrity and Verification",
-    "description": "Any `trap` statement in the PKGBUILD.",
+    "description": "`trap` registers signal handlers. In a PKGBUILD it can suppress errors (`trap '' ERR`), run code on build completion (`trap 'payload' EXIT`), or perform legitimate cleanup. Legitimate cleanup traps exist but are uncommon enough to flag.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#r099"
   },
   "r104": {
@@ -1636,7 +1636,7 @@
     "name": "Error Handling Suppressed",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "`trap '' ERR` or `trap '' DEBUG`.",
+    "description": "Suppresses error handling (`ERR`) or trace output (`DEBUG`), hiding build failures from the reviewer. These are subsets of R099 but carry higher severity because they actively conceal activity. Only the single-quote form is common; the double-quote form is rare and already caught by R099.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#r104"
   },
   "r144": {
@@ -1660,7 +1660,7 @@
     "name": "Recursive Self-Spawn",
     "severity": "CRITICAL",
     "categoryTitle": "Sabotage",
-    "description": "A function whose body pipes itself into itself and backgrounds the result, or an unbounded loop that backgrounds work.",
+    "description": "The classic `:(){ :|:& };:` and its named variants. Detected structurally rather than by literal: the pattern is a back-reference, so `bomb() { bomb | bomb & }; bomb` matches for the same reason the `:` form does, and renaming the function buys nothing.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/sabotage/#s001"
   },
   "s002": {
@@ -1668,7 +1668,7 @@
     "name": "Recursive Deletion Outside The Build Tree",
     "severity": "CRITICAL",
     "categoryTitle": "Sabotage",
-    "description": "`rm -rf` (in either flag order) whose dangerous target is not a build-sandbox path.",
+    "description": "The conjunction is the rule. `rm -rf` alone is housekeeping; a target of `/`, `/*`, `/etc`, `/usr`, `/var`, `/boot`, `/home`, `/root`, `~` or `$HOME` is not. A `rm` whose target is `$srcdir` or `$pkgdir` is exempt, because a recursive delete inside the build tree is what makepkg expects; the exemption is per command, so a benign sandbox delete on a line no longer masks a following `rm -rf ~`.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/sabotage/#s002"
   },
   "s003": {
@@ -1676,7 +1676,7 @@
     "name": "Raw Block Device Write",
     "severity": "CRITICAL",
     "categoryTitle": "Sabotage",
-    "description": "`dd of=`, `mkfs`, `wipefs`, `blkdiscard`, `sgdisk`, `fdisk`, `parted` or `shred` targeting a block device, or `dd of=/dev/mem`.",
+    "description": "Nothing a package build legitimately does writes to `/dev/sda`. `dd` writing to a *file* is ordinary (generating test data, padding an image) and does not fire; only a device target does.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/sabotage/#s003"
   },
   "s004": {
@@ -1684,7 +1684,7 @@
     "name": "Secure Deletion Of User Data",
     "severity": "HIGH",
     "categoryTitle": "Sabotage",
-    "description": "`shred`, `srm` or `wipe` targeting the operator's home, `/home/`, or a credential directory (`.ssh`, `.gnupg`, `.aws`, `.config`, `.local`), on a line naming no sandbox variable.",
+    "description": "Separated from S002 because unrecoverable deletion is a different claim from deletion: `rm` leaves data recoverable in principle and `shred` does not, so the response differs even though the intent looks the same.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/sabotage/#s004"
   },
   "s005": {
@@ -1692,7 +1692,7 @@
     "name": "Permission Change On A System Path",
     "severity": "HIGH",
     "categoryTitle": "Sabotage",
-    "description": "`chmod 777` on a system path or the operator's home, or `chown` of a system path, outside the build sandbox.",
+    "description": "World-writable system directories are a privilege-escalation primitive left behind for later rather than an attack that completes now, which is why this is HIGH rather than CRITICAL. `chmod 777 \"$pkgdir/var/run\"` is sloppy packaging, not this rule's business.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/sabotage/#s005"
   },
   "s006": {
@@ -1700,7 +1700,7 @@
     "name": "System Service Disruption",
     "severity": "HIGH",
     "categoryTitle": "Sabotage",
-    "description": "`systemctl stop`/`disable`/`mask` of a **system** unit, `systemctl isolate`/`poweroff`/`reboot`/`halt`, `killall`/`pkill` of a system daemon, `ufw disable`, `firewall-cmd --panic-off`/`--remove-service`, or `setenforce 0`.",
+    "description": "The unit list is the whole precision of this rule. A package stopping or disabling **its own** service is standard packaging - you stop a daemon before replacing its binary and disable it on removal - and four diffs in the locked benign corpus do exactly that (`systemctl disable input-remapper`, `systemctl disable --now mullvad-daemon`). Without the list, a rule on the verbs alone flags every one of them.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/sabotage/#s006"
   },
   "s007": {
@@ -1708,7 +1708,7 @@
     "name": "Cryptocurrency Miner",
     "severity": "HIGH",
     "categoryTitle": "Sabotage",
-    "description": "A known miner binary in command position, a `stratum+tcp://` or `stratum+ssl://` URL, `--donate-level`, or a known mining-pool hostname.",
+    "description": "Resource theft rather than damage, and the reason the family is called sabotage: nothing is destroyed, the machine is simply working for someone else. The pool URL and `--donate-level` are matched anywhere on the line rather than in command position, because writing a pool URL into a config file is how a miner is installed, not how one is mentioned.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/sabotage/#s007"
   },
   "s008": {
@@ -1716,7 +1716,7 @@
     "name": "Shell History Or Log Destruction",
     "severity": "MEDIUM",
     "categoryTitle": "Sabotage",
-    "description": "`history -c`, deletion or truncation of a shell history file, `unset HISTFILE`, `set +o history`, `journalctl --vacuum-*`, or truncation of `/var/log/`.",
+    "description": "Anti-forensics, and MEDIUM because on its own it is weak evidence: a misguided recipe might clear history for tidiness. Its value is compositional - erasing the record of what ran is a strong signal *beside* something that ran, and H027 counts capability spread across families.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/sabotage/#s008"
   },
   "source_bucket": {
@@ -1732,7 +1732,7 @@
     "name": "Signing-Key Novelty",
     "severity": "HIGH",
     "categoryTitle": "Temporal Context",
-    "description": "A `validpgpkeys` fingerprint added in this diff has never",
+    "description": "This is distinct from package novelty: the xz lesson is a *key* story. A key that has signed nothing else in the ecosystem, appearing on this package, is worth a high-weight flag even when the package itself is old.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#t001"
   },
   "t002": {
@@ -1740,7 +1740,7 @@
     "name": "Maintainer Domain Novelty",
     "severity": "MEDIUM",
     "categoryTitle": "Temporal Context",
-    "description": "The maintainer email's domain first appeared in the",
+    "description": "A first-seen domain is a weak but real signal about a maintainer with no prior footprint. Cold index declines, like T001.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#t002"
   },
   "t003": {
@@ -1748,7 +1748,7 @@
     "name": "Signing Key Rotated",
     "severity": "HIGH",
     "categoryTitle": "Temporal Context",
-    "description": "A `validpgpkeys` key is removed *and* a different one is",
+    "description": "The xz backdoor's shape: the trusted signer is swapped, not merely widened (H078) or narrowed (H024). Unlike T001 it needs no ecosystem history - the rotation of trust inside one commit is its own fact - so it fires cold.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#t003"
   },
   "u001": {
@@ -1756,7 +1756,7 @@
     "name": "Manifest Added Or Removed",
     "severity": "INFO",
     "categoryTitle": "Upstream Manifests",
-    "description": "A known manifest (from `[patterns] manifest_filenames`) is",
+    "description": "Ledger only. A new or removed manifest changes what the committed dependency surface is, but its mere presence is not a claim about intent.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/upstream-manifests/#u001"
   },
   "u002": {
@@ -1764,7 +1764,7 @@
     "name": "Upstream Dependency Delta",
     "severity": "INFO",
     "categoryTitle": "Upstream Manifests",
-    "description": "A manifest's parsed dependency set gains or loses a name.",
+    "description": "A declared-surface ledger entry, presented with its own group and the \"TrustSight does not verify these\" line: it reports the names the committed manifest added or removed, never scores them (B10). Lockfile churn is reported as counts and named top-level dependencies, not a full delta.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/upstream-manifests/#u002"
   },
   "u003": {
@@ -1772,7 +1772,7 @@
     "name": "New Remote Source In Manifest",
     "severity": "MEDIUM",
     "categoryTitle": "Upstream Manifests",
-    "description": "A manifest gains a `source_kind=git` dependency, or a",
+    "description": "The scored core. The gained hosts are run through the same host canonicalization as a `source=()` URL and join the run's `hosts_gained` view, so host-novelty tiers, source buckets and the G-series treat a manifest-introduced host exactly like a declared one. The claim is precise: \"the build will now fetch from a host the recipe did not declare.\"",
     "docsUrl": "https://docs.trustsight.org/reference/rules/upstream-manifests/#u003"
   },
   "u004": {
@@ -1780,7 +1780,7 @@
     "name": "Registry Redirect",
     "severity": "MEDIUM",
     "categoryTitle": "Upstream Manifests",
-    "description": "A committed file redirects the resolver away from its",
+    "description": "A redirected resolver sends every dependency the build installs somewhere other than the default registry, which is the destination a reviewer has no other way to see.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/upstream-manifests/#u004"
   },
   "u005": {
@@ -1788,7 +1788,7 @@
     "name": "Dependency Surface Jump",
     "severity": "INFO",
     "categoryTitle": "Upstream Manifests",
-    "description": "A manifest's dependency count multiplies past",
+    "description": "Ledger only, and its primary consumer is the correlation feed: a dependency surface that multiplies in one update is a campaign shape the G-series joins across packages, not a per-package verdict.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/upstream-manifests/#u005"
   },
   "u006": {
@@ -1796,13 +1796,13 @@
     "name": "Manifest Changed Without Its Lockfile",
     "severity": "INFO",
     "categoryTitle": "Upstream Manifests",
-    "description": "A declaration manifest (`go.mod`, `Cargo.toml`,",
+    "description": "A real integrity signal (spec section 7.2): the resolved dependency set is not committed alongside the declaration, so what the build will actually fetch is unstated. It stays **weight 0** because VCS and library packaging legitimately omit lockfiles - the corpus must adjudicate a scored rate before it can be promoted.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/upstream-manifests/#u006"
   },
   "w001": {
     "id": "W001",
     "name": "Executes Code This Analysis Did Not Read",
-    "severity": "",
+    "severity": "INFO",
     "categoryTitle": "Unverifiable",
     "description": "Fires when a build function runs a script - through an interpreter, or as `./name` - whose path is neither declared in `source=()` nor committed to the repository.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/unverifiable/#w001"
@@ -1810,7 +1810,7 @@
   "w002": {
     "id": "W002",
     "name": "Build Resolves Dependencies From A Registry",
-    "severity": "",
+    "severity": "INFO",
     "categoryTitle": "Unverifiable",
     "description": "Fires on a build step that resolves packages from a language registry: `npm install`, `pip install -r`, `cargo fetch`, `go mod download` and siblings.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/unverifiable/#w002"
@@ -1818,7 +1818,7 @@
   "w003": {
     "id": "W003",
     "name": "Applies A Patch This Analysis Did Not Read",
-    "severity": "",
+    "severity": "INFO",
     "categoryTitle": "Unverifiable",
     "description": "Fires on `patch` or `git apply` naming a `.patch`/`.diff` that is not committed to the repository.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/unverifiable/#w003"
@@ -1826,7 +1826,7 @@
   "w004": {
     "id": "W004",
     "name": "Build Engine Runs A Manifest This Analysis Did Not Read",
-    "severity": "",
+    "severity": "INFO",
     "categoryTitle": "Unverifiable",
     "description": "Fires when `make`, `ninja`, `bazel`, `scons` or a sibling is given an explicit manifest argument that is neither declared nor committed.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/unverifiable/#w004"
@@ -1834,7 +1834,7 @@
   "w005": {
     "id": "W005",
     "name": "Build Runs A Target Whose Recipe Was Not Read",
-    "severity": "",
+    "severity": "INFO",
     "categoryTitle": "Unverifiable",
     "description": "Fires when `make` or `ninja` is given a non-standard target and no `Makefile` is committed.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/unverifiable/#w005"
@@ -1842,7 +1842,7 @@
   "w006": {
     "id": "W006",
     "name": "Generated File Names A Build-Only Path",
-    "severity": "",
+    "severity": "INFO",
     "categoryTitle": "Unverifiable",
     "description": "Fires when a `printf`/`echo`/`cat`/`tee` writes a file outside `$pkgdir` whose content names `$srcdir`, `$startdir`, `$PWD` or `$BUILDDIR` in a field that is not merely descriptive.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/unverifiable/#w006"
@@ -1850,7 +1850,7 @@
   "w007": {
     "id": "W007",
     "name": "Dependency Novelty Declined For Insufficient Observations",
-    "severity": "",
+    "severity": "INFO",
     "categoryTitle": "Unverifiable",
     "description": "Fires when D001/D002 would have judged an added dependency but abstained because the dependency corpus holds no observations. Without the corpus guard every name looks novel and D001 fires on every package a fresh install sees, so the rules stand down - and the stand-down is reported rather than left as silence.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/unverifiable/#w007"
@@ -1858,7 +1858,7 @@
   "w008": {
     "id": "W008",
     "name": "Unresolved Construct In A Recipe",
-    "severity": "",
+    "severity": "INFO",
     "categoryTitle": "Unverifiable",
     "description": "Fires when the tokenizer could not resolve one or more assignments in the recipe (a computed `source=()`, a build-time value). An unresolved construct is an analysis boundary: the reader is told what the analysis could not resolve. It is the W-series face of the same fact the refusal rules X026 (X026 fires on an unresolved construct referenced from an executable function, scored) report as a suspicion - [X026 and X027 may fire on the same diff](crossfire.md#x026), weight-0 vs scored.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/unverifiable/#w008"
@@ -1866,7 +1866,7 @@
   "w009": {
     "id": "W009",
     "name": "Upstream Manifests Not Examined",
-    "severity": "",
+    "severity": "INFO",
     "categoryTitle": "Unverifiable",
     "description": "Fires when a committed dependency manifest could not be parsed (malformed, or over the byte cap), or when the recipe declares a source archive whose listing contains a known manifest filename. The second shape is a standing boundary, not a per-diff gap: the analysis never fetches and never extracts (A2, A8), so the manifests inside an upstream archive are outside what any run can read by design.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/unverifiable/#w009"
@@ -1874,7 +1874,7 @@
   "w010": {
     "id": "W010",
     "name": "Alert Volume Capped",
-    "severity": "",
+    "severity": "INFO",
     "categoryTitle": "Unverifiable",
     "description": "Fires when a run produces more findings than `[alerts] max_rendered_findings` (default 50) and the terminal therefore groups the remainder. The per-band counts travel with it, so grouping is reported rather than silent; the JSON report is never filtered and carries every finding.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/unverifiable/#w010"
@@ -1882,7 +1882,7 @@
   "x001": {
     "id": "X001",
     "name": "Encoded Payload Decoded And Executed",
-    "severity": "",
+    "severity": "CRITICAL",
     "categoryTitle": "Crossfire",
     "description": "Fires when an encoded blob is decoded and the result reaches a shell or interpreter inside an executing scope. Covers hex and octal escapes, reversed hex dumps (`xxd -r`, `od -An`, `hexdump`), non-base64 decoders (`base32 -d`, `basenc`, `openssl enc -d`, `uudecode`), ANSI-C `$'...'` blobs, and `tr` rotations.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x001"
@@ -1890,7 +1890,7 @@
   "x002": {
     "id": "X002",
     "name": "Non-Literal Executable Name",
-    "severity": "",
+    "severity": "CRITICAL",
     "categoryTitle": "Crossfire",
     "description": "Fires when the word in command position is not a literal. Recognised shapes:",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x002"
@@ -1898,7 +1898,7 @@
   "x003": {
     "id": "X003",
     "name": "Obfuscated Command Argument",
-    "severity": "",
+    "severity": "HIGH",
     "categoryTitle": "Crossfire",
     "description": "Fires on a `curl`/`wget` long option truncated to a unique prefix (`--upload-f`), a shell invoked with options stuffed around `-c` (`bash -lc`, `sh -ec`, `sh -ce`), or a URL whose host is an octal, hex or integer-encoded IP.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x003"
@@ -1906,7 +1906,7 @@
   "x004": {
     "id": "X004",
     "name": "Build Output Suppressed",
-    "severity": "",
+    "severity": "MEDIUM",
     "categoryTitle": "Crossfire",
     "description": "Fires on `TERM=dumb` (quoted or not), `set +x` in any letter order, `set +o xtrace`, or a redirection that detaches a stream (`exec >/dev/null`, `exec 2>>/dev/null`, `exec &>/dev/null`, `exec 2>&-`) inside an executing scope.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x004"
@@ -1914,7 +1914,7 @@
   "x005": {
     "id": "X005",
     "name": "Home Reached By An Alternative Spelling",
-    "severity": "",
+    "severity": "HIGH",
     "categoryTitle": "Crossfire",
     "description": "Fires when a write or redirect reaches a home directory by a spelling [H032](install-and-persist.md#h032) does not match: `/home/alice`, `/home/$USER/...`, `~alice`, `/root`, `${HOME:-/home/alice}/...`, or a traversal naming `home` or `root`. The trailing separator is optional.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x005"
@@ -1922,7 +1922,7 @@
   "x006": {
     "id": "X006",
     "name": "Source Points Somewhere Unexpected",
-    "severity": "",
+    "severity": "HIGH",
     "categoryTitle": "Crossfire",
     "description": "Fires on a URL shortener or a raw-IP URL anywhere in the diff. Neither is legitimate in a `source=` array: a shortener hides the destination from the reader, and a raw IP has no name to check.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x006"
@@ -1930,7 +1930,7 @@
   "x007": {
     "id": "X007",
     "name": "Multiple Evasion Techniques",
-    "severity": "",
+    "severity": "CRITICAL",
     "categoryTitle": "Crossfire",
     "description": "Fires when two or more distinct crossfire techniques appear in one diff. One technique can be an accident of style; two is a method.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x007"
@@ -1938,7 +1938,7 @@
   "x008": {
     "id": "X008",
     "name": "Whitespace A Shell Does Not Split On",
-    "severity": "",
+    "severity": "MEDIUM",
     "categoryTitle": "Crossfire",
     "description": "Fires on a whitespace character other than space, tab, newline or carriage return, on an executing line of a shell file.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x008"
@@ -1946,7 +1946,7 @@
   "x009": {
     "id": "X009",
     "name": "Fetch Through An Uncatalogued Client",
-    "severity": "",
+    "severity": "CRITICAL",
     "categoryTitle": "Crossfire",
     "description": "Fires when a network client other than `curl`/`wget` feeds a shell or interpreter on an executing line.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x009"
@@ -1954,7 +1954,7 @@
   "x010": {
     "id": "X010",
     "name": "Interpreter One-Liner Reaches The Network",
-    "severity": "",
+    "severity": "HIGH",
     "categoryTitle": "Crossfire",
     "description": "Fires when a `-c`/`-e`/`-r` script contains a URL or a fetch call (`urlopen`, `requests.get`, `file_get_contents`, `LWP`, `socket.connect`). No shell client is involved, so H016's inventory never sees it.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x010"
@@ -1962,7 +1962,7 @@
   "x011": {
     "id": "X011",
     "name": "Package Manager Runs Fetched Code At Build Time",
-    "severity": "",
+    "severity": "HIGH",
     "categoryTitle": "Crossfire",
     "description": "Fires when a language package manager resolves and executes third-party code during the build (`npm install`, `pip install`, `cargo`, `go install`, `gem`, `composer`, `npx`, `deno run`).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x011"
@@ -1970,7 +1970,7 @@
   "x012": {
     "id": "X012",
     "name": "Build Toolchain Redirected Into The Source Tree",
-    "severity": "",
+    "severity": "HIGH",
     "categoryTitle": "Crossfire",
     "description": "Fires when `CC`, `CXX`, `LD`, `AR`, `PATH`, `LD_PRELOAD`, `LD_LIBRARY_PATH`, `PYTHONPATH`, `MAKEFLAGS` or a sibling is assigned a path under `$srcdir`, `$startdir` or `$pkgdir`, and a compile or configure step follows.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x012"
@@ -1978,7 +1978,7 @@
   "x013": {
     "id": "X013",
     "name": "Fetch Redirected Or Trust Root Replaced",
-    "severity": "",
+    "severity": "HIGH",
     "categoryTitle": "Crossfire",
     "description": "Fires when the recipe changes where a fetch goes or what it trusts: a proxy export, `--resolve`, `--connect-to`, `--doh-url`, or a replaced CA bundle (`--cacert`, `SSL_CERT_FILE`, `CURL_CA_BUNDLE`).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x013"
@@ -1986,7 +1986,7 @@
   "x014": {
     "id": "X014",
     "name": "Environment Variable Names Code To Run",
-    "severity": "",
+    "severity": "HIGH",
     "categoryTitle": "Crossfire",
     "description": "Fires when a variable or flag carries a value the receiving program executes.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x014"
@@ -1994,7 +1994,7 @@
   "x015": {
     "id": "X015",
     "name": "Work Scheduled To Run After The Build",
-    "severity": "",
+    "severity": "HIGH",
     "categoryTitle": "Crossfire",
     "description": "Fires on `crontab`, `at`, `batch`, `systemd-run`, `incrontab`, `entr`, `inotifywait`, `udevadm control`, `systemctl start`, or `systemctl enable --now`.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x015"
@@ -2002,7 +2002,7 @@
   "x016": {
     "id": "X016",
     "name": "Fetch Piped Into An Unrecognised Consumer",
-    "severity": "",
+    "severity": "HIGH",
     "categoryTitle": "Crossfire",
     "description": "Fires when a pipeline starts with a network client and ends in a command that is neither a known data consumer nor an executor R001 claims.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x016"
@@ -2010,7 +2010,7 @@
   "x017": {
     "id": "X017",
     "name": "Tool Flag Or Builtin Carries A Command",
-    "severity": "",
+    "severity": "HIGH",
     "categoryTitle": "Crossfire",
     "description": "Fires on a command placed where a command is not expected:",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x017"
@@ -2018,7 +2018,7 @@
   "x018": {
     "id": "X018",
     "name": "Interpreter One-Liner Assembles A Name",
-    "severity": "",
+    "severity": "HIGH",
     "categoryTitle": "Crossfire",
     "description": "Fires when a `-c`/`-e`/`-r` script builds the name it calls, or hands a build-tree path to an exec primitive.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x018"
@@ -2026,7 +2026,7 @@
   "x019": {
     "id": "X019",
     "name": "Host Material Sent Or Packaged",
-    "severity": "",
+    "severity": "HIGH",
     "categoryTitle": "Crossfire",
     "description": "Fires on two shapes of one act.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x019"
@@ -2034,7 +2034,7 @@
   "x020": {
     "id": "X020",
     "name": "Recipe Writes The Build Steps The Engine Runs",
-    "severity": "",
+    "severity": "HIGH",
     "categoryTitle": "Crossfire",
     "description": "Fires when a `printf`/`echo`/`cat`/`tee` writes a build manifest - `build.ninja`, `Makefile`, `BUILD.bazel`, `meson.build`, a `*.mk` - whose content carries a directive the engine executes.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x020"
@@ -2042,7 +2042,7 @@
   "x021": {
     "id": "X021",
     "name": "Executor Runs A File Chosen At Runtime",
-    "severity": "",
+    "severity": "HIGH",
     "categoryTitle": "Crossfire",
     "description": "Fires when a known executor's file argument is a positional parameter, an array element, or a glob.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x021"
@@ -2050,7 +2050,7 @@
   "x022": {
     "id": "X022",
     "name": "Generated Config Handed To The Tool That Reads It",
-    "severity": "",
+    "severity": "HIGH",
     "categoryTitle": "Crossfire",
     "description": "Fires when a write produces a file whose content names a build-tree path, and a later line passes that file - or its directory, behind a configuration flag - to a program.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x022"
@@ -2058,7 +2058,7 @@
   "x023": {
     "id": "X023",
     "name": "Command Output Executed As A Script",
-    "severity": "",
+    "severity": "HIGH",
     "categoryTitle": "Crossfire",
     "description": "Fires when a pipeline ends in a shell and does not start with a network client. The pipeline is read after variable, array and alias resolution, so `C=curl; $C u | bash` is R001's and `C=aria2c; $C u | bash` is [X009](#x009)'s; this rule is for the pipeline that is still not a fetch after resolution (a command substitution or a nameref the tokenizer refuses to fold).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x023"
@@ -2066,7 +2066,7 @@
   "x024": {
     "id": "X024",
     "name": "Indirect Sensitive Assignment",
-    "severity": "",
+    "severity": "HIGH",
     "categoryTitle": "Crossfire",
     "description": "Fires when a sensitive makepkg variable (`DLAGENTS`, `COMPRESS*`, `PACMAN_AUTH`, `CFLAGS`, `CXXFLAGS`, `LDFLAGS`, `MAKEFLAGS`, `RUSTFLAGS`, `PATH`, `LD_PRELOAD`, `LD_LIBRARY_PATH`, `PYTHONPATH`) is assigned a value that comes from another variable, a command substitution, or an array expansion.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x024"
@@ -2074,7 +2074,7 @@
   "x025": {
     "id": "X025",
     "name": "Multi-Line Function Shadow",
-    "severity": "",
+    "severity": "HIGH",
     "categoryTitle": "Crossfire",
     "description": "Fires when a function definition is split across multiple lines using backslash-newline continuations, specifically for functions in the shadowed set (shell builtins, makepkg helpers, common utilities).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x025"
@@ -2082,7 +2082,7 @@
   "x026": {
     "id": "X026",
     "name": "Unresolved Constructs In Executable Positions",
-    "severity": "",
+    "severity": "MEDIUM",
     "categoryTitle": "Crossfire",
     "description": "Fires when an assignment the tokenizer refused is *referenced from* `build()`, `prepare()`, `check()` or `package()`. Top-level metadata (`pkgver=$(date)`, decorative variables) is not an executable position. The finding lists the unresolved names and the functions that reference them; `[thresholds] x026.min_count` sets the firing floor (default 1). The unresolved-is-not-seen contract holds: X026 reports the refusal, it never makes another rule treat the value as read.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x026"
@@ -2090,7 +2090,7 @@
   "x027": {
     "id": "X027",
     "name": "Refusal Cluster",
-    "severity": "",
+    "severity": "CRITICAL",
     "categoryTitle": "Crossfire",
     "description": "Fires when X026's input set holds two or more distinct unresolved names in executable positions. X027 implies X026; no orphaned cluster findings. As with X026, the refusals are also an analysis boundary: [W008](unverifiable.md#w008) reports the unresolved constructs at weight 0 (X reports the suspicion, W reports the boundary; both may fire on the same diff).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x027"
@@ -2098,7 +2098,7 @@
   "x028": {
     "id": "X028",
     "name": "Pattern Completed Across Commits",
-    "severity": "",
+    "severity": "HIGH",
     "categoryTitle": "Crossfire",
     "description": "Joins the immediately preceding recorded review's added lines with the current diff's and runs the crossfire catalog over the joined stream; it fires only when the join yields a technique *neither half yields alone*. Gaps in history degrade to no-firing. The current catalog already owns the completed pipeline in one half for the common split shapes (R001), so the rule is quiet on the locked single-diff corpus; the join-with-self safety invariant is tested.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x028"
@@ -2106,7 +2106,7 @@
   "x029": {
     "id": "X029",
     "name": "Encoded Material At Rest",
-    "severity": "",
+    "severity": "MEDIUM",
     "categoryTitle": "Crossfire",
     "description": "Fires on a base64, base32 or hex literal above the length floor (default 256 encoded characters, `[thresholds] x029.min_length`) when no decoder is present in the same diff. A decoder in the diff routes the shape to X001. The finding names the literal class, never the literal's content. Measured on the locked benign corpus: 1/3,739.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x029"
@@ -2114,7 +2114,7 @@
   "x030": {
     "id": "X030",
     "name": "ANSI-C Quoted Content In Commands",
-    "severity": "",
+    "severity": "HIGH",
     "categoryTitle": "Crossfire",
     "description": "Fires on a command-position `$'...'` literal with two or more hex/octal escapes (or a control escape) whose decoded value is not a benign single token (a path, a flag, a filename). Formatting-only escapes (` `, `\t`) are ordinary. Measured on the locked benign corpus: 0/3,739.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x030"
@@ -2122,7 +2122,7 @@
   "x031": {
     "id": "X031",
     "name": "Build Reads Non-Code Text",
-    "severity": "",
+    "severity": "HIGH",
     "categoryTitle": "Crossfire",
     "description": "Fires when `build()`/`prepare()`/`package()` reads its own PKGBUILD (by name, or through `$srcdir`/`$startdir`) and pipes the content through a transformation into a shell or `eval`. Reading a different file, or reading the recipe for metadata without execution, stands down. Measured on the locked benign corpus: 0/3,739.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x031"
@@ -2130,7 +2130,7 @@
   "x032": {
     "id": "X032",
     "name": "Command Name Assembled By Splicing",
-    "severity": "",
+    "severity": "HIGH",
     "categoryTitle": "Crossfire",
     "description": "Fires when a command name is built by splicing quotes or ANSI-C escapes: `cu\"\"rl`, `su\"d\"o`, `su$'\\x64'o`, `${IFS}sudo`. A PKGBUILD has no honest reason to disguise a command name, so the splicing itself is the finding, whether or not the hidden command is harmless. It closes the refusal family's residual: a splice a shell executes but the tokenizer folds can still be reported as the *attempt* it is.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x032"
@@ -2138,7 +2138,7 @@
   "x033": {
     "id": "X033",
     "name": "File With No Provenance Executed",
-    "severity": "",
+    "severity": "HIGH",
     "categoryTitle": "Crossfire",
     "description": "Fires when a build function executes a file at the `$srcdir` root that the recipe neither declares in `source=()`, writes itself, nor fetches inline with a network client. `build()` running `bash \"$srcdir\"/stage.sh` where `stage.sh` came from nowhere is a payload the source array never showed: a checksummed tarball unpacks into its own subdirectory, so a file sitting at the source root has no provenance at all. Files inside the unpacked tree (a relative path after `cd`, or `$srcdir/pkg-ver/...`), declared source names, freshly written names, and anything a fetch client produced (H082's case) stay out of scope.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x033"

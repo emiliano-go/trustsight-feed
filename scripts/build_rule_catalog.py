@@ -34,9 +34,7 @@ DOCS_BASE = "https://docs.trustsight.org/reference/rules"
 
 HEADING = re.compile(r"^### ([A-Z]\d{3}):\s*(.*?)\s*(?:\{#([^}]+)\})?\s*$")
 H1 = re.compile(r"^#\s+(.*?)\s*$")
-SEVERITY = re.compile(r"^-\s*\*\*Severity:\*\*\s*([A-Za-z]+)")
-DESCRIPTION = re.compile(r"^-\s*\*\*Description:\*\*\s*(.*\S)\s*$")
-CONDITION = re.compile(r"^-\s*\*\*Condition:\*\*\s*(.*\S)\s*$")
+BULLET = re.compile(r"^-\s*\*\*([A-Za-z ]+):\*\*\s*(.*\S)?\s*$")
 
 # Rule ids the tool emits that have no published docs heading: the weighted
 # novelty signal, the source-provenance bucket and the coverage gap.  The feed
@@ -151,6 +149,64 @@ def _category_titles() -> dict[str, str]:
     return {}
 
 
+def _section_bullets_and_prose(lines: list[str], start: int, end: int) -> tuple[dict, list[str]]:
+    """A section's bullets (with their wrapped continuation lines) and prose.
+
+    The docs state some rules as a one-line ``Description``, others as a
+    ``Condition`` that wraps across lines, and often an explanatory paragraph
+    below. Reading only the first line truncated the explanation (a rule read
+    "A package whose name ends in -bin declares an added" and stopped), so a
+    bullet absorbs its continuation lines and the prose paragraphs are kept
+    whole.
+    """
+    bullets: dict[str, str] = {}
+    prose: list[str] = []
+    key: str | None = None
+    parts: list[str] = []
+    block: list[str] = []
+
+    def flush_bullet() -> None:
+        nonlocal key, parts
+        if key is not None:
+            bullets.setdefault(key, " ".join(parts).strip())
+        key, parts = None, []
+
+    def flush_prose() -> None:
+        if block:
+            prose.append(" ".join(block))
+            block.clear()
+
+    for i in range(start, end):
+        line = lines[i]
+        stripped = line.strip()
+        if not stripped:
+            flush_bullet()
+            flush_prose()
+            continue
+        m = BULLET.match(line)
+        if m:
+            flush_bullet()
+            flush_prose()
+            key = m.group(1).strip().lower()
+            parts = [m.group(2).strip()] if m.group(2) else []
+        elif key is not None:
+            parts.append(stripped)
+        else:
+            block.append(stripped)
+    flush_bullet()
+    flush_prose()
+    return bullets, prose
+
+
+META_LINE = re.compile(r"^\*\*([A-Z]+)\*\*.*(?:weight|category)")
+FIRE_RATE = re.compile(r"^(?:Fire rate|Measured)[:\s]")
+
+
+def _looks_like_meta(text: str) -> bool:
+    """A `**SEVERITY** (weight N) · category x` or `Fire rate: ...` line."""
+    return bool(META_LINE.match(text)) or bool(FIRE_RATE.match(text))
+
+
 def _parse_page(path: Path) -> list[dict]:
     lines = path.read_text().split("\n")
     page = path.stem
@@ -161,53 +217,39 @@ def _parse_page(path: Path) -> list[dict]:
             page_title = m.group(1)
             break
 
+    heads = [i for i, line in enumerate(lines) if HEADING.match(line)]
     entries = []
-    i = 0
-    while i < len(lines):
-        m = HEADING.match(lines[i])
-        if not m:
-            i += 1
-            continue
+    for n, index in enumerate(heads):
+        m = HEADING.match(lines[index])
         rule_id, name, anchor = m.group(1), m.group(2), m.group(3)
-        severity = ""
-        description = ""
-        condition = ""
-        prose = ""
-        j = i + 1
-        while j < len(lines) and not HEADING.match(lines[j]):
-            line = lines[j]
-            s = SEVERITY.match(line)
-            d = DESCRIPTION.match(line)
-            c = CONDITION.match(line)
-            if s and not severity:
-                severity = s.group(1).upper()
-            if d and not description:
-                description = d.group(1)
-            if c and not condition:
-                condition = c.group(1)
-            # Most rules state no explicit Description: they carry a Condition
-            # and/or a prose paragraph.  Fall back to the first of those, so a
-            # rule explained on its page is explained in the feed too.
-            if not prose and line.strip() and line[0] not in "-#|!<" \
-                    and not line.startswith("**"):
-                block = []
-                k = j
-                while k < len(lines) and lines[k].strip() and not HEADING.match(lines[k]):
-                    block.append(lines[k].strip())
-                    k += 1
-                prose = " ".join(block)
-            j += 1
-        description = description or condition or prose
+        end = heads[n + 1] if n + 1 < len(heads) else len(lines)
+        bullets, prose = _section_bullets_and_prose(lines, index + 1, end)
+        severity = (bullets.get("severity") or "").split(" ")[0].upper()
+        explicit = bullets.get("description") or ""
+        condition = bullets.get("condition") or ""
+        # Some pages (crossfire, sabotage) open with `**SEVERITY** ... category`
+        # instead of a Severity bullet. That line is metadata, not the
+        # explanation; take its severity and use the paragraph after it.
+        paragraph = ""
+        for block in prose:
+            if _looks_like_meta(block):
+                if not severity:
+                    m2 = META_LINE.match(block)
+                    severity = m2.group(1) if m2 else severity
+                continue
+            paragraph = block
+            break
         entries.append({
             "id": rule_id,
             "name": name,
             "severity": severity,
-            "description": description,
+            # An explicit Description wins; otherwise the explanatory
+            # paragraph, and only then the bare Condition.
+            "description": explicit or paragraph or condition,
             "page": page,
             "pageTitle": page_title,
             "anchor": anchor or rule_id.lower(),
         })
-        i = j
     return entries
 
 
