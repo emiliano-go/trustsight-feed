@@ -107,6 +107,24 @@ function diffValues(diffText, keywords) {
   return { removed, added }
 }
 
+/** A line with its version numbers and checksums blanked, for comparison. */
+function withoutVersions(line) {
+  return line
+    .replace(/\$\{?pkgver\}?/g, 'V')
+    .replace(/\bv?\d+(?:\.\d+)+(?:[-._][0-9A-Za-z]+)*/g, 'V')
+    .replace(/\b[0-9a-f]{32,}\b/gi, 'H')
+}
+
+/**
+ * True when the change is more than a version bump. A source line whose only
+ * difference is the version (or a checksum) did not really change, and the
+ * card must not say it did.
+ */
+function changedBeyondVersion(removed, added) {
+  const norm = (arr) => [...new Set(arr.map(withoutVersions))].sort().join('|')
+  return norm(removed) !== norm(added)
+}
+
 /**
  * The context of a flagged package: who maintains it and where its source
  * comes from. Always shown beside the rule triggers, colored by whether the
@@ -143,9 +161,11 @@ function ContextBlock({ packageName, findings }) {
   }, [packageName])
 
   const maintChanged = info.maintainerRemoved.length || info.maintainerAdded.length
-  const upChanged = info.upstreamRemoved.length || info.upstreamAdded.length
+  const upChanged = changedBeyondVersion(info.upstreamRemoved, info.upstreamAdded)
   const maintainerClass = info.maintainerRemoved.length ? ' context__card--del' : info.maintainerAdded.length ? ' context__card--add' : ''
-  const upstreamClass = info.upstreamRemoved.length ? ' context__card--del' : info.upstreamAdded.length ? ' context__card--add' : ''
+  const upstreamClass = upChanged
+    ? (info.upstreamRemoved.length ? ' context__card--del' : ' context__card--add')
+    : ''
 
   return (
     <div className="context">
