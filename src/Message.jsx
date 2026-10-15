@@ -99,9 +99,33 @@ function diffValues(diffText, keywords) {
   return { removed, added }
 }
 
+/**
+ * The source URLs a diff adds and removes. Only `source=` declarations are
+ * read, and only the URL in each is kept, so a card shows the old and new
+ * upstream rather than every line that merely mentions the word "source".
+ */
+const SOURCE_DECL = /^\s*source(?:_[a-z0-9_]+)?\s*=/
+function sourceUrlsFromDiff(diffText) {
+  const removed = []
+  const added = []
+  const seen = { '-': new Set(), '+': new Set() }
+  for (const raw of String(diffText || '').split('\n')) {
+    if (raw.startsWith('+++') || raw.startsWith('---')) continue
+    const sign = raw[0]
+    if (sign !== '+' && sign !== '-') continue
+    const body = raw.slice(1)
+    if (!SOURCE_DECL.test(body)) continue
+    for (const m of body.matchAll(/https?:\/\/[^\s'")]+/g)) {
+      if (seen[sign].has(m[0])) continue
+      seen[sign].add(m[0])
+      ;(sign === '-' ? removed : added).push(m[0])
+    }
+  }
+  return { removed, added }
+}
+
 /** A line with its version numbers and checksums blanked, for comparison. */
-function withoutVersions(line) {
-  return line
+function withoutVersions(line) {  return line
     .replace(/\$\{?pkgver\}?/g, 'V')
     .replace(/\bv?\d+(?:\.\d+)+(?:[-._][0-9A-Za-z]+)*/g, 'V')
     .replace(/\b[0-9a-f]{32,}\b/gi, 'H')
@@ -142,7 +166,7 @@ function ContextBlock({ packageName, findings }) {
       const parsed = parsePkgbuild(String(srcBody.content || ''))
       const diff = String(diffBody.diff || '')
       const m = diffValues(diff, ['Maintainer'])
-      const u = diffValues(diff, ['source', 'url'])
+      const u = sourceUrlsFromDiff(diff)
       setInfo({
         maintainer: parsed.maintainer, url: parsed.url, sources: parsed.sources,
         maintainerRemoved: m.removed, maintainerAdded: m.added,
