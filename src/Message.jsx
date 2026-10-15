@@ -45,6 +45,120 @@ function unresolvedNames(findings) {
   return names
 }
 
+/**
+ * Map a unified diff onto the current file: the set of added line numbers, and
+ * the removed lines keyed by the line number they precede. This is what lets
+ * the source view show the change in place.
+ */
+function parseFileDiff(diffText, names) {
+  const added = new Set()
+  const delsBefore = new Map()
+  if (!diffText) return { added, delsBefore }
+  let inFile = false
+  let newLine = 0
+  for (const line of diffText.split('\n')) {
+    if (line.startsWith('diff --git ')) {
+      const m = line.match(/ b\/(.+)$/)
+      inFile = Boolean(m) && names.includes(m[1])
+      continue
+    }
+    if (!inFile) continue
+    if (line.startsWith('@@')) {
+      const m = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
+      newLine = m ? Number(m[1]) : 0
+      continue
+    }
+    if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('index ') || line.startsWith('\\')) continue
+    if (line.startsWith('+')) { added.add(newLine); newLine += 1 }
+    else if (line.startsWith('-')) {
+      if (!delsBefore.has(newLine)) delsBefore.set(newLine, [])
+      delsBefore.get(newLine).push(line.slice(1))
+    } else if (line.startsWith(' ')) { newLine += 1 }
+  }
+  return { added, delsBefore }
+}
+
+const MAINTAINER_RULES = new Set(['H026', 'H088', 'C006', 'C030'])
+const UPSTREAM_RULES = new Set(['H049', 'SOURCE_BUCKET', 'NOVELTY', 'C003', 'H019'])
+
+/** The maintainer and upstream URLs a PKGBUILD declares. */
+function parsePkgbuild(text) {
+  if (!text) return { maintainer: '', url: '', sources: [] }
+  const maintainer = (text.match(/^#\s*Maintainer[^\n:]*:\s*(.+?)\s*$/m) || [])[1] || ''
+  const url = (text.match(/^url=(['"]?)([^'"\n]+)\1/m) || [])[2] || ''
+  const sources = []
+  const block = text.match(/source(?:_[a-z0-9_]+)?=\(([\s\S]*?)\)/m)
+  if (block) {
+    for (const m of block[1].matchAll(/['"]([^'"]+)['"]/g)) {
+      if (/^[a-z][a-z0-9+.-]*:\/\//i.test(m[1])) sources.push(m[1])
+    }
+  }
+  return { maintainer, url, sources }
+}
+
+/**
+ * The findings whose rule is about context rather than a source line: who
+ * maintains the package and where its source comes from. The concrete values
+ * are read from the PKGBUILD, since the finding reason does not carry them.
+ */
+function ContextBlock({ packageName, findings }) {
+  const maintainerFired = findings.some((f) => MAINTAINER_RULES.has(f.rule_id))
+  const upstreamFired = findings.some((f) => UPSTREAM_RULES.has(f.rule_id))
+  const manifests = findings.filter((f) => /^U\d{3}$/.test(f.rule_id))
+  const manifestFiles = [...new Set(manifests.map((f) => f.file).filter(Boolean))]
+  const [pkgbuild, setPkgbuild] = useState('')
+
+  useEffect(() => {
+    let live = true
+    if (!maintainerFired && !upstreamFired) return undefined
+    fetch(`/api/source/${encodeURIComponent(packageName)}?file=PKGBUILD`)
+      .then((res) => (res.ok ? res.json() : {}))
+      .then((body) => { if (live) setPkgbuild(String(body.content || '')) })
+      .catch(() => {})
+    return () => { live = false }
+  }, [packageName, maintainerFired, upstreamFired])
+
+  if (!maintainerFired && !upstreamFired && !manifestFiles.length) return null
+  const info = parsePkgbuild(pkgbuild)
+
+  return (
+    <div className="context">
+      <span className="pkg__label">Context</span>
+      <div className="context__cards">
+        {maintainerFired ? (
+          <article className="context__card">
+            <span className="context__title">Maintainer</span>
+            <span className="context__value">{info.maintainer || 'changed'}</span>
+            <span className="context__note">A maintainer rule fired; the finding explains the change.</span>
+          </article>
+        ) : null}
+        {upstreamFired ? (
+          <article className="context__card">
+            <span className="context__title">Upstream</span>
+            {info.url
+              ? <a className="context__value" href={info.url} target="_blank" rel="noreferrer">{info.url}</a>
+              : <span className="context__value">source changed</span>}
+            {info.sources.length ? (
+              <ul className="context__list">
+                {info.sources.slice(0, 4).map((u) => <li key={u}><a href={u} target="_blank" rel="noreferrer">{u}</a></li>)}
+              </ul>
+            ) : null}
+          </article>
+        ) : null}
+        {manifestFiles.length ? (
+          <article className="context__card">
+            <span className="context__title">Upstream manifests</span>
+            <ul className="context__list">
+              {manifestFiles.map((f) => <li key={f}><code className="md-code">{f}</code></li>)}
+            </ul>
+            <span className="context__note">Open the Source tab to view them.</span>
+          </article>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
 /** Packages the analysis could not fully read, with what it could not resolve. */
 function Refusals({ refusals }) {
   if (!refusals.length) return null
@@ -183,8 +297,9 @@ function Findings({ findings }) {
         const loc = locationLabel(f)
         const rule = ruleInfo(f.rule_id)
         const unresolved = parseUnresolved(f.reason)
+        const sev = String(f.severity || 'info').toLowerCase()
         return (
-          <li className="finding" key={`${f.rule_id}-${i}`}>
+          <li className={`finding finding--${sev}`} key={`${f.rule_id}-${i}`}>
             <div className="finding__head">
               <RuleChip id={f.rule_id} />
               {loc
@@ -226,14 +341,19 @@ function SourceView({ packageName, files, findings }) {
   useEffect(() => {
     let live = true
     setState({ loading: true })
-    fetch(`/api/source/${encodeURIComponent(packageName)}?file=${encodeURIComponent(file)}`)
-      .then(async (res) => {
-        const body = await res.json().catch(() => ({}))
-        if (res.ok) return { content: String(body.content || ''), actualFile: body.file || file }
-        if (body.error === 'not_found') return { notFound: true, available: Array.isArray(body.available) ? body.available : [] }
-        return { error: body.error ? `Could not load (${body.error}).` : `HTTP ${res.status}` }
+    const sourceReq = fetch(`/api/source/${encodeURIComponent(packageName)}?file=${encodeURIComponent(file)}`)
+      .then(async (res) => ({ res, body: await res.json().catch(() => ({})) }))
+    const diffReq = fetch(`/api/diff/${encodeURIComponent(packageName)}`)
+      .then((res) => (res.ok ? res.json() : {}))
+      .catch(() => ({}))
+    Promise.all([sourceReq, diffReq])
+      .then(([{ res, body }, diffBody]) => {
+        const diff = String((diffBody && diffBody.diff) || '')
+        if (!live) return
+        if (res.ok) return setState({ content: String(body.content || ''), actualFile: body.file || file, diff })
+        if (body.error === 'not_found') return setState({ notFound: true, available: Array.isArray(body.available) ? body.available : [], diff })
+        setState({ error: body.error ? `Could not load (${body.error}).` : `HTTP ${res.status}`, diff })
       })
-      .then((next) => { if (live) setState(next) })
       .catch((err) => { if (live) setState({ error: String(err && err.message ? err.message : err) }) })
     return () => { live = false }
   }, [packageName, file])
@@ -265,6 +385,17 @@ function SourceView({ packageName, files, findings }) {
       }
     })
   }
+
+  // Merge the diff in place: added lines get a green row, removed lines are
+  // inserted red before the line they preceded.
+  const diffInfo = parseFileDiff(state.diff, [file, state.actualFile].filter(Boolean))
+  const rows = []
+  lines.forEach((text, i) => {
+    const lineNo = i + 1
+    for (const removed of diffInfo.delsBefore.get(lineNo) || []) rows.push({ kind: 'del', text: removed, no: null })
+    rows.push({ kind: diffInfo.added.has(lineNo) ? 'add' : 'ctx', text, no: lineNo })
+  })
+  for (const removed of diffInfo.delsBefore.get(lines.length + 1) || []) rows.push({ kind: 'del', text: removed, no: null })
 
   return (
     <div className="source">
@@ -299,18 +430,14 @@ function SourceView({ packageName, files, findings }) {
             <p className="source__note">Showing {state.actualFile}, the matching file in the repository.</p>
           ) : null}
           <div className="source__code">
-            {lines.map((text, i) => {
-              const lineNo = i + 1
-              const hits = byLine.get(lineNo)
+            {rows.map((row, i) => {
+              const hits = row.no ? byLine.get(row.no) : null
+              const cls = `source__line${row.kind !== 'ctx' ? ` source__line--${row.kind}` : ''}${hits ? ' source__line--hit' : ''}${row.no && unresolvedLines.has(row.no) ? ' source__line--unresolved' : ''}`
               return (
-                <div
-                  className={`source__line${hits ? ' source__line--hit' : ''}${unresolvedLines.has(lineNo) ? ' source__line--unresolved' : ''}`}
-                  key={lineNo}
-                  title={hits ? hits.map((h) => h.reason).filter(Boolean).join(' | ') : undefined}
-                >
-                  <span className="source__no">{lineNo}</span>
+                <div className={cls} key={i} title={hits ? hits.map((h) => h.reason).filter(Boolean).join(' | ') : undefined}>
+                  <span className="source__no">{row.no || ''}</span>
                   <span className="source__text">
-                    {text || ' '}
+                    {row.text || ' '}
                     {hits ? (
                       <span className="source__hits">
                         {hits.map((h, j) => <RuleChip key={`${h.rule_id}-${j}`} id={h.rule_id} />)}
@@ -451,6 +578,7 @@ function PackageSections({ packages }) {
             ) : (
               <p className="pkg__meta">No located findings in this entry.</p>
             )}
+            <ContextBlock packageName={pkg.package} findings={findings} />
             {rules.length ? (
               <div className="rule-cards">
                 {rules.map((id) => <RuleCard key={id} id={id} />)}

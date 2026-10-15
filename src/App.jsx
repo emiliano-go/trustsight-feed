@@ -100,6 +100,13 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, event, refreshTick])
 
+  // Reload the list and the stats without reloading the page.
+  function manualRefresh() {
+    setNow(Date.now())
+    setRefreshTick((t) => t + 1)
+    fetch('/api/stats').then((r) => r.json()).then(setStats).catch(() => {})
+  }
+
   return (
     <div className="page" id="top">
       <a className="skip-link" href="#content">Skip to content</a>
@@ -173,6 +180,15 @@ export function App() {
                 </button>
               ))}
             </div>
+            <button
+              type="button"
+              className="filter refresh-button"
+              onClick={manualRefresh}
+              disabled={loading}
+              aria-label="Reload the list"
+            >
+              {loading ? 'Refreshing…' : '⟳ Refresh'}
+            </button>
           </div>
           <p className="feed-count">
             {loading && !items.length ? 'loading…' : `${items.length} shown${next ? '+' : ''}`}
