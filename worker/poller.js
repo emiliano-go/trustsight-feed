@@ -107,8 +107,8 @@ function ntfyUrl(env, since) {
  * answers 522 (an edge timeout) under load; a retry usually clears it, and a
  * miss is harmless because ntfy caches the message for the next cycle.
  */
-const POLL_TIMEOUT_MS = 8_000
-const POLL_ATTEMPTS = 3
+const POLL_TIMEOUT_MS = 3_000
+const POLL_ATTEMPTS = 4
 
 async function fetchNtfy(url, headers) {
   let last
