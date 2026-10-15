@@ -534,6 +534,12 @@ a.chip:hover { border-color: var(--accent); color: var(--accent); }
 }
 .context__card--wide { grid-column: 1 / -1; }
 
+/* Past and current values, shown as a small git diff. */
+.context__diff { display: flex; flex-direction: column; gap: 3px; font-family: var(--font-mono); font-size: 0.7059rem; line-height: 1.5; }
+.context__diff-line { padding: 3px 8px; border-radius: 4px; overflow-wrap: anywhere; }
+.context__diff-line--del { background: color-mix(in srgb, var(--plate-red) 20%, transparent); color: var(--fg); }
+.context__diff-line--add { background: color-mix(in srgb, var(--plate-green) 18%, transparent); color: var(--fg); }
+
 /* ---------- maintainers ---------- */
 
 .maintainers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }

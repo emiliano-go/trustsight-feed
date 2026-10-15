@@ -93,18 +93,18 @@ function parsePkgbuild(text) {
   return { maintainer, url, sources }
 }
 
-/** Whether the diff adds or removes a line mentioning any keyword. */
-function diffTouched(diffText, keywords) {
-  let added = false
-  let removed = false
-  if (!diffText) return { added, removed }
+/** The removed and added lines of a diff that mention any keyword. */
+function diffValues(diffText, keywords) {
+  const removed = []
+  const added = []
+  if (!diffText) return { removed, added }
   for (const line of diffText.split('\n')) {
     if (line.startsWith('+++') || line.startsWith('---')) continue
     if (!keywords.some((k) => line.includes(k))) continue
-    if (line.startsWith('+')) added = true
-    else if (line.startsWith('-')) removed = true
+    if (line.startsWith('+')) added.push(line.slice(1).trim())
+    else if (line.startsWith('-')) removed.push(line.slice(1).trim())
   }
-  return { added, removed }
+  return { removed, added }
 }
 
 /**
@@ -118,7 +118,8 @@ function ContextBlock({ packageName, findings }) {
   )]
   const [info, setInfo] = useState({
     maintainer: '', url: '', sources: [],
-    maintainerAdded: false, maintainerRemoved: false, upstreamAdded: false, upstreamRemoved: false,
+    maintainerRemoved: [], maintainerAdded: [],
+    upstreamRemoved: [], upstreamAdded: [],
   })
 
   useEffect(() => {
@@ -130,19 +131,21 @@ function ContextBlock({ packageName, findings }) {
       if (!live) return
       const parsed = parsePkgbuild(String(srcBody.content || ''))
       const diff = String(diffBody.diff || '')
-      const m = diffTouched(diff, ['Maintainer'])
-      const u = diffTouched(diff, ['url=', 'source=', 'source_'])
+      const m = diffValues(diff, ['Maintainer'])
+      const u = diffValues(diff, ['source', 'url'])
       setInfo({
         maintainer: parsed.maintainer, url: parsed.url, sources: parsed.sources,
-        maintainerAdded: m.added, maintainerRemoved: m.removed,
-        upstreamAdded: u.added, upstreamRemoved: u.removed,
+        maintainerRemoved: m.removed, maintainerAdded: m.added,
+        upstreamRemoved: u.removed, upstreamAdded: u.added,
       })
     })
     return () => { live = false }
   }, [packageName])
 
-  const maintainerClass = info.maintainerRemoved ? ' context__card--del' : info.maintainerAdded ? ' context__card--add' : ''
-  const upstreamClass = info.upstreamRemoved ? ' context__card--del' : info.upstreamAdded ? ' context__card--add' : ''
+  const maintChanged = info.maintainerRemoved.length || info.maintainerAdded.length
+  const upChanged = info.upstreamRemoved.length || info.upstreamAdded.length
+  const maintainerClass = info.maintainerRemoved.length ? ' context__card--del' : info.maintainerAdded.length ? ' context__card--add' : ''
+  const upstreamClass = info.upstreamRemoved.length ? ' context__card--del' : info.upstreamAdded.length ? ' context__card--add' : ''
 
   return (
     <div className="context">
@@ -150,24 +153,34 @@ function ContextBlock({ packageName, findings }) {
       <div className="context__cards">
         <article className={`context__card${maintainerClass}`}>
           <span className="context__title">Maintainer</span>
-          <span className="context__value">{info.maintainer || 'unknown'}</span>
-          {info.maintainerAdded || info.maintainerRemoved
-            ? <span className="context__note">{info.maintainerRemoved ? 'changed in the latest commit' : 'set in the latest commit'}</span>
-            : null}
+          {maintChanged ? (
+            <div className="context__diff">
+              {info.maintainerRemoved.map((l, i) => <div className="context__diff-line context__diff-line--del" key={`r${i}`}>- {l}</div>)}
+              {info.maintainerAdded.map((l, i) => <div className="context__diff-line context__diff-line--add" key={`a${i}`}>+ {l}</div>)}
+            </div>
+          ) : (
+            <span className="context__value">{info.maintainer || 'unknown'}</span>
+          )}
         </article>
         <article className={`context__card${upstreamClass}`}>
           <span className="context__title">Upstream</span>
-          {info.url
-            ? <a className="context__value" href={info.url} target="_blank" rel="noreferrer">{info.url}</a>
-            : <span className="context__value">unknown</span>}
-          {info.sources.length ? (
-            <ul className="context__list">
-              {info.sources.slice(0, 4).map((u) => <li key={u}><a href={u} target="_blank" rel="noreferrer">{u}</a></li>)}
-            </ul>
-          ) : null}
-          {info.upstreamAdded || info.upstreamRemoved
-            ? <span className="context__note">{info.upstreamRemoved ? 'source changed in the latest commit' : 'source set in the latest commit'}</span>
-            : null}
+          {upChanged ? (
+            <div className="context__diff">
+              {info.upstreamRemoved.map((l, i) => <div className="context__diff-line context__diff-line--del" key={`r${i}`}>- {l}</div>)}
+              {info.upstreamAdded.map((l, i) => <div className="context__diff-line context__diff-line--add" key={`a${i}`}>+ {l}</div>)}
+            </div>
+          ) : (
+            <>
+              {info.url
+                ? <a className="context__value" href={info.url} target="_blank" rel="noreferrer">{info.url}</a>
+                : <span className="context__value">unknown</span>}
+              {info.sources.length ? (
+                <ul className="context__list">
+                  {info.sources.slice(0, 4).map((u) => <li key={u}><a href={u} target="_blank" rel="noreferrer">{u}</a></li>)}
+                </ul>
+              ) : null}
+            </>
+          )}
         </article>
         {manifestFiles.length ? (
           <article className="context__card context__card--wide">
