@@ -1,6 +1,7 @@
 import { env, SELF } from 'cloudflare:test'
-import { beforeEach, describe, expect, it } from 'vitest'
-import { attachmentUrl, baseSlug, buildSearchText, ftsQuery, isTrustSightNotification, parseNotification, pickHeadline, resolveDocumentBody, summarize } from '../worker/lib.js'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { alertingClusters, attachmentUrl, baseSlug, buildSearchText, ftsQuery, isTrustSightNotification, parseNotification, pickHeadline, resolveDocumentBody, RetryableIngestError, summarize } from '../worker/lib.js'
+import { pollNtfy } from '../worker/poller.js'
 
 function messageEvent(overrides = {}) {
   return {
@@ -71,16 +72,45 @@ describe('lib parsing', () => {
     expect(body).toContain('trustsight.alerts')
   })
 
-  it('falls back to the raw body when an attachment cannot be fetched', async () => {
+  it('returns the raw body when an attachment is definitively not a document', async () => {
     const msg = { message: 'You received a file: attachment.json', attachment: { url: 'https://ntfy.sh/file/x.json' } }
-    expect(await resolveDocumentBody(msg, 'ntfy.sh', async () => ({ ok: false, text: async () => '' }))).toBe(msg.message)
-    expect(await resolveDocumentBody(msg, 'ntfy.sh', async () => { throw new Error('boom') })).toBe(msg.message)
+    // 404 (the file is gone) and a 2xx that is not JSON are definitive.
+    expect(await resolveDocumentBody(msg, 'ntfy.sh', async () => ({ ok: false, status: 404, text: async () => '' }))).toBe(msg.message)
+    expect(await resolveDocumentBody(msg, 'ntfy.sh', async () => ({ ok: true, status: 200, text: async () => 'not json' }))).toBe(msg.message)
+  })
+
+  it('throws a retryable error when the attachment fetch is transient', async () => {
+    // A transient failure must not degrade to "not ours" - that would advance
+    // the cursor past the message and lose it. It throws so the poller retries.
+    const msg = { message: 'You received a file: attachment.json', attachment: { url: 'https://ntfy.sh/file/x.json' } }
+    await expect(resolveDocumentBody(msg, 'ntfy.sh', async () => { throw new Error('boom') }))
+      .rejects.toThrow(RetryableIngestError)
+    await expect(resolveDocumentBody(msg, 'ntfy.sh', async () => ({ ok: false, status: 503, text: async () => '' })))
+      .rejects.toThrow(RetryableIngestError)
   })
 
   it('builds an AND-of-prefixes FTS query', () => {
     expect(ftsQuery('some-pkg')).toBe('some* pkg*')
     expect(ftsQuery('  ')).toBeNull()
     expect(ftsQuery('H001')).toBe('h001*')
+  })
+
+  it('treats context hubs and one-member clusters as not-campaigns', () => {
+    // An older watcher shipped hundreds of H061 hubs (one member each) as
+    // "campaign cluster(s)"; the feed must not read that as an incident.
+    const payload = {
+      campaign_cluster: [
+        { rule_id: 'H061', members: ['sdl2'], count: 1 },
+        { rule_id: 'G001', members: ['lonely'], count: 1 },
+        { rule_id: 'G006', members: ['a', 'b'], count: 2 },
+        { rule_id: 'G002', members: ['a', 'b'], count: 2 },
+      ],
+    }
+    expect(alertingClusters(payload).map((c) => c.rule_id)).toEqual(['G002'])
+    expect(pickHeadline(payload)).toBe('campaign across 2 packages (G002)')
+    // With nothing left, the headline falls through, not to a fake campaign.
+    expect(pickHeadline({ campaign_cluster: [{ rule_id: 'H061', members: ['sdl2'], count: 1 }] }, 'TrustSight: alive'))
+      .toBe('TrustSight: alive')
   })
 
   it('summarizes packages and rules without duplicates', () => {
@@ -308,5 +338,61 @@ describe('api endpoints', () => {
     expect(body.schema).toBe('1')
     expect(body.last).toBe(1777723200)
     expect(res.headers.get('cache-control')).toBe('no-store')
+  })
+})
+
+describe('poll cursor', () => {
+  const ATTACH = 'https://ntfy.sh/file/att.json'
+
+  // A large document (delivered as an attachment) followed by a heartbeat. The
+  // alert is published first, so it must be handled before the heartbeat.
+  function ndjson() {
+    const alert = {
+      id: 'attmsg', time: 1777723201, event: 'message', topic: 't', title: 'big',
+      message: 'You received a file: attachment.json', attachment: { url: ATTACH },
+    }
+    const beat = {
+      id: 'beatmsg', time: 1777723202, event: 'message', topic: 't',
+      title: 'TrustSight: alive',
+      message: JSON.stringify({ event: 'trustsight.heartbeat', tool: 'trustsight', title: 'TrustSight: alive' }),
+    }
+    return `${JSON.stringify(alert)}\n${JSON.stringify(beat)}\n`
+  }
+
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it('does not advance the cursor past a message whose attachment fetch failed', async () => {
+    await env.DB.exec('DELETE FROM notifications')
+    await env.DB.prepare("UPDATE meta SET value='' WHERE key='cursor'").run()
+
+    let attachmentDown = true
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      const u = String(url)
+      if (u.includes('/json?poll=1')) return new Response(ndjson(), { status: 200 })
+      if (u === ATTACH) {
+        if (attachmentDown) throw new Error('network down')
+        return new Response(JSON.stringify({
+          event: 'trustsight.alerts', tool: 'trustsight', title: 'big', alerts: [], over_threshold: [],
+        }), { status: 200 })
+      }
+      return new Response('', { status: 404 })
+    }))
+
+    // First poll: the alert's attachment is unreachable, so the loop stops
+    // there and the cursor stays put. Nothing after it is committed either.
+    const first = await pollNtfy(env)
+    expect(first.stored).toBe(0)
+    expect(first.cursor).toBe('')
+    const afterFirst = await env.DB.prepare('SELECT COUNT(*) AS n FROM notifications').first()
+    expect(afterFirst.n).toBe(0)
+
+    // Second poll: the attachment is back. The alert is stored, then the
+    // heartbeat, and the cursor advances to the last handled id.
+    attachmentDown = false
+    const second = await pollNtfy(env)
+    expect(second.stored).toBe(2)
+    expect(second.cursor).toBe('beatmsg')
+    const rows = await env.DB.prepare('SELECT id FROM notifications ORDER BY time').all()
+    expect(rows.results.map((r) => r.id)).toEqual(['attmsg', 'beatmsg'])
   })
 })

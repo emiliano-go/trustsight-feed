@@ -97,6 +97,26 @@ export function buildSearchText({ event, title, day, payload }) {
   return [...new Set(parts.filter((p) => p !== undefined && p !== null && p !== ''))].join(' ')
 }
 
+/**
+ * The campaign clusters worth showing: a `G`-series rule with two or more
+ * members.
+ *
+ * The watcher's correlation sweep also returns weight-0 *context* findings -
+ * `H057`/`H060`/`H061` hubs, one member each - and an older build shipped them
+ * in `campaign_cluster`, so a routine sweep read as "226 campaign cluster(s)"
+ * naming the ecosystem's most depended-on packages. A cluster that is not a
+ * `G` rule, or that names a single package, is not a campaign and is filtered
+ * here whatever the producer sent.
+ */
+export function alertingClusters(payload) {
+  const clusters = (payload && payload.campaign_cluster) || []
+  return clusters.filter((c) => {
+    const rule = String((c && c.rule_id) || '')
+    return rule.startsWith('G') && rule !== 'G006' &&
+      Array.isArray(c.members) && c.members.length >= 2
+  })
+}
+
 //: A document larger than ntfy's message-body limit is delivered as an
 //: attachment; we fetch it, but never more than this, to bound a fetch.
 export const MAX_ATTACHMENT_BYTES = 1_000_000
@@ -124,24 +144,50 @@ export function attachmentUrl(msg, serverHost) {
 }
 
 /**
+ * A transient failure fetching a document. The caller must NOT advance its
+ * cursor past the message: ntfy caches it for hours, so the next poll can
+ * still retrieve it. See `resolveDocumentBody`.
+ */
+export class RetryableIngestError extends Error {
+  constructor(message) {
+    super(message)
+    this.name = 'RetryableIngestError'
+  }
+}
+
+/**
  * The JSON document for a message: its body, or, for a large one, the
- * attachment it points at. Never throws: on any failure the raw body is
- * returned, so a bad attachment is stored as an unparsed document rather than
- * dropped.
+ * attachment it points at.
+ *
+ * A *transient* failure to fetch the attachment (a network error, a 429 or a
+ * 5xx) throws `RetryableIngestError`, so the poller keeps its cursor and
+ * retries the message instead of treating an unretrieved attachment as a
+ * foreign body and dropping the whole document. A *definitive* answer (the
+ * URL is off-host, the file is gone, the body is genuinely not JSON) returns
+ * the raw body, which the caller then rejects as not-TrustSight.
  */
 export async function resolveDocumentBody(msg, serverHost, doFetch = fetch) {
   const body = typeof msg.message === 'string' ? msg.message : ''
   const url = attachmentUrl(msg, serverHost)
   if (!url) return body
+  let res
   try {
-    const res = await doFetch(url)
-    if (!res.ok) return body
-    const text = await res.text()
-    if (text.length > MAX_ATTACHMENT_BYTES) return body
-    return looksLikeJson(text) ? text : body
-  } catch {
-    return body
+    res = await doFetch(url)
+  } catch (err) {
+    throw new RetryableIngestError(`attachment fetch failed: ${err && err.message ? err.message : err}`)
   }
+  if (res.status === 429 || res.status >= 500) {
+    throw new RetryableIngestError(`attachment fetch transient status ${res.status}`)
+  }
+  if (!res.ok) return body
+  let text
+  try {
+    text = await res.text()
+  } catch (err) {
+    throw new RetryableIngestError(`attachment body failed: ${err && err.message ? err.message : err}`)
+  }
+  if (text.length > MAX_ATTACHMENT_BYTES) return body
+  return looksLikeJson(text) ? text : body
 }
 
 /** A compact list-item projection derived from a stored row and its payload. */export function summarize(row) {
@@ -160,7 +206,7 @@ export async function resolveDocumentBody(msg, serverHost, doFetch = fetch) {
     for (const f of o.findings || []) addRule(f.rule_id)
   }
   for (const m of payload.ioc_matches || []) addPkg(m.package)
-  for (const c of payload.campaign_cluster || []) {
+  for (const c of alertingClusters(payload)) {
     addRule(c.rule_id)
     // The member packages are the campaign; the search index already names
     // them, and leaving them out of the projection showed a campaign with no
@@ -214,7 +260,7 @@ export function pickHeadline(payload, fallback = '') {
     return ioc.length === 1 ? `IOC match on ${packages[0]}` : `${ioc.length} IOC matches (${packages[0]} first)`
   }
 
-  const clusters = payload.campaign_cluster || []
+  const clusters = alertingClusters(payload)
   if (clusters.length) {
     const top = clusters.reduce((a, b) =>
       (b.count > a.count || (b.count === a.count && String(b.rule_id) > String(a.rule_id))) ? b : a)

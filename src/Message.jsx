@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks'
 import { AccessibilityMenu, ThemeSwitch, Wordmark } from './Controls.jsx'
 import { RuleCard, RuleChip, RuleHighlight, ruleInfo } from './RuleChip.jsx'
 import { AUR_PACKAGE, AUR_PKGBUILD, eventBadgeClass, eventLabel, formatTime, locationLabel, relative } from './util.js'
+import { alertingClusters } from '../worker/lib.js'
 
 const SECURITY = 'https://docs.trustsight.org/security/'
 const NTFY = 'https://ntfy.sh/trustsight-aur-1d8a3fd2'
@@ -66,13 +67,24 @@ function groupAlerts(alerts) {
   return [...byName.values()]
 }
 
-function AlertList({ alerts }) {
+function AlertList({ alerts, overPackages }) {
   if (!alerts.length) return null
-  const groups = groupAlerts(alerts)
+  // A package that also crossed the threshold is rendered once, in full, by
+  // the over-threshold section below - so it is not repeated here.  Its rule
+  // firings are still named there through the located findings.
+  const all = groupAlerts(alerts)
+  const groups = all.filter((group) => !overPackages.has(group.package))
+  const alsoOver = all.length - groups.length
   return (
     <section className="detail__section">
       <h2>New alerts ({alerts.length})</h2>
       <p className="detail__explain">{ENTRY_TYPES.alert}</p>
+      {alsoOver ? (
+        <p className="detail__explain">
+          {alsoOver} of these package{alsoOver === 1 ? '' : 's'} {alsoOver === 1 ? 'is' : 'are'} also
+          over threshold, shown in full below.
+        </p>
+      ) : null}
       {groups.map((group) => (
         <article className="pkg" key={group.package}>
           <header className="pkg__head">
@@ -117,7 +129,12 @@ function PackageSections({ packages }) {
       <p className="detail__explain">{ENTRY_TYPES.over_threshold}</p>
       {packages.map((pkg) => {
         const findings = pkg.findings || []
-        const rules = [...new Set(pkg.rules || [])]
+        // A rule that has a located finding is already named and explained by
+        // its finding row (the chip explains the rule on hover, or on tap on a
+        // phone).  Only rules with no located finding need a card, so a rule is
+        // never rendered twice.
+        const foundRules = new Set(findings.map((f) => f.rule_id))
+        const rules = [...new Set(pkg.rules || [])].filter((id) => !foundRules.has(id))
         return (
           <article className="pkg" key={pkg.package}>
             <header className="pkg__head">
@@ -135,11 +152,13 @@ function PackageSections({ packages }) {
             ) : (
               <p className="pkg__meta">No located findings in this entry.</p>
             )}
-            <div className="rule-cards">
-              {rules.length
-                ? rules.map((id) => <RuleCard key={id} id={id} />)
-                : <p className="pkg__meta">No named rule in this entry.</p>}
-            </div>
+            {rules.length ? (
+              <div className="rule-cards">
+                {rules.map((id) => <RuleCard key={id} id={id} />)}
+              </div>
+            ) : findings.length ? null : (
+              <p className="pkg__meta">No named rule in this entry.</p>
+            )}
           </article>
         )
       })}
@@ -166,7 +185,7 @@ function IocSection({ matches }) {
 }
 
 function Campaigns({ payload }) {
-  const clusters = payload.campaign_cluster || []
+  const clusters = alertingClusters(payload)
   const impersonation = payload.impersonation || []
   if (!clusters.length && !impersonation.length) return null
   const total = clusters.length + impersonation.length
@@ -238,6 +257,7 @@ export function Message({ slug }) {
   const payload = data ? data.payload : {}
   const alerts = payload.alerts || []
   const packages = payload.over_threshold || []
+  const overPackages = new Set(packages.map((p) => p.package))
   const ioc = payload.ioc_matches || []
   const pretty = data ? JSON.stringify(payload, null, 2) : ''
 
@@ -286,12 +306,12 @@ export function Message({ slug }) {
               </div>
             ) : null}
 
-            <AlertList alerts={alerts} />
+            <AlertList alerts={alerts} overPackages={overPackages} />
             <PackageSections packages={packages} />
             <IocSection matches={ioc} />
             <Campaigns payload={payload} />
 
-            {!alerts.length && !packages.length && !ioc.length && !(payload.campaign_cluster || []).length && !(payload.impersonation || []).length ? (
+            {!alerts.length && !packages.length && !ioc.length && !alertingClusters(payload).length && !(payload.impersonation || []).length ? (
               <p className="feed-empty">This document carries no alerts, packages, indicators or campaigns.</p>
             ) : null}
 

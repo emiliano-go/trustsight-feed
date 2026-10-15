@@ -125,7 +125,14 @@ export async function pollNtfy(env) {
 
   let received = 0
   let stored = 0
-  let lastId = ''
+  // The cursor only ever moves to a message we actually *handled* - stored,
+  // skipped as a duplicate, or rejected as not-ours. A message whose store
+  // threw (a transient fetch or D1 error) stops the loop with the cursor left
+  // just before it, so the next poll fetches it again. Advancing past it, as
+  // this used to, dropped the notification forever: ntfy's `since=<id>` walks
+  // publication order, so a later poll returns only messages after the last one
+  // and never revisits the gap.
+  let committed = ''
   for (const line of text.split('\n')) {
     const trimmed = line.trim()
     if (!trimmed) continue
@@ -137,14 +144,15 @@ export async function pollNtfy(env) {
     }
     if (msg.event !== 'message' || !msg.id) continue
     received += 1
-    lastId = msg.id
     try {
       if (await storeNotification(env, msg, host, headers)) stored += 1
+      committed = msg.id
     } catch (err) {
-      console.warn('store failed for', msg.id, err)
+      console.warn('store failed for', msg.id, '- holding the cursor to retry:', err)
+      break
     }
   }
 
-  if (lastId && lastId !== cursor) await setCursor(env, lastId)
-  return { received, stored, cursor: lastId || cursor, truncated }
+  if (committed && committed !== cursor) await setCursor(env, committed)
+  return { received, stored, cursor: committed || cursor, truncated }
 }
