@@ -78,9 +78,6 @@ function parseFileDiff(diffText, names) {
   return { added, delsBefore }
 }
 
-const MAINTAINER_RULES = new Set(['H026', 'H088', 'C006', 'C030'])
-const UPSTREAM_RULES = new Set(['H049', 'SOURCE_BUCKET', 'NOVELTY', 'C003', 'H019'])
-
 /** The maintainer and upstream URLs a PKGBUILD declares. */
 function parsePkgbuild(text) {
   if (!text) return { maintainer: '', url: '', sources: [] }
@@ -96,55 +93,82 @@ function parsePkgbuild(text) {
   return { maintainer, url, sources }
 }
 
+/** Whether the diff adds or removes a line mentioning any keyword. */
+function diffTouched(diffText, keywords) {
+  let added = false
+  let removed = false
+  if (!diffText) return { added, removed }
+  for (const line of diffText.split('\n')) {
+    if (line.startsWith('+++') || line.startsWith('---')) continue
+    if (!keywords.some((k) => line.includes(k))) continue
+    if (line.startsWith('+')) added = true
+    else if (line.startsWith('-')) removed = true
+  }
+  return { added, removed }
+}
+
 /**
- * The findings whose rule is about context rather than a source line: who
- * maintains the package and where its source comes from. The concrete values
- * are read from the PKGBUILD, since the finding reason does not carry them.
+ * The context of a flagged package: who maintains it and where its source
+ * comes from. Always shown beside the rule triggers, colored by whether the
+ * latest commit changed that line.
  */
 function ContextBlock({ packageName, findings }) {
-  const maintainerFired = findings.some((f) => MAINTAINER_RULES.has(f.rule_id))
-  const upstreamFired = findings.some((f) => UPSTREAM_RULES.has(f.rule_id))
-  const manifests = findings.filter((f) => /^U\d{3}$/.test(f.rule_id))
-  const manifestFiles = [...new Set(manifests.map((f) => f.file).filter(Boolean))]
-  const [pkgbuild, setPkgbuild] = useState('')
+  const manifestFiles = [...new Set(
+    findings.filter((f) => /^U\d{3}$/.test(f.rule_id)).map((f) => f.file).filter(Boolean),
+  )]
+  const [info, setInfo] = useState({
+    maintainer: '', url: '', sources: [],
+    maintainerAdded: false, maintainerRemoved: false, upstreamAdded: false, upstreamRemoved: false,
+  })
 
   useEffect(() => {
     let live = true
-    if (!maintainerFired && !upstreamFired) return undefined
-    fetch(`/api/source/${encodeURIComponent(packageName)}?file=PKGBUILD`)
-      .then((res) => (res.ok ? res.json() : {}))
-      .then((body) => { if (live) setPkgbuild(String(body.content || '')) })
-      .catch(() => {})
+    Promise.all([
+      fetch(`/api/source/${encodeURIComponent(packageName)}?file=PKGBUILD`).then((r) => (r.ok ? r.json() : {})).catch(() => ({})),
+      fetch(`/api/diff/${encodeURIComponent(packageName)}`).then((r) => (r.ok ? r.json() : {})).catch(() => ({})),
+    ]).then(([srcBody, diffBody]) => {
+      if (!live) return
+      const parsed = parsePkgbuild(String(srcBody.content || ''))
+      const diff = String(diffBody.diff || '')
+      const m = diffTouched(diff, ['Maintainer'])
+      const u = diffTouched(diff, ['url=', 'source=', 'source_'])
+      setInfo({
+        maintainer: parsed.maintainer, url: parsed.url, sources: parsed.sources,
+        maintainerAdded: m.added, maintainerRemoved: m.removed,
+        upstreamAdded: u.added, upstreamRemoved: u.removed,
+      })
+    })
     return () => { live = false }
-  }, [packageName, maintainerFired, upstreamFired])
+  }, [packageName])
 
-  if (!maintainerFired && !upstreamFired && !manifestFiles.length) return null
-  const info = parsePkgbuild(pkgbuild)
+  const maintainerClass = info.maintainerRemoved ? ' context__card--del' : info.maintainerAdded ? ' context__card--add' : ''
+  const upstreamClass = info.upstreamRemoved ? ' context__card--del' : info.upstreamAdded ? ' context__card--add' : ''
 
   return (
     <div className="context">
       <span className="pkg__label">Context</span>
       <div className="context__cards">
-        {maintainerFired ? (
-          <article className="context__card">
-            <span className="context__title">Maintainer</span>
-            <span className="context__value">{info.maintainer || 'changed'}</span>
-            <span className="context__note">A maintainer rule fired; the finding explains the change.</span>
-          </article>
-        ) : null}
-        {upstreamFired ? (
-          <article className="context__card">
-            <span className="context__title">Upstream</span>
-            {info.url
-              ? <a className="context__value" href={info.url} target="_blank" rel="noreferrer">{info.url}</a>
-              : <span className="context__value">source changed</span>}
-            {info.sources.length ? (
-              <ul className="context__list">
-                {info.sources.slice(0, 4).map((u) => <li key={u}><a href={u} target="_blank" rel="noreferrer">{u}</a></li>)}
-              </ul>
-            ) : null}
-          </article>
-        ) : null}
+        <article className={`context__card${maintainerClass}`}>
+          <span className="context__title">Maintainer</span>
+          <span className="context__value">{info.maintainer || 'unknown'}</span>
+          {info.maintainerAdded || info.maintainerRemoved
+            ? <span className="context__note">{info.maintainerRemoved ? 'changed in the latest commit' : 'set in the latest commit'}</span>
+            : null}
+        </article>
+        <article className={`context__card${upstreamClass}`}>
+          <span className="context__title">Upstream</span>
+          {info.url
+            ? <a className="context__value" href={info.url} target="_blank" rel="noreferrer">{info.url}</a>
+            : <span className="context__value">unknown</span>}
+          {info.sources.length ? (
+            <ul className="context__list">
+              {info.sources.slice(0, 4).map((u) => <li key={u}><a href={u} target="_blank" rel="noreferrer">{u}</a></li>)}
+            </ul>
+          ) : null}
+          {info.upstreamAdded || info.upstreamRemoved
+            ? <span className="context__note">{info.upstreamRemoved ? 'source changed in the latest commit' : 'source set in the latest commit'}</span>
+            : null}
+        </article>
         {manifestFiles.length ? (
           <article className="context__card">
             <span className="context__title">Upstream manifests</span>
@@ -156,6 +180,50 @@ function ContextBlock({ packageName, findings }) {
         ) : null}
       </div>
     </div>
+  )
+}
+
+/** Everyone who updated a package in this document, and how many each touched. */
+function MaintainersSection({ packages }) {
+  const key = packages.join(',')
+  const [maintainers, setMaintainers] = useState(null)
+
+  useEffect(() => {
+    let live = true
+    if (!packages.length) return undefined
+    fetch(`/api/maintainers?packages=${encodeURIComponent(key)}`)
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((body) => { if (live) setMaintainers(body.maintainers || {}) })
+      .catch(() => {})
+    return () => { live = false }
+  }, [key])
+
+  if (!maintainers) return null
+  const groups = new Map()
+  for (const pkg of packages) {
+    const who = maintainers[pkg] || 'unknown'
+    if (!groups.has(who)) groups.set(who, [])
+    groups.get(who).push(pkg)
+  }
+  if (!groups.size) return null
+  const ordered = [...groups.entries()].sort((a, b) => (b[1].length - a[1].length) || a[0].localeCompare(b[0]))
+
+  return (
+    <section className="detail__section">
+      <h2>Maintainers ({ordered.length})</h2>
+      <p className="detail__explain">Who updated the packages in this document, and how many each touched.</p>
+      <ul className="maintainers">
+        {ordered.map(([who, pkgs]) => (
+          <li className="maintainer" key={who}>
+            <span className="maintainer__name">{who}</span>
+            <span className="maintainer__count">{pkgs.length} package{pkgs.length === 1 ? '' : 's'}</span>
+            <span className="maintainer__pkgs">
+              {pkgs.map((p) => <a key={p} href={AUR_PACKAGE(p)} target="_blank" rel="noreferrer">{p}</a>)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
@@ -533,6 +601,8 @@ function DiffView({ packageName }) {
 function FindingsOrSource({ packageName, findings }) {
   const [view, setView] = useState('findings')
   const files = [...new Set(findings.map((f) => f.file).filter(Boolean))]
+  // PKGBUILD first: it is the artifact a reader wants by default.
+  files.sort((a, b) => (a === 'PKGBUILD' ? -1 : b === 'PKGBUILD' ? 1 : a.localeCompare(b)))
   return (
     <>
       <div className="pkg__viewrow">
@@ -570,6 +640,7 @@ function PackageSections({ packages }) {
               <a className="pkg__action" href={AUR_PKGBUILD(pkg.package)} target="_blank" rel="noreferrer">See PKGBUILD ↗</a>
             </header>
             {pkg.last_modified ? <p className="pkg__meta">AUR change: {pkg.last_modified}</p> : null}
+            <ContextBlock packageName={pkg.package} findings={findings} />
             {findings.length ? (
               <>
                 <p className="pkg__meta">What fired, and the line that triggered it:</p>
@@ -578,7 +649,6 @@ function PackageSections({ packages }) {
             ) : (
               <p className="pkg__meta">No located findings in this entry.</p>
             )}
-            <ContextBlock packageName={pkg.package} findings={findings} />
             {rules.length ? (
               <div className="rule-cards">
                 {rules.map((id) => <RuleCard key={id} id={id} />)}
@@ -686,6 +756,14 @@ export function Message({ slug }) {
   const packages = payload.over_threshold || []
   const overPackages = new Set(packages.map((p) => p.package))
   const ioc = payload.ioc_matches || []
+  const allPackages = [...new Set([
+    ...alerts.map((a) => a.package),
+    ...packages.map((p) => p.package),
+    ...ioc.map((m) => m.package),
+    ...alertingClusters(payload).flatMap((c) => c.members || []),
+    ...(payload.impersonation || []).flatMap((c) => c.members || []),
+    ...(payload.refusals || []).map((r) => r.package),
+  ].filter(Boolean))]
   const pretty = data ? JSON.stringify(payload, null, 2) : ''
 
   async function copyJson() {
@@ -733,6 +811,7 @@ export function Message({ slug }) {
               </div>
             ) : null}
 
+            <MaintainersSection packages={allPackages} />
             <Refusals refusals={payload.refusals || []} />
             <AlertList alerts={alerts} overPackages={overPackages} />
             <PackageSections packages={packages} />

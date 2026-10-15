@@ -511,6 +511,23 @@ a.chip:hover { border-color: var(--accent); color: var(--accent); }
   color: var(--fg-muted);
 }
 .context__value { font-size: 0.8824rem; color: var(--fg); word-break: break-word; }
+.context__card--add {
+  border-left-color: var(--plate-green);
+  background: color-mix(in srgb, var(--plate-green) 10%, var(--bg));
+}
+.context__card--del {
+  border-left-color: var(--plate-red);
+  background: color-mix(in srgb, var(--plate-red) 10%, var(--bg));
+}
+
+/* ---------- maintainers ---------- */
+
+.maintainers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.maintainer { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding: 10px 14px; border: 1px solid var(--rule); border-radius: 6px; }
+.maintainer__name { font-family: var(--font-mono); font-weight: 700; color: var(--fg); }
+.maintainer__count { font-family: var(--font-mono); font-size: 0.7647rem; color: var(--fg-muted); }
+.maintainer__pkgs { display: flex; flex-wrap: wrap; gap: 8px; flex: 1 1 240px; }
+.maintainer__pkgs a { font-family: var(--font-mono); font-size: 0.7647rem; color: var(--accent); }
 .context__note { font-size: 0.7647rem; color: var(--fg-muted); }
 .context__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-family: var(--font-mono); font-size: 0.7059rem; }
 .context__list a { word-break: break-all; }
@@ -765,4 +782,33 @@ a.chip:hover { border-color: var(--accent); color: var(--accent); }
   .detail__meta { gap: 8px 14px; }
   .json { font-size: 0.7647rem; padding: 16px; }
 }
+
+/* ---------- phone polish ---------- */
+
+@media (max-width: 720px) {
+  /* A stray wide element must never let the whole page slide sideways. */
+  html, body { overflow-x: hidden; }
+
+  /* Every control is a comfortable tap target. */
+  .view-switch { width: 100%; justify-content: stretch; }
+  .view-switch button { flex: 1; min-height: 44px; padding: 10px 12px; font-size: 0.7059rem; }
+  .source__file { min-height: 40px; padding: 8px 12px; }
+  .refresh-button { min-height: 44px; }
+
+  /* Context and maintainers read top to bottom on a narrow screen. */
+  .context__cards { grid-template-columns: 1fr; }
+  .maintainer { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .maintainer__pkgs { flex: 1 1 auto; }
+
+  /* Findings stack cleanly; long tokens wrap instead of scrolling the page. */
+  .finding__head { align-items: flex-start; }
+  .diff__line, .source__text { overflow-wrap: anywhere; }
+  .source__hits { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 0; }
+  .pkg__action, .member__pkgbuild { align-self: flex-start; }
+  .finding__loc { max-width: 100%; }
+
+  /* The modal takes the screen without ever exceeding it. */
+  .modal__panel { max-height: 88vh; }
+}
+
 

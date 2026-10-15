@@ -23,6 +23,7 @@ const ENDPOINTS = [
   'GET /api/messages/{slug}',
   'GET /api/source/{package}?file=PKGBUILD',
   'GET /api/diff/{package}',
+  'GET /api/maintainers?packages=a,b,c',
   'GET /api/stats',
 ]
 
@@ -247,17 +248,70 @@ async function diff(env, url, name) {
   return done(text)
 }
 
+/** The current AUR maintainer for a batch of packages, from the AUR RPC. */
+async function fetchMaintainers(nameList) {
+  const found = {}
+  for (let i = 0; i < nameList.length; i += 50) {
+    const params = nameList.slice(i, i + 50).map((n) => `arg[]=${encodeURIComponent(n)}`).join('&')
+    try {
+      const res = await fetch(`${AUR_RPC_INFO}?${params}`, { headers: { 'user-agent': 'trustsight-feed/1.0' } })
+      if (!res.ok) continue
+      const body = await res.json()
+      for (const row of body.results || []) found[row.Name] = row.Maintainer || ''
+    } catch {
+      /* a package with no RPC answer is simply left unknown */
+    }
+  }
+  return found
+}
+
+async function maintainers(env, url) {
+  const raw = url.searchParams.get('packages') || ''
+  const names = [...new Set(raw.split(',').map((s) => s.trim()).filter((n) => PACKAGE_RE.test(n)))].slice(0, 100)
+  if (!names.length) return json({ maintainers: {} })
+
+  const now = Math.floor(Date.now() / 1000)
+  const result = {}
+  const missing = []
+  const rows = await env.DB.prepare(
+    `SELECT package, maintainer, fetched_at FROM maintainer_cache WHERE package IN (${names.map(() => '?').join(',')})`
+  ).bind(...names).all()
+  const cached = new Map((rows.results || []).map((r) => [r.package, r]))
+  for (const name of names) {
+    const row = cached.get(name)
+    if (row && now - row.fetched_at <= MAINTAINER_CACHE_TTL) result[name] = row.maintainer
+    else missing.push(name)
+  }
+  if (missing.length) {
+    const fetched = await fetchMaintainers(missing)
+    for (const name of missing) {
+      const value = fetched[name] || ''
+      result[name] = value
+      await env.DB.prepare(
+        `INSERT INTO maintainer_cache (package, maintainer, fetched_at) VALUES (?, ?, ?)
+         ON CONFLICT(package) DO UPDATE SET maintainer = excluded.maintainer, fetched_at = excluded.fetched_at`
+      ).bind(name, value, now).run()
+    }
+  }
+  return new Response(JSON.stringify({ maintainers: result }), {
+    status: 200,
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'public, max-age=3600', ...CORS },
+  })
+}
+
 // The AUR artifact the analysis read. The feed serves it back, unmodified, so
 // the detail page can show the source with the flagged lines highlighted. The
 // host is fixed (never a package-declared URL) and the size is capped.
 const AUR_CGIT = 'https://aur.archlinux.org/cgit/aur.git/plain'
 const AUR_TREE = 'https://aur.archlinux.org/cgit/aur.git/tree/'
 const AUR_PATCH = 'https://aur.archlinux.org/cgit/aur.git/patch/'
+const AUR_RPC_INFO = 'https://aur.archlinux.org/rpc/v5/info'
 const MAX_SOURCE_BYTES = 512 * 1024
 const MAX_DIFF_BYTES = 1024 * 1024
 //: How long a fetched AUR file is served from the store before it is fetched
 //: again. A page view never reaches the AUR; only the first view after this.
 const SOURCE_CACHE_TTL = 86400
+const MAINTAINER_CACHE_TTL = 86400
 
 async function cacheRead(env, kind, name, file) {
   const row = await env.DB.prepare(
@@ -400,6 +454,7 @@ export async function handleApi(request, env, url) {
   if ((match = path.match(/^\/api\/diff\/(.+)$/))) {
     return diff(env, url, decodeURIComponent(match[1]))
   }
+  if (path === '/api/maintainers') return maintainers(env, url)
   if (path.startsWith('/api/messages/')) {
     const slug = decodeURIComponent(path.slice('/api/messages/'.length))
     if (!slug) return json({ error: 'not_found' }, 404)
