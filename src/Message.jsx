@@ -93,6 +93,21 @@ function parsePkgbuild(text) {
   return { maintainer, url, sources }
 }
 
+/**
+ * The file paths a unified diff touches, in order. The diff is the record of
+ * what actually changed, so it names the files a reader may want to open even
+ * when no finding happens to point at them (the PKGBUILD, for one).
+ */
+function diffFiles(diffText) {
+  const files = []
+  const seen = new Set()
+  for (const line of String(diffText || '').split('\n')) {
+    const m = line.match(/^diff --git a\/.+ b\/(.+)$/)
+    if (m && !seen.has(m[1])) { seen.add(m[1]); files.push(m[1]) }
+  }
+  return files
+}
+
 /** The removed and added lines of a diff that mention any keyword. */
 function diffValues(diffText, keywords) {
   const removed = []
@@ -448,7 +463,9 @@ function Findings({ findings }) {
  * the note under the code says.
  */
 function SourceView({ packageName, files, findings }) {
-  const [file, setFile] = useState(files[0])
+  // The PKGBUILD is the artifact a reader wants first, and it always exists in
+  // an AUR repository, so it is the default whatever the findings name.
+  const [file, setFile] = useState('PKGBUILD')
   const [state, setState] = useState({ loading: true })
 
   useEffect(() => {
@@ -472,7 +489,16 @@ function SourceView({ packageName, files, findings }) {
   }, [packageName, file])
 
   const lines = state.content === undefined ? [] : state.content.split('\n')
-  const pickerFiles = state.available && state.available.length ? state.available : files
+  // Offer the PKGBUILD, every file a finding names, every file the diff
+  // touches, and (on a miss) the repository's own list. Without this the
+  // picker held only the findings' files, so for a package whose findings all
+  // point at a `.install` the PKGBUILD never appeared.
+  const pickerFiles = [...new Set([
+    'PKGBUILD',
+    ...files,
+    ...diffFiles(state.diff),
+    ...(state.available || []),
+  ])]
 
   // Highlight the findings for the requested file name, even when the
   // repository holds the same file under a different name.
