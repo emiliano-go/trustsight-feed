@@ -454,6 +454,32 @@ a.chip:hover { border-color: var(--accent); color: var(--accent); }
   font-style: italic;
 }
 .finding__reason { display: block; margin: 8px 0 0; color: var(--fg-muted); font-size: 0.8529rem; }
+
+/* The matched source line, shown as the diff line it came from. */
+.finding__diff {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.7647rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--fg);
+}
+.finding__diff--add {
+  background: color-mix(in srgb, var(--plate-green) 16%, transparent);
+  border-color: color-mix(in srgb, var(--plate-green) 45%, var(--rule));
+}
+.finding__diff--del {
+  background: color-mix(in srgb, var(--plate-red) 18%, transparent);
+  border-color: color-mix(in srgb, var(--plate-red) 45%, var(--rule));
+}
+.finding__diff--meta {
+  color: var(--fg-muted);
+  background: color-mix(in srgb, var(--fg) 5%, transparent);
+}
 .finding__unresolved { margin: 8px 0 0; color: var(--fg-muted); font-size: 0.8235rem; }
 .finding__explain {
   margin: 8px 0 0;

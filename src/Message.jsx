@@ -418,6 +418,26 @@ function AlertList({ alerts, overPackages }) {
 }
 
 /** Every finding the watcher sent, each with the file and line it fired on. */
+/**
+ * Split a finding reason into its prose and a trailing diff line. Many reasons
+ * end in the matched source line, e.g.
+ * `... Outside Package Root: + chmod 4755 /opt/Haven/chrome-sandbox`; that line
+ * belongs in a code block colored like the diff it came from, not in the prose.
+ */
+function splitReason(reason) {
+  if (!reason) return { text: '', diff: '' }
+  const m = reason.match(/(?:^|:\s)([+-]\s*\S[^\n]*)$/)
+  if (!m) return { text: reason.trim(), diff: '' }
+  return { text: reason.slice(0, m.index).replace(/:\s*$/, '').trim(), diff: m[1].trim() }
+}
+
+function diffLineClass(diff) {
+  if (diff.startsWith('+++') || diff.startsWith('---')) return 'finding__diff--meta'
+  if (diff.startsWith('+')) return 'finding__diff--add'
+  if (diff.startsWith('-')) return 'finding__diff--del'
+  return ''
+}
+
 function Findings({ findings }) {
   if (!findings || !findings.length) return null
   return (
@@ -427,6 +447,7 @@ function Findings({ findings }) {
         const rule = ruleInfo(f.rule_id)
         const unresolved = parseUnresolved(f.reason)
         const sev = String(f.severity || 'info').toLowerCase()
+        const { text: reasonText, diff } = splitReason(f.reason)
         return (
           <li className={`finding finding--${sev}`} key={`${f.rule_id}-${i}`}>
             <div className="finding__head">
@@ -435,7 +456,8 @@ function Findings({ findings }) {
                 ? <pre className="finding__loc">{loc}</pre>
                 : <span className="finding__loc finding__loc--none" title="This signal names a fact about the change, not a line">no line</span>}
             </div>
-            {f.reason ? <p className="finding__reason">{f.reason}</p> : null}
+            {reasonText ? <p className="finding__reason">{reasonText}</p> : null}
+            {diff ? <pre className={`finding__diff ${diffLineClass(diff)}`}>{diff}</pre> : null}
             {unresolved.length ? (
               <p className="finding__unresolved">
                 Not resolved:
