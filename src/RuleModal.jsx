@@ -54,7 +54,6 @@ export function RuleModal() {
             <h2 className="modal__title">{rule.name}</h2>
             <div className="modal__meta">
               {sev ? <span className={`sev ${severityClass(sev)}`}>{sev}</span> : null}
-              <span className="modal__cat">{rule.categoryTitle}</span>
             </div>
             <p className="modal__desc">{rule.description ? renderMarkdown(rule.description, rule.docsUrl) : 'This rule has no published description.'}</p>
             <a className="modal__link" href={rule.docsUrl} target="_blank" rel="noreferrer">Open in the rules reference ↗</a>

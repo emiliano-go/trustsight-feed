@@ -25,6 +25,7 @@ const NOTIFICATION_SUMMARY = {
       },
     },
     packages: { type: 'array', items: { type: 'string' }, description: 'Unique package names named in the document.' },
+    ioc_packages: { type: 'array', items: { type: 'string' }, description: 'Packages that matched a known-bad indicator (IOC).' },
     rules: { type: 'array', items: { type: 'string' }, description: 'Unique rule ids that fired.' },
   },
 }

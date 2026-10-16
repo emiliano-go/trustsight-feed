@@ -18,23 +18,33 @@ const FILTERS = [
 
 function FeedItem({ item }) {
   const href = `/${item.slug}/`
+  const iocPackages = new Set(item.ioc_packages || [])
+  const isIoc = iocPackages.size > 0 || Boolean(item.counts && item.counts.ioc)
   return (
-    <article className="feed-item">
+    <article className={`feed-item${isIoc ? ' feed-item--ioc' : ''}`}>
       <div className="feed-item__head">
         <a className="feed-item__time" href={href} data-route>{formatTime(item.time)}</a>
         <span className={eventBadgeClass(item.event)}>{eventLabel(item.event)}</span>
-        {item.day ? <span className="badge">day {item.day}</span> : null}
+        {isIoc ? <span className="badge badge--ioc">IOC match</span> : null}
       </div>
       <h3 className="feed-item__title">
-        <a href={href} data-route>{item.headline || item.title || '(untitled notification)'}</a>
+        <a href={href} data-route>{item.headline || item.title || 'Untitled notification'}</a>
       </h3>
       <div className="feed-item__tags">
         {item.packages.map((name) => (
-          <a className="chip" key={`p-${name}`} href={AUR_PACKAGE(name)} target="_blank" rel="noreferrer">{name}</a>
+          <a className={`chip${iocPackages.has(name) ? ' chip--ioc' : ''}`} key={`p-${name}`} href={AUR_PACKAGE(name)} target="_blank" rel="noreferrer">{name}</a>
         ))}
         {item.rules.map((id) => <RuleChip key={`r-${id}`} id={id} />)}
       </div>
     </article>
+  )
+}
+
+function FeedSkeleton() {
+  return (
+    <div className="feed-skeleton" aria-hidden="true">
+      <i /><i /><i />
+    </div>
   )
 }
 
@@ -72,7 +82,7 @@ export function App() {
   }
 
   // Stats are cheap and the watcher keeps pushing: refresh them, and the
-  // relative "last signal" clock, so neither freezes on a stale first paint.
+  // relative "last refreshed" clock, so neither freezes on a stale first paint.
   useEffect(() => {
     let live = true
     const refresh = () => fetch('/api/stats')
@@ -120,26 +130,20 @@ export function App() {
           </div>
         </div>
         <h1>AUR watcher feed</h1>
-        <p className="masthead-definition">
-          Notifications from the TrustSight AUR watcher, stored as the watcher published them.
-          Search them by package, rule, version or day. Each entry links to its full evidence
-          document.
-        </p>
         <p className="masthead-note">
-          TrustSight produces evidence, not proof of safety. It never runs a PKGBUILD and never
-          modifies your system. A notification is evidence, not a verdict, and nothing here is
-          permission to install: a clean signal means no published rule matched, not that the
-          update is safe. See the <a href={SECURITY} target="_blank" rel="noreferrer">security model</a>.
+          TrustSight reports evidence, not verdicts. It never runs a PKGBUILD or changes your
+          system, and a clean result only means no published rule matched. It is not a reason to
+          install. Read the <a href={SECURITY} target="_blank" rel="noreferrer">security model</a>.
         </p>
         <div className="masthead-stats">
-          <div><b>{stats ? stats.total : '…'}</b>alert notifications preserved</div>
+          <div><b>{stats ? stats.total : '…'}</b>Alerts</div>
           {stats && Number.isFinite(stats.last) ? (
             <div title={`last stored notification: ${formatTime(stats.last)}`}>
-              <b>{relative(stats.last, now)}</b>last signal
+              <b>{relative(stats.last, now)}</b>Last refreshed
             </div>
           ) : null}
-          {stats ? <div><b>{stats.over_threshold}</b>over threshold</div> : null}
-          {stats ? <div><b>{stats.ioc}</b>IOC matches</div> : null}
+          {stats ? <div className="stat--warn"><b>{stats.over_threshold}</b>Over threshold</div> : null}
+          {stats ? <div className="stat--ioc"><b>{stats.ioc}</b>IOC matches</div> : null}
         </div>
         <nav className="masthead-links" aria-label="Primary">
           <a href={DOCS} target="_blank" rel="noreferrer">Docs ↗</a>
@@ -153,9 +157,8 @@ export function App() {
       </header>
 
       <main id="content">
-        <section className="section" aria-labelledby="feed">
-          <div className="section-label">Feed</div>
-          <h2 id="feed">Search the alerts</h2>
+        <section className="section feed-section" aria-labelledby="feed">
+          <h2 id="feed" className="visually-hidden">Search the alerts</h2>
 
           <div className="feed-controls">
             <label className="search">
@@ -163,7 +166,7 @@ export function App() {
               <input
                 type="search"
                 value={query}
-                placeholder="package, rule id, version, day…"
+                placeholder="Search by package, rule, version or day"
                 onInput={(e) => setQuery(e.target.value)}
               />
             </label>
@@ -190,21 +193,19 @@ export function App() {
               {loading ? 'Refreshing…' : '⟳ Refresh'}
             </button>
           </div>
-          <p className="feed-count">
-            {loading && !items.length ? 'loading…' : `${items.length} shown${next ? '+' : ''}`}
-          </p>
-
-          {error ? <p className="feed-error">Could not load the feed: {error}</p> : null}
+          {error ? <p className="feed-error">Couldn&rsquo;t load the feed ({error}). Try Refresh.</p> : null}
           {!loading && !error && !items.length ? (
             <p className="feed-empty">
               {query.trim()
-                ? `No notifications match “${query.trim()}”.`
-                : 'No notifications yet. The watcher pushes here as it raises alerts.'}
+                ? `Nothing matches “${query.trim()}”. Try a package name, rule ID or version.`
+                : 'No alerts yet. New ones appear here as the watcher raises them.'}
             </p>
           ) : null}
 
           <div className="feed">
-            {items.map((item) => <FeedItem key={item.slug} item={item} />)}
+            {loading && !items.length
+              ? [0, 1, 2, 3].map((i) => <FeedSkeleton key={i} />)
+              : items.map((item) => <FeedItem key={item.slug} item={item} />)}
           </div>
 
           {next ? (
@@ -214,7 +215,7 @@ export function App() {
               disabled={loading}
               onClick={() => load({ append: true, before: next.before, beforeRow: next.beforeRow })}
             >
-              {loading ? 'loading…' : 'Load older'}
+              {loading ? 'Loading…' : 'Load older'}
             </button>
           ) : null}
         </section>
@@ -223,7 +224,7 @@ export function App() {
       <footer className="colophon" aria-label="Colophon">
         <div>
           <h2>TrustSight Watcher</h2>
-          <p>Alerts are ingested from the watcher&rsquo;s ntfy topic and preserved in a searchable store. This site is watcher.trustsight.org.</p>
+          <p>Alerts arrive from the watcher&rsquo;s ntfy topic and are stored here so you can search them. Served at watcher.trustsight.org.</p>
           <p>Built by <strong>Emiliano Gandini</strong>. MIT licensed.</p>
         </div>
         <div>
@@ -238,9 +239,9 @@ export function App() {
           </ul>
         </div>
         <p className="colophon-note">
-          An alert means a rule matched the change under review. It is input to a decision, not the
-          decision: absence of signals is a statement about detection, not about the update. Read
-          the <a href={SECURITY} target="_blank" rel="noreferrer">security model</a>.
+          An alert means a rule matched the change under review. It informs your decision and does
+          not make it. No alert only means no rule matched, not that the update is safe. Read the{' '}
+          <a href={SECURITY} target="_blank" rel="noreferrer">security model</a>.
         </p>
       </footer>
     </div>

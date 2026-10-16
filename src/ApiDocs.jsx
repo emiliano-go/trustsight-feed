@@ -92,7 +92,6 @@ export function ApiDocs() {
         {spec ? (
           <>
             <h1>API reference</h1>
-            <p className="masthead-definition">{spec.info && spec.info.description}</p>
             <div className="detail__meta">
               <span>{spec.info && spec.info.title} v{spec.info && spec.info.version}</span>
               <span>{(spec.servers && spec.servers[0] && spec.servers[0].url) || ''}</span>
@@ -110,7 +109,6 @@ export function ApiDocs() {
             {(spec.tags || []).map((tag) => grouped[tag.name] ? (
               <section className="detail__section" key={tag.name}>
                 <h2>{tag.name}</h2>
-                {tag.description ? <p className="detail__explain">{tag.description}</p> : null}
                 {grouped[tag.name].map(({ path, method, operation }) => (
                   <Endpoint key={`${method}-${path}`} path={path} method={method} operation={operation} />
                 ))}

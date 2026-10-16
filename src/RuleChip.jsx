@@ -74,7 +74,6 @@ export function RuleChip({ id }) {
         <RuleBody id={id} />
         {rule ? (
           <>
-            <span className="rule-pop__cat">{rule.categoryTitle}</span>
             {rule.description ? <span className="rule-pop__desc">{renderMarkdown(rule.description, rule.docsUrl)}</span> : null}
             <a className="rule-pop__link" href={rule.docsUrl} target="_blank" rel="noreferrer">
               rules reference ↗
@@ -118,7 +117,6 @@ export function RuleCard({ id }) {
           <span className="rule-card__name">{rule ? rule.name : 'Unknown rule'}</span>
           {sev ? <span className={`sev ${severityClass(sev)}`}>{sev}</span> : null}
         </span>
-        <span className="rule-card__tap">Tap for the full explanation</span>
       </button>
     )
   }
@@ -130,7 +128,6 @@ export function RuleCard({ id }) {
         <span className="rule-card__name">{rule ? rule.name : 'Unknown rule'}</span>
         {sev ? <span className={`sev ${severityClass(sev)}`}>{sev}</span> : null}
       </header>
-      {rule && rule.categoryTitle ? <span className="rule-card__cat">{rule.categoryTitle}</span> : null}
       <p className="rule-card__desc">
         {rule && rule.description
           ? renderMarkdown(rule.description, rule.docsUrl)

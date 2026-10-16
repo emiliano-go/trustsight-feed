@@ -259,8 +259,7 @@ function MaintainersSection({ packages }) {
 
   return (
     <section className="detail__section">
-      <h2>Maintainers ({ordered.length})</h2>
-      <p className="detail__explain">Who updated the packages in this document, and how many each touched.</p>
+      <h2>Maintainers <span className="count">{ordered.length}</span></h2>
       <ul className="maintainers">
         {ordered.map(([who, pkgs]) => (
           <li className="maintainer" key={who}>
@@ -281,8 +280,7 @@ function Refusals({ refusals }) {
   if (!refusals.length) return null
   return (
     <section className="detail__section">
-      <h2>Could not fully read ({refusals.length})</h2>
-      <p className="detail__explain">{ENTRY_TYPES.refusal}</p>
+      <h2>Could not fully read <span className="count">{refusals.length}</span></h2>
       {refusals.map((refusal, i) => {
         const findings = refusal.findings || []
         const unresolved = findings.flatMap((f) => parseUnresolved(f.reason))
@@ -308,10 +306,7 @@ function Refusals({ refusals }) {
               </div>
             ) : null}
             {findings.length ? (
-              <>
-                <p className="pkg__meta">What the analysis could not resolve:</p>
-                <FindingsOrSource packageName={refusal.package} findings={findings} />
-              </>
+              <FindingsOrSource packageName={refusal.package} findings={findings} />
             ) : (
               <p className="pkg__meta">A construct in this recipe could not be resolved, so part of the change was not read.</p>
             )}
@@ -372,7 +367,7 @@ function groupAlerts(alerts) {
   return [...byName.values()]
 }
 
-function AlertList({ alerts, overPackages }) {
+function AlertList({ alerts, overPackages, iocPackages }) {
   if (!alerts.length) return null
   // A package that also crossed the threshold is rendered once, in full, by
   // the over-threshold section below - so it is not repeated here.  Its rule
@@ -386,26 +381,25 @@ function AlertList({ alerts, overPackages }) {
   const distinctRules = [...new Set(groups.flatMap((group) => group.rules))].sort()
   return (
     <section className="detail__section">
-      <h2>New alerts ({alerts.length})</h2>
-      <p className="detail__explain">{ENTRY_TYPES.alert}</p>
+      <h2>New alerts <span className="count">{alerts.length}</span></h2>
       {alsoOver ? (
         <p className="detail__explain">
-          {alsoOver} of these package{alsoOver === 1 ? '' : 's'} {alsoOver === 1 ? 'is' : 'are'} also
-          over threshold, shown in full below.
+          {alsoOver === 1 ? '1 package is' : `${alsoOver} packages are`} also over threshold, shown in full below.
         </p>
       ) : null}
       {distinctRules.length ? (
         <>
-          <span className="pkg__label">Rules in this batch ({distinctRules.length})</span>
+          <span className="pkg__label">Rules in this batch <span className="count">{distinctRules.length}</span></span>
           <div className="rule-cards">
             {distinctRules.map((id) => <RuleCard key={id} id={id} />)}
           </div>
         </>
       ) : null}
       {groups.map((group) => (
-        <article className="pkg" key={group.package}>
+        <article className={`pkg${iocPackages.has(group.package) ? ' pkg--ioc' : ''}`} key={group.package}>
           <header className="pkg__head">
             <a className="pkg__name" href={AUR_PACKAGE(group.package)} target="_blank" rel="noreferrer">{group.package}</a>
+            {iocPackages.has(group.package) ? <span className="badge badge--ioc">IOC match</span> : null}
             <span className="pkg__version">{group.rules.length} rule{group.rules.length === 1 ? '' : 's'}</span>
           </header>
           <div className="ref-list">
@@ -479,6 +473,77 @@ function Findings({ findings }) {
   )
 }
 
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+// A host or file name is flagged as the whole URL or path it sits in
+// (`git+https://host/x.git`), not the bare host.
+const tokenPattern = (t) => (/\./.test(t) && !/\s/.test(t)
+  ? `[^\\s'"()]*${escapeRe(t)}[^\\s'"()]*`
+  : escapeRe(t))
+
+/**
+ * The exact strings a finding names in its reason (a host, a quoted token), so
+ * the source view can mark just those instead of the whole line.
+ */
+function flagTokens(f) {
+  const { text } = splitReason(f.reason)
+  const tokens = new Set()
+  for (const m of text.matchAll(/`([^`]+)`|"([^"]+)"|'([^']+)'/g)) tokens.add(m[1] || m[2] || m[3])
+  for (const m of text.matchAll(/\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}\b/gi)) tokens.add(m[0])
+  return [...tokens].filter((t) => t.length >= 3)
+}
+
+/** Split *text* into plain strings and <mark> spans for every *re* match. */
+function markText(text, re) {
+  if (!re) return text
+  const out = []
+  let last = 0
+  re.lastIndex = 0
+  for (let m = re.exec(text); m; m = re.exec(text)) {
+    if (!m[0]) { re.lastIndex++; continue }
+    if (m.index > last) out.push(text.slice(last, m.index))
+    out.push(<mark className="source__mark" key={m.index}>{m[0]}</mark>)
+    last = m.index + m[0].length
+  }
+  if (last < text.length) out.push(text.slice(last))
+  return out
+}
+
+/**
+ * Map each 1-based line to the logical shell statement that holds it, so a
+ * finding on `source=(...` highlights every line of the array, not just the
+ * first. A statement continues across lines while a quote or `(` is open, or
+ * after a trailing backslash.
+ */
+function statementSpans(lines) {
+  const spans = new Map()
+  let start = 0
+  let depth = 0
+  let quote = ''
+  lines.forEach((text, i) => {
+    if (!depth && !quote && start === 0) start = i + 1
+    let cont = false
+    for (let c = 0; c < text.length; c++) {
+      const ch = text[c]
+      if (quote) {
+        if (ch === '\\' && quote === '"') c++
+        else if (ch === quote) quote = ''
+      } else if (ch === '\\') {
+        if (c === text.length - 1) cont = true
+        else c++
+      } else if (ch === '"' || ch === "'") quote = ch
+      else if (ch === '#' && (c === 0 || /\s/.test(text[c - 1]))) break
+      else if (ch === '(') depth++
+      else if (ch === ')' && depth) depth--
+    }
+    if (depth || quote || cont) return
+    for (let n = start; n <= i + 1; n++) spans.set(n, [start, i + 1])
+    start = 0
+  })
+  if (start) for (let n = start; n <= lines.length; n++) spans.set(n, [start, lines.length])
+  return spans
+}
+
 /**
  * The source of the artifact the findings fired on, read from the AUR
  * repository and shown with the flagged lines highlighted. The line numbers
@@ -525,11 +590,14 @@ function SourceView({ packageName, files, findings }) {
 
   // Highlight the findings for the requested file name, even when the
   // repository holds the same file under a different name.
+  const spans = statementSpans(lines)
+  const spanOf = (n) => spans.get(n) || [n, n]
   const byLine = new Map()
   for (const f of findings) {
     if (f.file !== file || !f.line) continue
-    if (!byLine.has(f.line)) byLine.set(f.line, [])
-    byLine.get(f.line).push(f)
+    const key = spanOf(f.line)[0]
+    if (!byLine.has(key)) byLine.set(key, [])
+    byLine.get(key).push(f)
   }
   // An unresolved construct has no line in the finding, so find it by name in
   // the source and flag the line that references it.
@@ -539,13 +607,29 @@ function SourceView({ packageName, files, findings }) {
     const carriers = findings.filter((f) => parseUnresolved(f.reason).length)
     lines.forEach((text, i) => {
       if (!text || ![...names].some((name) => containsToken(text, name))) return
-      const lineNo = i + 1
-      unresolvedLines.add(lineNo)
-      if (!byLine.has(lineNo)) byLine.set(lineNo, [])
+      const key = spanOf(i + 1)[0]
+      unresolvedLines.add(key)
+      if (!byLine.has(key)) byLine.set(key, [])
       for (const f of carriers) {
-        if (!byLine.get(lineNo).some((h) => h.rule_id === f.rule_id)) byLine.get(lineNo).push(f)
+        if (!byLine.get(key).some((h) => h.rule_id === f.rule_id)) byLine.get(key).push(f)
       }
     })
+  }
+
+  // Per flagged statement: a regex over the strings its findings name, and
+  // whether any of them actually appears in its lines. Without a match the
+  // whole row stays tinted, since the finding names no narrower text.
+  const marks = new Map()
+  for (const [key, hits] of byLine) {
+    const tokens = new Set(hits.flatMap(flagTokens))
+    if (unresolvedLines.has(key)) names.forEach((n) => tokens.add(n))
+    const re = tokens.size
+      ? new RegExp(`(?<![A-Za-z0-9_])(?:${[...tokens].sort((a, b) => b.length - a.length).map(tokenPattern).join('|')})(?![A-Za-z0-9_])`, 'gi')
+      : null
+    const [first, last] = spanOf(key)
+    let found = false
+    if (re) for (let n = first; n <= last && !found; n++) { re.lastIndex = 0; found = re.test(lines[n - 1] || '') }
+    marks.set(key, { re: found ? re : null, found })
   }
 
   // Findings on this file with no line to point at (a missing checksum, an
@@ -587,14 +671,17 @@ function SourceView({ packageName, files, findings }) {
           <div className="source__code">
             {lines.map((text, i) => {
               const lineNo = i + 1
-              const hits = byLine.get(lineNo)
-              const cls = `source__line${hits ? ' source__line--hit' : ''}${unresolvedLines.has(lineNo) ? ' source__line--unresolved' : ''}`
+              const [first] = spanOf(lineNo)
+              const hits = byLine.get(first)
+              const mark = marks.get(first)
+              const tint = hits && !(mark && mark.found)
+              const cls = `source__line${hits ? ' source__line--hit' : ''}${tint ? ' source__line--tint' : ''}${tint && unresolvedLines.has(first) ? ' source__line--unresolved' : ''}`
               return (
                 <div className={cls} key={lineNo} title={hits ? hits.map((h) => h.reason).filter(Boolean).join(' | ') : undefined}>
                   <span className="source__no">{lineNo}</span>
                   <span className="source__text">
-                    {text || ' '}
-                    {hits ? (
+                    {text ? markText(text, mark && mark.re) : ' '}
+                    {hits && first === lineNo ? (
                       <span className="source__hits">
                         {hits.map((h, j) => <RuleChip key={`${h.rule_id}-${j}`} id={h.rule_id} />)}
                       </span>
@@ -632,6 +719,52 @@ function ViewToggle({ view, onChange }) {
 }
 
 /**
+ * A unified diff as files of rows with old and new line numbers. Header lines
+ * (index, ---, +++) are dropped; rename, new-file and mode lines become a note
+ * on the file.
+ */
+function parseDiff(text) {
+  const files = []
+  let file = null
+  let oldNo = 0
+  let newNo = 0
+  for (const line of text.split('\n')) {
+    const head = line.match(/^diff --git a\/.+ b\/(.+)$/)
+    if (head) {
+      file = { name: head[1], add: 0, del: 0, note: '', rows: [] }
+      files.push(file)
+      continue
+    }
+    if (!file) continue
+    const hunk = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@\s*(.*)$/)
+    if (hunk) {
+      oldNo = Number(hunk[1])
+      newNo = Number(hunk[2])
+      file.rows.push({ type: 'hunk', text: hunk[3] || '' })
+      continue
+    }
+    if (/^(index |--- |\+\+\+ )/.test(line)) continue
+    const note = line.match(/^(new file|deleted file|rename (?:from|to)|similarity|old mode|new mode)\b(.*)$/)
+    if (note) {
+      file.note = file.note || (note[1] === 'new file' ? 'new file' : note[1] === 'deleted file' ? 'deleted' : 'renamed')
+      continue
+    }
+    if (line.startsWith('\\')) continue
+    if (!file.rows.length) continue
+    if (line.startsWith('+')) {
+      file.rows.push({ type: 'add', new: newNo++, text: line.slice(1) })
+      file.add++
+    } else if (line.startsWith('-')) {
+      file.rows.push({ type: 'del', old: oldNo++, text: line.slice(1) })
+      file.del++
+    } else if (line !== '' || oldNo) {
+      file.rows.push({ type: 'ctx', old: oldNo++, new: newNo++, text: line.slice(1) })
+    }
+  }
+  return files.filter((f) => f.rows.length)
+}
+
+/**
  * The latest AUR commit as a unified diff. This is where a removed construct
  * shows: the deleted lines are rendered red and the added ones green, so what
  * disappeared from the recipe is visible even when the current file no longer
@@ -654,37 +787,49 @@ function DiffView({ packageName }) {
     return () => { live = false }
   }, [packageName])
 
-  const text = state.diff || ''
-  const start = text.indexOf('diff --git')
-  const body = start >= 0 ? text.slice(start) : text
-  const lines = body ? body.split('\n') : []
-
-  function lineClass(line) {
-    if (line.startsWith('diff --git') || line.startsWith('index ') || line.startsWith('---') ||
-        line.startsWith('+++') || line.startsWith('@@') || line.startsWith('new file') ||
-        line.startsWith('deleted file') || line.startsWith('similarity') || line.startsWith('rename ') ||
-        line.startsWith('old mode') || line.startsWith('new mode')) {
-      return 'diff__line diff__line--meta'
-    }
-    if (line.startsWith('+')) return 'diff__line diff__line--add'
-    if (line.startsWith('-')) return 'diff__line diff__line--del'
-    return 'diff__line'
-  }
+  const files = parseDiff(state.diff || '')
+  const added = files.reduce((n, f) => n + f.add, 0)
+  const removed = files.reduce((n, f) => n + f.del, 0)
 
   return (
     <div className="diff">
       {state.loading ? <p className="pkg__meta">Loading diff…</p> : null}
       {state.error ? <p className="feed-error">Could not load the diff: {state.error}</p> : null}
-      {state.diff !== undefined && !lines.length ? <p className="pkg__meta">No diff for the latest commit.</p> : null}
-      {lines.length ? (
+      {state.diff !== undefined && !files.length ? <p className="pkg__meta">No diff for the latest commit.</p> : null}
+      {files.length ? (
         <>
-          <div className="diff__code">
-            {lines.map((line, i) => <div className={lineClass(line)} key={i}>{line || ' '}</div>)}
-          </div>
-          <p className="source__note">
-            Diff of the latest AUR commit, the change the watcher alerted on. Removed lines are red;
-            added lines are green.
+          <p className="diff__summary">
+            {files.length} file{files.length === 1 ? '' : 's'} changed
+            <span className="diff__stat diff__stat--add">+{added}</span>
+            <span className="diff__stat diff__stat--del">&minus;{removed}</span>
           </p>
+          {files.map((file) => (
+            <section className="diff__file" key={file.name}>
+              <header className="diff__file-head">
+                <span className="diff__file-name">{file.name}</span>
+                {file.note ? <span className="diff__file-note">{file.note}</span> : null}
+                <span className="diff__stat diff__stat--add">+{file.add}</span>
+                <span className="diff__stat diff__stat--del">&minus;{file.del}</span>
+              </header>
+              <div className="diff__code">
+                {file.rows.map((row, i) => (
+                  row.type === 'hunk' ? (
+                    <div className="diff__row diff__row--hunk" key={i}>
+                      <span className="diff__no" /><span className="diff__no" /><span className="diff__sign" />
+                      <span className="diff__text">{row.text}</span>
+                    </div>
+                  ) : (
+                    <div className={`diff__row diff__row--${row.type}`} key={i}>
+                      <span className="diff__no">{row.old ?? ''}</span>
+                      <span className="diff__no">{row.new ?? ''}</span>
+                      <span className="diff__sign">{row.type === 'add' ? '+' : row.type === 'del' ? '−' : ''}</span>
+                      <span className="diff__text">{row.text || ' '}</span>
+                    </div>
+                  )
+                ))}
+              </div>
+            </section>
+          ))}
         </>
       ) : null}
     </div>
@@ -711,12 +856,11 @@ function FindingsOrSource({ packageName, findings }) {
   )
 }
 
-function PackageSections({ packages }) {
+function PackageSections({ packages, iocPackages }) {
   if (!packages.length) return null
   return (
     <section className="detail__section">
-      <h2>Packages over threshold ({packages.length})</h2>
-      <p className="detail__explain">{ENTRY_TYPES.over_threshold}</p>
+      <h2>Packages over threshold <span className="count">{packages.length}</span></h2>
       {packages.map((pkg) => {
         const findings = pkg.findings || []
         // A rule that has a located finding is already named and explained by
@@ -726,20 +870,18 @@ function PackageSections({ packages }) {
         const foundRules = new Set(findings.map((f) => f.rule_id))
         const rules = [...new Set(pkg.rules || [])].filter((id) => !foundRules.has(id))
         return (
-          <article className="pkg" key={pkg.package}>
+          <article className={`pkg${iocPackages.has(pkg.package) ? ' pkg--ioc' : ''}`} key={pkg.package}>
             <header className="pkg__head">
               <a className="pkg__name" href={AUR_PACKAGE(pkg.package)} target="_blank" rel="noreferrer">{pkg.package}</a>
               {pkg.version ? <span className="pkg__version">{pkg.version}</span> : null}
+              {iocPackages.has(pkg.package) ? <span className="badge badge--ioc">IOC match</span> : null}
               {pkg.score !== undefined && pkg.score !== null ? <span className="badge badge--alerts">score {pkg.score}</span> : null}
               <a className="pkg__action" href={AUR_PKGBUILD(pkg.package)} target="_blank" rel="noreferrer">See PKGBUILD ↗</a>
             </header>
             {pkg.last_modified ? <p className="pkg__meta">AUR change: {pkg.last_modified}</p> : null}
             <ContextBlock packageName={pkg.package} findings={findings} />
             {findings.length ? (
-              <>
-                <p className="pkg__meta">What fired, and the line that triggered it:</p>
-                <FindingsOrSource packageName={pkg.package} findings={findings} />
-              </>
+              <FindingsOrSource packageName={pkg.package} findings={findings} />
             ) : (
               <p className="pkg__meta">No located findings in this entry.</p>
             )}
@@ -760,15 +902,15 @@ function PackageSections({ packages }) {
 function IocSection({ matches }) {
   if (!matches.length) return null
   return (
-    <section className="detail__section">
-      <h2>Indicators of compromise ({matches.length})</h2>
-      <p className="detail__explain">{ENTRY_TYPES.ioc}</p>
-      <div className="ref-list">
+    <section className="detail__section detail__section--ioc">
+      <h2>Indicators of compromise <span className="count">{matches.length}</span></h2>
+      <div className="ioc-list">
         {matches.map((m, i) => (
-          <span className="alert-item" key={`${m.package}-${i}`}>
+          <div className="ioc-row" key={`${m.package}-${i}`}>
+            <span className="badge badge--ioc">IOC match</span>
             <a className="pkg__name" href={AUR_PACKAGE(m.package)} target="_blank" rel="noreferrer">{m.package}</a>
-            {m.indicator ? <code className="chip">{m.indicator}</code> : null}
-          </span>
+            {m.indicator ? <code className="ioc-row__indicator">{m.indicator}</code> : null}
+          </div>
         ))}
       </div>
     </section>
@@ -782,21 +924,26 @@ function Campaigns({ payload }) {
   const total = clusters.length + impersonation.length
   return (
     <section className="detail__section">
-      <h2>Campaigns ({total})</h2>
-      <p className="detail__explain">{ENTRY_TYPES.campaign_cluster}</p>
+      <h2>Campaigns <span className="count">{total}</span></h2>
       {impersonation.map((camp, i) => {
         const members = camp.members || []
         return (
           <article className="pkg campaign" key={`imp-${i}`}>
             <header className="pkg__head">
               <span className="badge badge--imp">impersonation campaign</span>
-              <span className="pkg__version">{camp.maintainer || 'one submitter'} · {camp.count} name-clones</span>
+              <span className="pkg__version">Submitted by {camp.maintainer || 'one account'}</span>
             </header>
-            <p className="detail__explain">{ENTRY_TYPES.impersonation}</p>
             {camp.targets && camp.targets.length
-              ? <p className="pkg__meta">Impersonates: {camp.targets.join(', ')}</p>
+              ? (
+                <div className="impersonates">
+                  <span className="impersonates__label">Impersonating</span>
+                  {camp.targets.map((t) => (
+                    <a className="impersonates__target" key={t} href={`https://aur.archlinux.org/packages?K=${encodeURIComponent(t)}&SeB=n`} target="_blank" rel="noreferrer">{t}</a>
+                  ))}
+                </div>
+              )
               : null}
-            <h3 className="campaign__subhead">Affected packages ({members.length})</h3>
+            <h3 className="campaign__subhead">Flagged packages <span className="count">{members.length}</span></h3>
             <MemberList names={members} />
           </article>
         )
@@ -811,8 +958,7 @@ function Campaigns({ payload }) {
               <RuleChip id={cluster.rule_id} />
               <span className="pkg__version">{type.label} · {members.length} packages</span>
             </header>
-            {type.means ? <p className="detail__explain">{renderMarkdown(type.means, type.docsUrl)}</p> : null}
-            <h3 className="campaign__subhead">Affected packages ({members.length})</h3>
+            <h3 className="campaign__subhead">Flagged packages <span className="count">{members.length}</span></h3>
             <MemberList names={members} />
           </article>
         )
@@ -850,6 +996,7 @@ export function Message({ slug }) {
   const packages = payload.over_threshold || []
   const overPackages = new Set(packages.map((p) => p.package))
   const ioc = payload.ioc_matches || []
+  const iocPackages = new Set(ioc.map((m) => m.package))
   const allPackages = [...new Set([
     ...alerts.map((a) => a.package),
     ...packages.map((p) => p.package),
@@ -895,21 +1042,24 @@ export function Message({ slug }) {
               <span title="Your local time with its offset, then UTC">{formatTime(data.time)}</span>
               <span>{relative(data.time)}</span>
               <span className={eventBadgeClass(data.event)}>{eventLabel(data.event)}</span>
-              {data.day ? <span>day {data.day}</span> : null}
+              {ioc.length ? <span className="badge badge--ioc">IOC match</span> : null}
               <a href={NTFY} target="_blank" rel="noreferrer">ntfy channel ↗</a>
             </div>
 
             {payload.cycle ? (
-              <div className="detail__meta">
-                <span>cycle: {payload.cycle.added} added · {payload.cycle.changed} changed · {payload.cycle.removed} removed · {payload.cycle.processed} processed</span>
+              <div className="masthead-stats detail__stats">
+                <div><b>{payload.cycle.added}</b>Added</div>
+                <div><b>{payload.cycle.changed}</b>Changed</div>
+                <div><b>{payload.cycle.removed}</b>Removed</div>
+                <div><b>{payload.cycle.processed}</b>Processed</div>
               </div>
             ) : null}
 
             <MaintainersSection packages={allPackages} />
             <Refusals refusals={payload.refusals || []} />
-            <AlertList alerts={alerts} overPackages={overPackages} />
-            <PackageSections packages={packages} />
             <IocSection matches={ioc} />
+            <AlertList alerts={alerts} overPackages={overPackages} iocPackages={iocPackages} />
+            <PackageSections packages={packages} iocPackages={iocPackages} />
             <Campaigns payload={payload} />
 
             {!alerts.length && !packages.length && !ioc.length && !alertingClusters(payload).length && !(payload.impersonation || []).length && !(payload.refusals || []).length ? (
@@ -917,7 +1067,7 @@ export function Message({ slug }) {
             ) : null}
 
             <section className="detail__section">
-              <h2>Full document</h2>
+              <h2>Raw document</h2>
               <div className="json-actions">
                 <button
                   type="button"
