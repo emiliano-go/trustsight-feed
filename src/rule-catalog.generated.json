@@ -1500,7 +1500,7 @@
     "name": "Source URL Uses IP Address",
     "severity": "MEDIUM",
     "categoryTitle": "Fetch and Execution",
-    "description": "A source URL pointing at a bare IP address bypasses DNS and any domain reputation the bucket classifier could apply. Loopback and private addresses are excluded: they distribute nothing, so a local URL a recipe only prints is not a source. A line that only prints text (`echo`/`printf`/`cat`) is excluded for the same reason.",
+    "description": "A source URL pointing at a bare IP address bypasses DNS and any domain reputation the bucket classifier could apply.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#r046"
   },
   "r047": {
@@ -1508,7 +1508,7 @@
     "name": "Source URL Uses Non-Standard Port",
     "severity": "LOW",
     "categoryTitle": "Fetch and Execution",
-    "description": "A source URL on a port other than 80, 443, 8080, or 8443. Unusual ports suggest a service that is not a conventional distribution host. Loopback and private addresses, and lines that only print text, are excluded, as for R046.",
+    "description": "A source URL on a port other than 80, 443, 8080, or 8443. Unusual ports suggest a service that is not a conventional distribution host.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#r047"
   },
   "r048": {
