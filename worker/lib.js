@@ -162,6 +162,7 @@ export function alertingClusters(payload) {
       impersonation: row.n_impersonation,
     },
     packages,
+    ioc_packages: [...new Set((payload.ioc_matches || []).map((m) => m.package).filter(Boolean))],
     rules,
   }
 }
