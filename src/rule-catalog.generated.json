@@ -852,7 +852,7 @@
     "name": "Name/Host Consensus Divergence",
     "severity": "MEDIUM",
     "categoryTitle": "Naming and Dependencies",
-    "description": "An ecosystem-prefixed package (`python-`, `ruby-`, `nodejs-`, ...) is sourced from neither its ecosystem's canonical hosts nor a known forge.",
+    "description": "H053 reads the name as a claim about where a package should come from, and checks the source against it. A `python-`, `ruby-` or `nodejs-` package is normally published on that ecosystem's own index (PyPI, RubyGems, npm) or built straight from a forge such as GitHub or GitLab. This rule fires on a new package whose name claims an ecosystem but whose source comes from a host that is neither: a name pointing one way while the source points another is the shape of a typosquat, or of a dependency silently redirected to somebody else's server. It compares the name to the source, not the code, so a project that legitimately mirrors its release elsewhere, or publishes only from a personal server, can trip it. The finding names the prefix and the host so the reader can judge that call.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/naming-and-dependency/#h053"
   },
   "h054": {
@@ -1500,7 +1500,7 @@
     "name": "Source URL Uses IP Address",
     "severity": "MEDIUM",
     "categoryTitle": "Fetch and Execution",
-    "description": "A source URL pointing at a bare IP address bypasses DNS and any domain reputation the bucket classifier could apply.",
+    "description": "A source URL pointing at a bare IP address bypasses DNS and any domain reputation the bucket classifier could apply. Loopback and private addresses are excluded: they distribute nothing, so a local URL a recipe only prints is not a source. A line that only prints text (`echo`/`printf`/`cat`) is excluded for the same reason.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#r046"
   },
   "r047": {
@@ -1508,7 +1508,7 @@
     "name": "Source URL Uses Non-Standard Port",
     "severity": "LOW",
     "categoryTitle": "Fetch and Execution",
-    "description": "A source URL on a port other than 80, 443, 8080, or 8443. Unusual ports suggest a service that is not a conventional distribution host.",
+    "description": "A source URL on a port other than 80, 443, 8080, or 8443. Unusual ports suggest a service that is not a conventional distribution host. Loopback and private addresses, and lines that only print text, are excluded, as for R046.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#r047"
   },
   "r048": {
