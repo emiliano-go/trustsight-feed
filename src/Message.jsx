@@ -289,8 +289,8 @@ function Refusals({ refusals }) {
             <header className="pkg__head">
               <a className="pkg__name" href={AUR_PACKAGE(refusal.package)} target="_blank" rel="noreferrer">{refusal.package}</a>
             </header>
-            {refusal.reason ? <p className="pkg__meta">{refusal.reason}</p> : null}
-            {unresolved.length ? (
+            <PartialBanner />
+            {unresolved.length && !(findings.length && findings.every(isPartialFinding)) ? (
               <div className="unresolved">
                 <span className="pkg__label">Not resolved</span>
                 <ul className="unresolved__list">
@@ -354,9 +354,19 @@ function MemberList({ names, iocPackages }) {
 }
 
 /**
+ * True for correlation rules (G001–G007): they aggregate across packages, so
+ * their alert groups are campaigns and rank ahead of per-package rules.
+ */
+function isCampaignRule(id) {
+  return /^G\d{3}$/.test(String(id || '').toUpperCase())
+}
+
+/**
  * Group a flat alert list by rule, so each fired rule owns an alert section
  * and the packages it flagged are listed inside it. A campaign fires the same
  * rule on many packages; grouping by rule keeps that campaign one section.
+ * Campaign groups sort before per-package groups; within each tier, severity
+ * desc then rule id.
  */
 function groupAlerts(alerts) {
   const byRule = new Map()
@@ -371,9 +381,10 @@ function groupAlerts(alerts) {
     byRule.get(entry.rule_id).packages.add(entry.package)
   }
   const order = sortRuleIds([...byRule.keys()])
+  const rank = (id) => (isCampaignRule(id) ? 0 : 1)
   const rules = [...byRule.values()]
     .map((group) => ({ ...group, packages: [...group.packages].sort() }))
-    .sort((a, b) => order.indexOf(a.rule) - order.indexOf(b.rule))
+    .sort((a, b) => rank(a.rule) - rank(b.rule) || order.indexOf(a.rule) - order.indexOf(b.rule))
   return { rules, bare }
 }
 
@@ -448,11 +459,110 @@ function diffLineClass(diff) {
   return ''
 }
 
+// The rules that report the same fact three ways: some assignments could not
+// be traced, so part of the recipe was not read.
+const PARTIAL_RULES = new Set(['X026', 'X027', 'W008'])
+
+function isPartialFinding(f) {
+  if (PARTIAL_RULES.has(String(f.rule_id || '').toUpperCase())) return true
+  return /unresolved assignment/i.test(String(f.reason || ''))
+}
+
+/**
+ * The unresolved variables of the partial-analysis family: names with the
+ * function that references them, parsed from the `name <- func` pairs an
+ * X026 reason carries.
+ */
+function parsePartialVars(findings) {
+  const byName = new Map()
+  for (const f of findings) {
+    for (const entry of parseUnresolved(f.reason)) {
+      if (!entry.name) continue
+      if (!byName.has(entry.name) || (!byName.get(entry.name) && entry.func)) {
+        byName.set(entry.name, entry.func || '')
+      }
+    }
+  }
+  return [...byName.entries()].map(([name, func]) => ({ name, func }))
+}
+
+/** Plain-language banner for an alert whose analysis was inconclusive. */
+function PartialBanner() {
+  return (
+    <p className="partial-banner">
+      Inconclusive analysis: TrustSight&rsquo;s static analysis could not fully resolve this package.
+      This is not a malware verdict; it means a human review is needed.
+    </p>
+  )
+}
+
+/**
+ * One plain-language card for every partial-analysis finding (X026/X027/W008)
+ * in a package: they describe the same unresolved set, so they merge into a
+ * single summary with the raw analyzer strings behind a details toggle.
+ */
+function PartialAnalysisCard({ findings }) {
+  const vars = parsePartialVars(findings)
+  const funcs = [...new Set(vars.map((v) => v.func).filter(Boolean))]
+  return (
+    <div className="partial">
+      <p className="partial__head">
+        <strong>
+          {vars.length
+            ? `Partial analysis: ${vars.length} variable${vars.length === 1 ? '' : 's'} could not be traced`
+            : 'Partial analysis: part of this recipe could not be read'}
+        </strong>
+      </p>
+      {vars.length ? (
+        <p className="partial__body">
+          The analyzer could not determine where{' '}
+          {vars.map((v, i) => (
+            <span key={v.name}>
+              {i ? ', ' : ''}<code className="md-code">{v.name}</code>
+            </span>
+          ))}{' '}
+          {vars.length === 1 ? 'is' : 'are'} set
+          {funcs.length ? (
+            <>
+              {'; '}{vars.length === 1 ? 'it is' : 'they are'} referenced from{' '}
+              {funcs.map((fn, i) => (
+                <span key={fn}>
+                  {i ? ', ' : ''}<code className="md-code">{fn}()</code>
+                </span>
+              ))}{' '}
+              in the PKGBUILD
+            </>
+          ) : null}
+          . This usually means indirect or dynamic assignment (often terminal color helpers).{' '}
+          <strong>Not a verdict</strong>: a human should look at the PKGBUILD.
+        </p>
+      ) : null}
+      <details className="partial__details">
+        <summary>Technical details</summary>
+        <ul className="partial__raw">
+          {findings.map((f, i) => (
+            <li key={`${f.rule_id}-${i}`}>
+              <RuleChip id={f.rule_id} /> <span className="partial__rawreason">{f.reason}</span>
+            </li>
+          ))}
+        </ul>
+      </details>
+    </div>
+  )
+}
+
 function Findings({ findings }) {
   if (!findings || !findings.length) return null
+  // The partial-analysis family (X026/X027/W008) is one fact said three ways;
+  // merge it into a single card and render the remaining findings as usual.
+  const partial = findings.filter(isPartialFinding)
+  const rest = findings.filter((f) => !isPartialFinding(f))
   return (
+    <>
+      {partial.length ? <PartialAnalysisCard findings={partial} /> : null}
+      {rest.length ? (
     <ul className="findings">
-      {findings.map((f, i) => {
+      {rest.map((f, i) => {
         const loc = locationLabel(f)
         const rule = ruleInfo(f.rule_id)
         const unresolved = parseUnresolved(f.reason)
@@ -486,6 +596,8 @@ function Findings({ findings }) {
         )
       })}
     </ul>
+      ) : null}
+    </>
   )
 }
 
@@ -895,6 +1007,7 @@ function PackageSections({ packages, iocPackages }) {
               <a className="pkg__action" href={AUR_PKGBUILD(pkg.package)} target="_blank" rel="noreferrer">See PKGBUILD ↗</a>
             </header>
             {pkg.last_modified ? <p className="pkg__meta">AUR change: {pkg.last_modified}</p> : null}
+            {findings.some(isPartialFinding) ? <PartialBanner /> : null}
             <ContextBlock packageName={pkg.package} findings={findings} />
             {findings.length ? (
               <FindingsOrSource packageName={pkg.package} findings={findings} />

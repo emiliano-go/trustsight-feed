@@ -692,6 +692,40 @@ a.chip--ioc:hover {
 .unresolved__list li { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .unresolved__from { color: var(--fg-muted); font-size: 0.8235rem; }
 
+/* ---------- partial analysis (X026/X027/W008 merged) ---------- */
+
+.partial-banner {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--plate-amber) 40%, var(--rule));
+  border-left-width: 3px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--plate-amber) 8%, transparent);
+  color: var(--fg);
+  font-size: 0.8824rem;
+  line-height: 1.6;
+}
+
+.partial {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--plate-amber);
+  border-radius: 6px;
+}
+.partial__head { margin: 0 0 6px; font-size: 0.9412rem; }
+.partial__body { margin: 0; max-width: 62ch; color: var(--fg-muted); font-size: 0.8824rem; line-height: 1.6; }
+.partial__details { margin: 10px 0 0; }
+.partial__details summary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.7647rem;
+  color: var(--accent);
+}
+.partial__raw { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.partial__raw li { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.partial__rawreason { color: var(--fg-muted); font-size: 0.8235rem; line-height: 1.6; flex: 1 1 240px; min-width: 0; }
+
 /* ---------- diff viewer ---------- */
 
 .diff { margin: 16px 0 0; }
