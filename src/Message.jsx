@@ -338,13 +338,14 @@ function campaignType(id) {
 }
 
 /** The affected packages of a campaign, each linked to its AUR page and PKGBUILD. */
-function MemberList({ names }) {
+function MemberList({ names, iocPackages }) {
   if (!names.length) return <p className="pkg__meta">No member packages named.</p>
   return (
     <ul className="campaign-members">
       {names.map((name) => (
         <li key={name}>
           <a className="member__name" href={AUR_PACKAGE(name)} target="_blank" rel="noreferrer">{name}</a>
+          {iocPackages && iocPackages.has(name) ? <span className="badge badge--ioc">IOC match</span> : null}
           <a className="member__pkgbuild" href={AUR_PKGBUILD(name)} target="_blank" rel="noreferrer" title={`PKGBUILD for ${name}`}>PKGBUILD ↗</a>
         </li>
       ))}
@@ -352,19 +353,28 @@ function MemberList({ names }) {
   )
 }
 
-/** Group a flat alert list by package, so each flagged package owns a section. */
+/**
+ * Group a flat alert list by rule, so each fired rule owns an alert section
+ * and the packages it flagged are listed inside it. A campaign fires the same
+ * rule on many packages; grouping by rule keeps that campaign one section.
+ */
 function groupAlerts(alerts) {
-  const byName = new Map()
+  const byRule = new Map()
+  const bare = []
   for (const entry of alerts) {
     if (!entry.package) continue
-    if (!byName.has(entry.package)) byName.set(entry.package, { package: entry.package, rules: [], seen: new Set() })
-    const group = byName.get(entry.package)
-    if (entry.rule_id && !group.seen.has(entry.rule_id)) {
-      group.seen.add(entry.rule_id)
-      group.rules.push(entry.rule_id)
+    if (!entry.rule_id) {
+      bare.push(entry)
+      continue
     }
+    if (!byRule.has(entry.rule_id)) byRule.set(entry.rule_id, { rule: entry.rule_id, packages: new Set() })
+    byRule.get(entry.rule_id).packages.add(entry.package)
   }
-  return [...byName.values()]
+  const order = sortRuleIds([...byRule.keys()])
+  const rules = [...byRule.values()]
+    .map((group) => ({ ...group, packages: [...group.packages].sort() }))
+    .sort((a, b) => order.indexOf(a.rule) - order.indexOf(b.rule))
+  return { rules, bare }
 }
 
 function AlertList({ alerts, overPackages, iocPackages }) {
@@ -372,13 +382,19 @@ function AlertList({ alerts, overPackages, iocPackages }) {
   // A package that also crossed the threshold is rendered once, in full, by
   // the over-threshold section below - so it is not repeated here.  Its rule
   // firings are still named there through the located findings.
-  const all = groupAlerts(alerts)
-  const groups = all.filter((group) => !overPackages.has(group.package))
-  const alsoOver = all.length - groups.length
-  // Explain each rule once for the whole batch. A campaign fires the same rule
-  // on many packages, so a card per package repeated the same text dozens of
-  // times; the legend explains it once and the packages stay compact.
-  const distinctRules = [...new Set(groups.flatMap((group) => group.rules))].sort()
+  const { rules: allRules, bare } = groupAlerts(alerts)
+  const hidden = new Set()
+  const groups = allRules
+    .map((group) => ({ ...group, packages: group.packages.filter((p) => (overPackages.has(p) ? (hidden.add(p), false) : true)) }))
+    .filter((group) => group.packages.length)
+  const bareVisible = bare.filter((entry) => {
+    if (overPackages.has(entry.package)) {
+      hidden.add(entry.package)
+      return false
+    }
+    return true
+  })
+  const alsoOver = hidden.size
   return (
     <section className="detail__section">
       <h2>New alerts <span className="count">{alerts.length}</span></h2>
@@ -387,24 +403,24 @@ function AlertList({ alerts, overPackages, iocPackages }) {
           {alsoOver === 1 ? '1 package is' : `${alsoOver} packages are`} also over threshold, shown in full below.
         </p>
       ) : null}
-      {distinctRules.length ? (
-        <>
-          <span className="pkg__label">Rules in this batch <span className="count">{distinctRules.length}</span></span>
-          <div className="rule-sections">
-            {sortRuleIds(distinctRules).map((id) => <RuleSection key={id} id={id} />)}
-          </div>
-        </>
-      ) : null}
       {groups.map((group) => (
-        <article className={`pkg${iocPackages.has(group.package) ? ' pkg--ioc' : ''}`} key={group.package}>
+        <article className="pkg" key={group.rule}>
           <header className="pkg__head">
-            <a className="pkg__name" href={AUR_PACKAGE(group.package)} target="_blank" rel="noreferrer">{group.package}</a>
-            {iocPackages.has(group.package) ? <span className="badge badge--ioc">IOC match</span> : null}
-            <span className="pkg__version">{group.rules.length} rule{group.rules.length === 1 ? '' : 's'}</span>
+            <RuleChip id={group.rule} />
+            <span className="pkg__version">{group.packages.length} package{group.packages.length === 1 ? '' : 's'}</span>
           </header>
-          <div className="ref-list">
-            {group.rules.map((id) => <RuleChip key={id} id={id} />)}
+          <MemberList names={group.packages} iocPackages={iocPackages} />
+          <div className="alert__rules">
+            <RuleSection id={group.rule} />
           </div>
+        </article>
+      ))}
+      {bareVisible.map((entry, i) => (
+        <article className={`pkg${iocPackages.has(entry.package) ? ' pkg--ioc' : ''}`} key={`${entry.package}-${i}`}>
+          <header className="pkg__head">
+            <a className="pkg__name" href={AUR_PACKAGE(entry.package)} target="_blank" rel="noreferrer">{entry.package}</a>
+            {iocPackages.has(entry.package) ? <span className="badge badge--ioc">IOC match</span> : null}
+          </header>
         </article>
       ))}
     </section>
