@@ -275,15 +275,33 @@ function MaintainersSection({ packages }) {
   )
 }
 
-/** Packages the analysis could not fully read, with what it could not resolve. */
+/**
+ * Packages the analysis could not fully read.
+ *
+ * Plain-language on purpose: a refusal is a limitation of the static check,
+ * not an accusation.  Say what could not be followed, where it is used, and
+ * what the reader should do - without the rule-name jargon the payload
+ * carries for the catalog pages.
+ */
 function Refusals({ refusals }) {
   if (!refusals.length) return null
   return (
     <section className="detail__section">
-      <h2>Could not fully read <span className="count">{refusals.length}</span></h2>
+      <h2>Not fully checked <span className="count">{refusals.length}</span></h2>
       {refusals.map((refusal, i) => {
         const findings = refusal.findings || []
-        const unresolved = findings.flatMap((f) => parseUnresolved(f.reason))
+        // X026/X027 both describe the same names; keep each once.
+        const seen = new Set()
+        const unresolved = findings
+          .flatMap((f) => parseUnresolved(f.reason))
+          .filter((entry) => {
+            const key = `${entry.name}|${entry.func}`
+            if (seen.has(key)) return false
+            seen.add(key)
+            return true
+          })
+        const names = unresolved.map((entry) => entry.name)
+        const funcs = [...new Set(unresolved.map((entry) => entry.func).filter(Boolean))]
         return (
           <article className="pkg" key={`${refusal.package}-${i}`}>
             <header className="pkg__head">
@@ -291,25 +309,42 @@ function Refusals({ refusals }) {
             </header>
             <PartialBanner />
             {unresolved.length && !(findings.length && findings.every(isPartialFinding)) ? (
-              <div className="unresolved">
-                <span className="pkg__label">Not resolved</span>
-                <ul className="unresolved__list">
-                  {unresolved.map((entry, j) => (
-                    <li key={`${entry.name}-${j}`}>
-                      <code className="md-code">{entry.name}</code>
-                      {entry.func
-                        ? <span className="unresolved__from">referenced from <code className="md-code">{entry.func}()</code></span>
-                        : null}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <>
+                <p className="pkg__meta">
+                  TrustSight reads recipes without running them, and this one
+                  computes {names.length === 1 ? 'one value' : `${names.length} values`}
+                  {' '}in a way the analyser could not follow
+                  {funcs.length ? ` (used in ${funcs.map((fn) => `${fn}()`).join(', ')})` : ''}:
+                  {' '}{names.map((name, j) => (
+                    <span key={name}>
+                      {j ? ', ' : ''}<code className="md-code">{name}</code>
+                    </span>
+                  ))}.
+                  Part of the build script was not checked.
+                </p>
+                <p className="pkg__meta">
+                  This is a gap in the check, not a sign of a problem — but it
+                  also means a problem in that part would not have been seen.
+                  Before installing, open the PKGBUILD and read
+                  {funcs.length ? ` ${funcs.map((fn) => `${fn}()`).join(', ')}` : ' the build functions'}
+                  {' '}yourself.
+                </p>
+              </>
             ) : null}
             {findings.length ? (
               <FindingsOrSource packageName={refusal.package} findings={findings} />
-            ) : (
-              <p className="pkg__meta">A construct in this recipe could not be resolved, so part of the change was not read.</p>
-            )}
+            ) : null}
+            {!unresolved.length && !findings.length ? (
+              <>
+                <p className="pkg__meta">
+                  TrustSight reads recipes without running them, and part of
+                  this one could not be read by the automatic check. That is a
+                  gap in the check, not a sign of a problem — but a problem in
+                  the unread part would not have been seen either.
+                </p>
+                {refusal.reason ? <p className="pkg__meta">Technical detail: {refusal.reason}</p> : null}
+              </>
+            ) : null}
           </article>
         )
       })}
@@ -1171,6 +1206,9 @@ export function Message({ slug }) {
               <span title="Your local time with its offset, then UTC">{formatTime(data.time)}</span>
               <span>{relative(data.time)}</span>
               <span className={eventBadgeClass(data.event)}>{eventLabel(data.event)}</span>
+              {data.tool_version
+                ? <span className="badge badge--version" title="TrustSight version that produced this analysis">TrustSight {data.tool_version}</span>
+                : null}
               {ioc.length ? <span className="badge badge--ioc">IOC match</span> : null}
               <a href={NTFY} target="_blank" rel="noreferrer">ntfy channel ↗</a>
             </div>

@@ -27,6 +27,7 @@ const NOTIFICATION_SUMMARY = {
     packages: { type: 'array', items: { type: 'string' }, description: 'Unique package names named in the document.' },
     ioc_packages: { type: 'array', items: { type: 'string' }, description: 'Packages that matched a known-bad indicator (IOC).' },
     rules: { type: 'array', items: { type: 'string' }, description: 'Unique rule ids that fired.' },
+    tool_version: { type: 'string', description: 'TrustSight version that produced this document. Absent on older notifications.', example: '0.20.2' },
   },
 }
 
@@ -314,6 +315,7 @@ export const openapiSpec = {
                     over_threshold: { type: 'integer' },
                     ioc: { type: 'integer' },
                     impersonation: { type: 'integer' },
+                    tool_version: { type: 'string', description: 'TrustSight version of the most recent alert document, read from its stored payload. Absent on older notifications.' },
                   },
                 },
               },

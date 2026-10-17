@@ -145,6 +145,7 @@ export function alertingClusters(payload) {
     for (const x of im.members || []) addPkg(x)
   }
   for (const r of payload.refusals || []) addPkg(r.package)
+  const tool_version = (payload && typeof payload.tool_version === 'string' && payload.tool_version) || undefined
   return {
     slug: row.slug,
     time: row.time,
@@ -164,6 +165,7 @@ export function alertingClusters(payload) {
     packages,
     ioc_packages: [...new Set((payload.ioc_matches || []).map((m) => m.package).filter(Boolean))],
     rules,
+    tool_version,
   }
 }
 

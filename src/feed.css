@@ -61,6 +61,7 @@
 .masthead-stats .stat--warn b { color: var(--plate-amber); }
 .masthead-stats .stat--ioc { border-left-color: var(--plate-red); }
 .masthead-stats .stat--ioc b { color: var(--plate-red); }
+.masthead-stats .stat--version { border-left-color: var(--accent, var(--rule)); }
 
 .masthead--feed .masthead-links {
   gap: 10px 26px;
@@ -234,6 +235,7 @@
 }
 .badge--alerts { background: color-mix(in srgb, var(--plate-red) 16%, transparent); color: var(--plate-red); }
 .badge--heartbeat { color: var(--fg-muted); }
+.badge--version { background: color-mix(in srgb, var(--fg-muted) 14%, transparent); color: var(--fg-muted); }
 .badge--ioc { background: var(--plate-red); color: #fff; }
 .badge--imp { background: var(--plate-red); color: #fff; }
 
@@ -1157,3 +1159,17 @@ a.chip--ioc:hover {
 }
 
 
+
+/* Refusal source disclosure: plain explanation stays on top, the marked-up
+   recipe opens inside. */
+.refusal__source {
+  margin-top: 0.5rem;
+}
+.refusal__source > summary {
+  cursor: pointer;
+  color: var(--accent, var(--rule));
+  font-size: 0.9rem;
+}
+.refusal__source[open] > summary {
+  margin-bottom: 0.5rem;
+}

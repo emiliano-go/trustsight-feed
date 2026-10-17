@@ -144,6 +144,11 @@ export function App() {
           ) : null}
           {stats ? <div className="stat--warn"><b>{stats.over_threshold}</b>Over threshold</div> : null}
           {stats ? <div className="stat--ioc"><b>{stats.ioc}</b>IOC matches</div> : null}
+          {stats && stats.tool_version ? (
+            <div className="stat--version" title="TrustSight version that produced these analyses">
+              <b>{stats.tool_version}</b>Analyzer
+            </div>
+          ) : null}
         </div>
         <nav className="masthead-links" aria-label="Primary">
           <a href={DOCS} target="_blank" rel="noreferrer">Docs ↗</a>

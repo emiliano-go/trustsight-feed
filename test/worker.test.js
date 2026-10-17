@@ -15,6 +15,7 @@ function messageEvent(overrides = {}) {
     message: JSON.stringify({
       event: 'trustsight.alerts',
       tool: 'trustsight',
+      tool_version: '0.20.2',
       title: 'TrustSight: 1 package(s) over threshold',
       day: '2026-05-01',
       cycle: { added: 3, changed: 41, removed: 2, processed: 44 },
@@ -230,6 +231,25 @@ describe('api endpoints', () => {
     const body = await res.json()
     expect(body.count).toBe(1)
     expect(body.items[0].packages).toContain('hot-pkg')
+  })
+
+  it('exposes tool_version on the message and on stats', async () => {
+    const message = await (await SELF.fetch('https://example.com/api/messages/2026-05-02/120000')).json()
+    expect(message.tool_version).toBe('0.20.2')
+
+    const stats = await (await SELF.fetch('https://example.com/api/stats')).json()
+    expect(stats.tool_version).toBe('0.20.2')
+  })
+
+  it('omits tool_version when the stored payload has none', async () => {
+    const doc = JSON.parse(messageEvent().message)
+    delete doc.tool_version
+    await seed({ message: JSON.stringify(doc) })
+
+    const stats = await (await SELF.fetch('https://example.com/api/stats')).json()
+    expect(stats).not.toHaveProperty('tool_version')
+    const message = await (await SELF.fetch('https://example.com/api/messages/2026-05-02/120000')).json()
+    expect(message).not.toHaveProperty('tool_version')
   })
 
   it('filters by date, hour and range', async () => {

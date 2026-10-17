@@ -215,7 +215,25 @@ async function stats(env) {
        FROM notifications
       WHERE event = 'trustsight.alerts'`
   ).first()
+  // The version of the latest alert document, from its stored payload. Older
+  // stored notifications carry no tool_version, so the field is omitted.
+  const latest = await env.DB.prepare(
+    `SELECT payload FROM notifications WHERE event = 'trustsight.alerts'
+      ORDER BY time DESC, rowid DESC LIMIT 1`
+  ).first()
+  const tool_version = extractToolVersion(latest && latest.payload)
+  if (row && tool_version) row.tool_version = tool_version
   return json(row || {})
+}
+
+/** The tool_version a stored payload JSON carries, when it has one. */
+function extractToolVersion(payloadJson) {
+  try {
+    const payload = JSON.parse(payloadJson || '{}')
+    return payload && typeof payload.tool_version === 'string' && payload.tool_version
+  } catch {
+    return false
+  }
 }
 
 function index() {
