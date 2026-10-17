@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
 import { AccessibilityMenu, ThemeSwitch, Wordmark } from './Controls.jsx'
-import { RuleCard, RuleChip, RuleHighlight, ruleInfo } from './RuleChip.jsx'
+import { RuleChip, RuleHighlight, RuleSection, ruleInfo, sortRuleIds } from './RuleChip.jsx'
 import { AUR_PACKAGE, AUR_PKGBUILD, eventBadgeClass, eventLabel, formatTime, locationLabel, relative } from './util.js'
 import { alertingClusters } from '../worker/lib.js'
 import { renderMarkdown } from './markdown.jsx'
@@ -390,8 +390,8 @@ function AlertList({ alerts, overPackages, iocPackages }) {
       {distinctRules.length ? (
         <>
           <span className="pkg__label">Rules in this batch <span className="count">{distinctRules.length}</span></span>
-          <div className="rule-cards">
-            {distinctRules.map((id) => <RuleCard key={id} id={id} />)}
+          <div className="rule-sections">
+            {sortRuleIds(distinctRules).map((id) => <RuleSection key={id} id={id} />)}
           </div>
         </>
       ) : null}
@@ -886,8 +886,8 @@ function PackageSections({ packages, iocPackages }) {
               <p className="pkg__meta">No located findings in this entry.</p>
             )}
             {rules.length ? (
-              <div className="rule-cards">
-                {rules.map((id) => <RuleCard key={id} id={id} />)}
+              <div className="rule-sections">
+                {sortRuleIds(rules).map((id) => <RuleSection key={id} id={id} />)}
               </div>
             ) : findings.length ? null : (
               <p className="pkg__meta">No named rule in this entry.</p>

@@ -541,52 +541,54 @@ a.chip--ioc:hover {
   line-height: 1.6;
 }
 
-/* ---------- rule explanation cards ---------- */
+/* ---------- rule explanation sections ---------- */
 
-.rule-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 12px;
+.rule-sections {
   margin: 14px 0 0;
 }
 
-.rule-card {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 16px 18px;
-  border: 1px solid var(--rule);
-  border-left: 3px solid var(--accent);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--bg) 58%, var(--fg) 3%);
+.rule-section {
+  padding: 10px 0 12px;
+  border-top: 1px solid var(--rule);
 }
-.rule-card--critical, .rule-card--fatal, .rule-card--high { border-left-color: var(--plate-red); }
-.rule-card--medium { border-left-color: var(--plate-amber); }
-.rule-card--low, .rule-card--info { border-left-color: var(--fg-muted); }
+.rule-section:last-child { border-bottom: 1px solid var(--rule); }
 
-.rule-card__head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.rule-card__id {
+.rule-section__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 6px;
+  font-size: 0.9412rem;
+  font-weight: 700;
+  color: var(--fg);
+}
+.rule-section__id {
   font-family: var(--font-mono);
-  font-size: 0.7059rem;
+  font-size: 0.7647rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--accent);
 }
-.rule-card__name { flex: 1; font-size: 0.9412rem; font-weight: 700; color: var(--fg); }
-.rule-card__desc { margin: 4px 0 2px; color: var(--fg-muted); font-size: 0.8824rem; line-height: 1.6; }
-.rule-card__link { margin-top: 4px; font-family: var(--font-mono); font-size: 0.7059rem; }
+.rule-section__name { flex: 1; font-size: inherit; font-weight: inherit; color: inherit; }
+.rule-section__desc { margin: 0 0 8px; max-width: 62ch; color: var(--fg-muted); font-size: 0.8824rem; line-height: 1.6; }
+.rule-section__link { font-family: var(--font-mono); font-size: 0.7647rem; }
 
-.rule-card--compact {
+.rule-section__tap {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
   width: 100%;
+  padding: 8px 0;
   text-align: left;
   font: inherit;
   color: inherit;
   cursor: pointer;
-  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+  background: none;
+  border: 0;
 }
-.rule-card--compact:hover,
-.rule-card--compact:focus-visible { border-color: var(--accent); }
-.rule-card--compact .rule-card__head { margin-bottom: 6px; }
+.rule-section__tap:hover .rule-section__name,
+.rule-section__tap:focus-visible .rule-section__name { color: var(--accent); }
 
 .alert-item { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; max-width: 100%; }
 .alert-item .pkg__name { word-break: break-word; }

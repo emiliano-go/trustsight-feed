@@ -95,12 +95,25 @@ export function RuleChip({ id }) {
   )
 }
 
+const SEVERITY_RANK = { FATAL: 0, CRITICAL: 1, HIGH: 2, MEDIUM: 3, LOW: 4, INFO: 5 }
+
+export function ruleSeverityRank(id) {
+  const rule = ruleInfo(id)
+  const sev = rule && rule.severity ? rule.severity.toUpperCase() : ''
+  return sev in SEVERITY_RANK ? SEVERITY_RANK[sev] : SEVERITY_RANK.INFO + 1
+}
+
+export function sortRuleIds(ids) {
+  return [...ids].sort((a, b) => ruleSeverityRank(a) - ruleSeverityRank(b) || a.localeCompare(b))
+}
+
 /**
- * The full explanation as a card. On a wide pointer it shows the whole
- * description inline; on touch or a narrow viewport it collapses to a compact
- * card that opens the modal, so a phone never gets a wall of text.
+ * The full explanation as a plain section. On a wide pointer it shows the
+ * whole description inline; on touch or a narrow viewport it collapses to a
+ * borderless button that opens the modal, so a phone never gets a wall of
+ * text.
  */
-export function RuleCard({ id }) {
+export function RuleSection({ id }) {
   const rule = ruleInfo(id)
   const sev = rule && rule.severity ? rule.severity.toUpperCase() : ''
 
@@ -108,35 +121,33 @@ export function RuleCard({ id }) {
     return (
       <button
         type="button"
-        className={`rule-card rule-card--compact rule-card--${sev ? sev.toLowerCase() : 'info'}`}
+        className="rule-section__tap"
         onClick={() => openRuleExplanation(id)}
         aria-label={`Rule ${id}${rule ? `: ${rule.name}` : ''}. Tap for the full explanation.`}
       >
-        <span className="rule-card__head">
-          <span className="rule-card__id">{id}</span>
-          <span className="rule-card__name">{rule ? rule.name : 'Unknown rule'}</span>
-          {sev ? <span className={`sev ${severityClass(sev)}`}>{sev}</span> : null}
-        </span>
+        <span className="rule-section__id">{id}</span>
+        <span className="rule-section__name">{rule ? rule.name : 'Unknown rule'}</span>
+        {sev ? <span className={`sev ${severityClass(sev)}`}>{sev}</span> : null}
       </button>
     )
   }
 
   return (
-    <article className={`rule-card rule-card--${sev ? sev.toLowerCase() : 'info'}`}>
-      <header className="rule-card__head">
-        <span className="rule-card__id">{id}</span>
-        <span className="rule-card__name">{rule ? rule.name : 'Unknown rule'}</span>
+    <section className="rule-section">
+      <h3 className="rule-section__head">
+        <span className="rule-section__id">{id}</span>
+        <span className="rule-section__name">{rule ? rule.name : 'Unknown rule'}</span>
         {sev ? <span className={`sev ${severityClass(sev)}`}>{sev}</span> : null}
-      </header>
-      <p className="rule-card__desc">
+      </h3>
+      <p className="rule-section__desc">
         {rule && rule.description
           ? renderMarkdown(rule.description, rule.docsUrl)
           : 'This rule is not in the catalog. It may be reserved or added since the catalog was generated.'}
       </p>
-      <a className="rule-card__link" href={rule ? rule.docsUrl : DOCS_RULES} target="_blank" rel="noreferrer">
+      <a className="rule-section__link" href={rule ? rule.docsUrl : DOCS_RULES} target="_blank" rel="noreferrer">
         rules reference ↗
       </a>
-    </article>
+    </section>
   )
 }
 
