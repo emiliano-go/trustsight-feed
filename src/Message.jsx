@@ -409,10 +409,10 @@ function AlertList({ alerts, overPackages, iocPackages }) {
             <RuleChip id={group.rule} />
             <span className="pkg__version">{group.packages.length} package{group.packages.length === 1 ? '' : 's'}</span>
           </header>
-          <MemberList names={group.packages} iocPackages={iocPackages} />
           <div className="alert__rules">
             <RuleSection id={group.rule} />
           </div>
+          <MemberList names={group.packages} iocPackages={iocPackages} />
         </article>
       ))}
       {bareVisible.map((entry, i) => (
