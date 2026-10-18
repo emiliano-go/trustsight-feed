@@ -1,0 +1,40 @@
+name: Sitemap
+
+# Regenerate public/sitemap.xml from the live feed API on every push, and
+# commit it back. The sitemap file itself is ignored so the commit that this
+# job makes cannot re-trigger the job.
+on:
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - public/sitemap.xml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sitemap-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sitemap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Regenerate sitemap.xml
+        run: node scripts/build-sitemap.mjs
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- public/sitemap.xml; then
+            echo "sitemap unchanged"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/sitemap.xml
+          git commit -m "chore: regenerate sitemap.xml"
+          git push
