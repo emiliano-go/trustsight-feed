@@ -439,6 +439,14 @@
     "description": "Trained immunity, reported: while a campaign is primed, a package in its scope is named as corroborated - one `G007` entry carrying `campaign_id`, weight 0. It adds no points: the bonus it replaced measured scope *breadth*, not corroboration, and the benign corpus carries no active campaign, so the points were never measured against the false-positive rate. Inert when no campaign is active. See [Campaign Alert Mode](../../explanation/campaign-alert-mode.md).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g007"
   },
+  "g008": {
+    "id": "G008",
+    "name": "First-Seen Account Adoption Burst",
+    "severity": "HIGH",
+    "categoryTitle": "Correlation",
+    "description": "The fennekuiper signature: a throwaway account sweeping up orphans in its first cycle. \"First-seen\" replaces \"registered 3 days ago\" because registration date is not in the RPC metadata and chasing profile pages would be a new fetch. First-seen is the deterministic, self-contained approximation: a throwaway account has, by definition, no prior maintainer events in the database.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g008"
+  },
   "h001": {
     "id": "H001",
     "name": "Checksum Disabled",
@@ -1766,6 +1774,22 @@
     "categoryTitle": "Temporal Context",
     "description": "The xz backdoor's shape: the trusted signer is swapped, not merely widened (H078) or narrowed (H024). Unlike T001 it needs no ecosystem history - the rotation of trust inside one commit is its own fact - so it fires cold.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#t003"
+  },
+  "t006": {
+    "id": "T006",
+    "name": "Metadata-Git Divergence",
+    "severity": "MEDIUM",
+    "categoryTitle": "Temporal Context",
+    "description": "In aurweb, pushes set both `LastModified` and the git commit timestamp, so divergence means commits were pushed and later stripped (a history rewrite). The benign explanations (staff reset, maintainer cleanup force-push) are themselves security-relevant, so this is MEDIUM, review-queue verdict. The finding's output is designed to be pasted into a report to AUR security, where push logs survive even when git history does not.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#t006"
+  },
+  "t007": {
+    "id": "T007",
+    "name": "Packager Not In History",
+    "severity": "INFO",
+    "categoryTitle": "Temporal Context",
+    "description": "A weight-0 corroboration signal: the AUR says this account packaged the project, but no commit in history mentions them. Name matching is fuzzy (display name vs email vs git config), so this corroborates T006 and G008 but never scores alone. On its own tier it is nearly a confession; as a solo scorer it would eventually burn someone with an unusual committer setup.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#t007"
   },
   "u001": {
     "id": "U001",
