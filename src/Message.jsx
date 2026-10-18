@@ -3,7 +3,7 @@ import { AccessibilityMenu, ThemeSwitch, Wordmark } from './Controls.jsx'
 import { RuleChip, RuleHighlight, RuleSection, ruleInfo, sortRuleIds } from './RuleChip.jsx'
 import { AUR_PACKAGE, AUR_PKGBUILD, eventBadgeClass, eventLabel, formatTime, locationLabel, relative } from './util.js'
 import { alertingClusters } from '../worker/lib.js'
-import { renderMarkdown } from './markdown.jsx'
+import { renderMarkdown, renderInlineCode } from './markdown.jsx'
 
 const SECURITY = 'https://docs.trustsight.org/security/'
 const NTFY = 'https://ntfy.sh/trustsight-aur-1d8a3fd2'
@@ -611,7 +611,7 @@ function Findings({ findings }) {
                 ? <pre className="finding__loc">{loc}</pre>
                 : <span className="finding__loc finding__loc--none" title="This signal names a fact about the change, not a line">no line</span>}
             </div>
-            {reasonText ? <p className="finding__reason">{reasonText}</p> : null}
+            {reasonText ? <p className="finding__reason">{renderInlineCode(reasonText)}</p> : null}
             {diff ? <pre className={`finding__diff ${diffLineClass(diff)}`}>{diff}</pre> : null}
             {unresolved.length ? (
               <p className="finding__unresolved">

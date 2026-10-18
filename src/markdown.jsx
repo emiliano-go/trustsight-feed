@@ -55,3 +55,35 @@ export function renderMarkdown(text, docsUrl) {
   if (last < text.length) out.push(text.slice(last))
   return out
 }
+
+// A finding reason is machine-generated and delimits code with `backticks`
+// or 'single quotes' (the same convention flagTokens reads), not prose, so
+// both spans become inline code. renderMarkdown above is deliberately left
+// alone: rule *descriptions* are authored prose where an apostrophe is just
+// an apostrophe.
+const REASON_CODE = /`([^`]+)`|'([^']+)'/g
+
+/** Split a reason into `{ code, text }` segments on its quoted spans. */
+export function splitInlineCode(text) {
+  if (!text) return []
+  const out = []
+  let last = 0
+  let m
+  REASON_CODE.lastIndex = 0
+  while ((m = REASON_CODE.exec(text)) !== null) {
+    if (m.index > last) out.push({ code: false, text: text.slice(last, m.index) })
+    out.push({ code: true, text: m[1] ?? m[2] })
+    last = m.index + m[0].length
+  }
+  if (last < text.length) out.push({ code: false, text: text.slice(last) })
+  return out
+}
+
+/** Preact nodes for a finding reason, with its quoted spans as inline code. */
+export function renderInlineCode(text) {
+  const segments = splitInlineCode(text)
+  if (!segments.length) return null
+  return segments.map((s, i) =>
+    s.code ? <code className="md-code" key={i}>{s.text}</code> : s.text,
+  )
+}
