@@ -436,7 +436,7 @@
     "name": "Campaign Corroboration",
     "severity": "INFO,",
     "categoryTitle": "Correlation",
-    "description": "Trained immunity, scored: while a campaign is primed, a package in its scope earns `+min(5, corroboration_count)` points, once, as one attributable breakdown entry carrying `campaign_id`. Bounded so a wide campaign cannot inflate a run, and inert when no campaign is active (the calibration corpus carries none). See [Campaign Alert Mode](../../explanation/campaign-alert-mode.md).",
+    "description": "Trained immunity, reported: while a campaign is primed, a package in its scope is named as corroborated - one `G007` entry carrying `campaign_id`, weight 0. It adds no points: the bonus it replaced measured scope *breadth*, not corroboration, and the benign corpus carries no active campaign, so the points were never measured against the false-positive rate. Inert when no campaign is active. See [Campaign Alert Mode](../../explanation/campaign-alert-mode.md).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g007"
   },
   "h001": {
@@ -1302,6 +1302,14 @@
     "categoryTitle": "Meta and Confluence",
     "description": "A rule declaring `escalates_when` fired while none of its declared licensors did - the detector travelled without its usual company. Like M004 this is a sensor-health observation, not evidence about the package, so it goes to the `cofire_health` channel and never scores. See [Escalation Licensing](../../explanation/escalation-licensing.md).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/meta/#m005"
+  },
+  "m006": {
+    "id": "M006",
+    "name": "Campaign Re-armed Too Often",
+    "severity": "INFO,",
+    "categoryTitle": "Meta and Confluence",
+    "description": "A campaign re-armed faster than `[alerts] campaign_min_reactivation_observations` allows. The window is still refreshed - re-activation is never blocked - but a campaign that re-primes over and over is the **instrument** churning, not a package misbehaving, so it is surfaced as a tool-health note rather than passed over in silence. Unlike M004 and M005 it is a cycle-level observation: it is raised in the correlation cycle's log, not attached to any package's `cofire_health`, and it never scores. See [Campaign Alert Mode](../../explanation/campaign-alert-mode.md).",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/meta/#m006"
   },
   "novelty": {
     "id": "NOVELTY",
