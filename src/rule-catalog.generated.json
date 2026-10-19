@@ -447,6 +447,22 @@
     "description": "The fennekuiper signature: a throwaway account sweeping up orphans in its first cycle. \"First-seen\" replaces \"registered 3 days ago\" because registration date is not in the RPC metadata and chasing profile pages would be a new fetch. First-seen is the deterministic, self-contained approximation: a throwaway account has, by definition, no prior maintainer events in the database.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g008"
   },
+  "g009": {
+    "id": "G009",
+    "name": "Watchlisted Maintainer",
+    "severity": "INFO",
+    "categoryTitle": "Correlation",
+    "description": "Report-only, weight 0, like G006. Registration date, \"Inactive since\" and suspension state are AUR profile-page facts the pipeline never fetches, so no machine rule can compute them. Where a human has established such a fact - the pattern a triager reads by hand, \"Inactive-since ~ Last Updated and Last Packager = Package Maintainer\" - the watchlist records it and this rule names the package instead of guessing from RPC metadata.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g009"
+  },
+  "g010": {
+    "id": "G010",
+    "name": "Shared First-Seen Host",
+    "severity": "INFO",
+    "categoryTitle": "Correlation",
+    "description": "The G001 shape with the novelty join instead of the gained-host join: only a host the corpus has not met before counts, so one honest newcomer per window is the AUR being the AUR and five is a distribution infrastructure. Weight 0 and never campaign-priming: a first contact is a statement about newness, never about intent, so G010 names the coordination and never scores, gates, or escalates a member (the Contact Ledger's plural-contact rule: strangers in company are a signal, strangers alone are a census).",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g010"
+  },
   "h001": {
     "id": "H001",
     "name": "Checksum Disabled",
