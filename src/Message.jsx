@@ -8,6 +8,14 @@ import { renderMarkdown, renderInlineCode } from './markdown.jsx'
 const SECURITY = 'https://docs.trustsight.org/security/'
 const NTFY = 'https://ntfy.sh/trustsight-aur-1d8a3fd2'
 
+/** The SPA route for a package's stored history. */
+export const packageHref = (name) => `/pkg/${encodeURIComponent(name)}`
+
+/** The inline jump from any package mention to its history page. */
+function PackageHistoryLink({ name }) {
+  return <a className="pkg__history" href={packageHref(name)} data-route>see package history</a>
+}
+
 // One-line explanations of the kinds of entry a document can carry, so a
 // reader knows what they are looking at before the list.
 export const ENTRY_TYPES = {
@@ -56,7 +64,7 @@ function containsToken(text, name) {
 }
 
 /** The maintainer and upstream URLs a PKGBUILD declares. */
-function parsePkgbuild(text) {
+export function parsePkgbuild(text) {
   if (!text) return { maintainer: '', url: '', sources: [] }
   const maintainer = (text.match(/^#\s*Maintainer[^\n:]*:\s*(.+?)\s*$/m) || [])[1] || ''
   const url = (text.match(/^url=(['"]?)([^'"\n]+)\1/m) || [])[2] || ''
@@ -86,7 +94,7 @@ function diffFiles(diffText) {
 }
 
 /** The removed and added lines of a diff that mention any keyword. */
-function diffValues(diffText, keywords) {
+export function diffValues(diffText, keywords) {
   const removed = []
   const added = []
   if (!diffText) return { removed, added }
@@ -105,7 +113,7 @@ function diffValues(diffText, keywords) {
  * upstream rather than every line that merely mentions the word "source".
  */
 const SOURCE_DECL = /^\s*source(?:_[a-z0-9_]+)?\s*=/
-function sourceUrlsFromDiff(diffText) {
+export function sourceUrlsFromDiff(diffText) {
   const removed = []
   const added = []
   const seen = { '-': new Set(), '+': new Set() }
@@ -136,7 +144,7 @@ function withoutVersions(line) {  return line
  * difference is the version (or a checksum) did not really change, and the
  * card must not say it did.
  */
-function changedBeyondVersion(removed, added) {
+export function changedBeyondVersion(removed, added) {
   const norm = (arr) => [...new Set(arr.map(withoutVersions))].sort().join('|')
   return norm(removed) !== norm(added)
 }
@@ -266,7 +274,12 @@ function MaintainersSection({ packages }) {
             <span className="maintainer__name">{who}</span>
             <span className="maintainer__count">{pkgs.length} package{pkgs.length === 1 ? '' : 's'}</span>
             <span className="maintainer__pkgs">
-              {pkgs.map((p) => <a key={p} href={AUR_PACKAGE(p)} target="_blank" rel="noreferrer">{p}</a>)}
+              {pkgs.map((p) => (
+                <span className="maintainer__pkg" key={p}>
+                  <a href={AUR_PACKAGE(p)} target="_blank" rel="noreferrer">{p}</a>
+                  <PackageHistoryLink name={p} />
+                </span>
+              ))}
             </span>
           </li>
         ))}
@@ -306,6 +319,7 @@ function Refusals({ refusals }) {
           <article className="pkg" key={`${refusal.package}-${i}`}>
             <header className="pkg__head">
               <a className="pkg__name" href={AUR_PACKAGE(refusal.package)} target="_blank" rel="noreferrer">{refusal.package}</a>
+              <PackageHistoryLink name={refusal.package} />
             </header>
             <PartialBanner />
             {unresolved.length && !(findings.length && findings.every(isPartialFinding)) ? (
@@ -382,6 +396,7 @@ function MemberList({ names, iocPackages }) {
           <a className="member__name" href={AUR_PACKAGE(name)} target="_blank" rel="noreferrer">{name}</a>
           {iocPackages && iocPackages.has(name) ? <span className="badge badge--ioc">IOC match</span> : null}
           <a className="member__pkgbuild" href={AUR_PKGBUILD(name)} target="_blank" rel="noreferrer" title={`PKGBUILD for ${name}`}>PKGBUILD ↗</a>
+          <PackageHistoryLink name={name} />
         </li>
       ))}
     </ul>
@@ -466,6 +481,7 @@ function AlertList({ alerts, overPackages, iocPackages }) {
           <header className="pkg__head">
             <a className="pkg__name" href={AUR_PACKAGE(entry.package)} target="_blank" rel="noreferrer">{entry.package}</a>
             {iocPackages.has(entry.package) ? <span className="badge badge--ioc">IOC match</span> : null}
+            <PackageHistoryLink name={entry.package} />
           </header>
         </article>
       ))}
@@ -586,7 +602,7 @@ function PartialAnalysisCard({ findings }) {
   )
 }
 
-function Findings({ findings }) {
+export function Findings({ findings }) {
   if (!findings || !findings.length) return null
   // The partial-analysis family (X026/X027/W008) is one fact said three ways;
   // merge it into a single card and render the remaining findings as usual.
@@ -1039,6 +1055,7 @@ function PackageSections({ packages, iocPackages }) {
               {pkg.version ? <span className="pkg__version">{pkg.version}</span> : null}
               {iocPackages.has(pkg.package) ? <span className="badge badge--ioc">IOC match</span> : null}
               {pkg.score !== undefined && pkg.score !== null ? <span className="badge badge--alerts">score {pkg.score}</span> : null}
+              <PackageHistoryLink name={pkg.package} />
               <a className="pkg__action" href={AUR_PKGBUILD(pkg.package)} target="_blank" rel="noreferrer">See PKGBUILD ↗</a>
             </header>
             {pkg.last_modified ? <p className="pkg__meta">AUR change: {pkg.last_modified}</p> : null}
@@ -1073,6 +1090,7 @@ function IocSection({ matches }) {
           <div className="ioc-row" key={`${m.package}-${i}`}>
             <span className="badge badge--ioc">IOC match</span>
             <a className="pkg__name" href={AUR_PACKAGE(m.package)} target="_blank" rel="noreferrer">{m.package}</a>
+            <PackageHistoryLink name={m.package} />
             {m.indicator ? <code className="ioc-row__indicator">{m.indicator}</code> : null}
           </div>
         ))}
@@ -1102,7 +1120,10 @@ function Campaigns({ payload }) {
                 <div className="impersonates">
                   <span className="impersonates__label">Impersonating</span>
                   {camp.targets.map((t) => (
-                    <a className="impersonates__target" key={t} href={`https://aur.archlinux.org/packages?K=${encodeURIComponent(t)}&SeB=n`} target="_blank" rel="noreferrer">{t}</a>
+                    <span className="impersonates__pkg" key={t}>
+                      <a className="impersonates__target" href={`https://aur.archlinux.org/packages?K=${encodeURIComponent(t)}&SeB=n`} target="_blank" rel="noreferrer">{t}</a>
+                      <PackageHistoryLink name={t} />
+                    </span>
                   ))}
                 </div>
               )

@@ -1,7 +1,7 @@
 // Read API over the D1 store. Public data, so responses are CORS-open for
 // anyone who wants to consume the feed from another tool.
 
-import { ftsQuery, summarize } from './lib.js'
+import { ftsQuery, packageHistory, summarize } from './lib.js'
 import { openapiSpec } from './openapi.js'
 
 const DEFAULT_LIMIT = 50
@@ -19,6 +19,7 @@ const ENDPOINTS = [
   'GET /api/date/{YYYY-MM-DD}',
   'GET /api/date/{YYYY-MM-DD}/{timeframe}',
   'GET /api/package/{name}',
+  'GET /api/package/{name}/history',
   'GET /api/rule/{id}',
   'GET /api/messages/{slug}',
   'GET /api/source/{package}?file=PKGBUILD',
@@ -187,6 +188,23 @@ async function byDate(env, url, date, timeframe) {
     to: window.to,
     event: url.searchParams.get('event') || 'all',
   })
+}
+
+async function packageHistoryResponse(env, name) {
+  if (!PACKAGE_RE.test(name)) return json({ error: 'bad_package' }, 400)
+  const fts = ftsQuery(name)
+  if (!fts) return json({ package: name, ...packageHistory([], name) })
+  // The FTS match is a prefix, so read a bounded window and let the exact
+  // package check in packageHistory discard the false positives.
+  const { results } = await env.DB.prepare(
+    `SELECT n.slug, n.time, n.event, n.title, n.payload
+       FROM notifications n
+       JOIN notifications_fts f ON f.rowid = n.rowid
+      WHERE f.notifications_fts MATCH ?
+      ORDER BY n.time DESC, n.rowid DESC
+      LIMIT 500`
+  ).bind(fts).all()
+  return json({ package: name, ...packageHistory(results || [], name) })
 }
 
 async function bySearch(env, url, term) {
@@ -491,6 +509,9 @@ export async function handleApi(request, env, url) {
   }
   if ((match = path.match(/^\/api\/date\/([0-9-]+)$/))) {
     return byDate(env, url, match[1], null)
+  }
+  if ((match = path.match(/^\/api\/package\/(.+)\/history$/))) {
+    return packageHistoryResponse(env, decodeURIComponent(match[1]))
   }
   if ((match = path.match(/^\/api\/package\/(.+)$/))) {
     return bySearch(env, url, decodeURIComponent(match[1]))

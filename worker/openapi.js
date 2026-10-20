@@ -226,6 +226,23 @@ export const openapiSpec = {
         responses: { 200: listResponse('Notifications naming the package.'), 429: RATE_LIMITED },
       },
     },
+    '/api/package/{name}/history': {
+      get: {
+        tags: ['Facets'],
+        summary: 'Everything known about a package across the stored alerts',
+        description: 'A newest-first timeline of every notification that names the package exactly, plus the rules, maintainer-change signals and upstream URLs those analyses record.',
+        parameters: [
+          { name: 'name', in: 'path', required: true, schema: { type: 'string' }, example: 'pgadmin4-server' },
+        ],
+        responses: {
+          200: {
+            description: 'The package history.',
+            content: { 'application/json': { schema: { type: 'object', additionalProperties: true } } },
+          },
+          400: BAD_REQUEST, 429: RATE_LIMITED,
+        },
+      },
+    },
     '/api/rule/{id}': {
       get: {
         tags: ['Facets'],

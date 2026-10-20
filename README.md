@@ -85,6 +85,10 @@ A read-only JSON API over the same store, with an OpenAPI 3.1 description:
   or a window in it (`HH`, `HH-HH`, or `HHMM-HHMM`).
 - `/api/package/{name}` and `/api/rule/{id}` everything mentioning a package or
   fired by a rule.
+- `/api/package/{name}/history` every stored alert that names a package, with
+  its version transitions, scores, rules, findings, maintainer-change signals
+  and the upstream URLs those analyses record. The page at `/pkg/{name}` renders
+  it beside the live AUR maintainer and current PKGBUILD.
 - `/api/messages/{slug}`, `/api/stats`.
 - `/api/source/{package}?file=PKGBUILD` the analysed AUR file, unmodified, so a
   client can show the flagged lines. Only AUR repository files resolve; the

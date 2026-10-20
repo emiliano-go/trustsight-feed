@@ -959,6 +959,66 @@ a.chip--ioc:hover {
 .pkg__action:hover,
 .member__pkgbuild:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 
+.pkg__history {
+  font-family: var(--font-mono);
+  font-size: 0.7059rem;
+  color: var(--fg-muted);
+  border-bottom: 1px dotted var(--rule);
+  white-space: nowrap;
+}
+.pkg__history:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+.maintainer__pkg { display: inline-flex; align-items: baseline; gap: 8px; }
+
+/* ---------- package history page ---------- */
+
+.history-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.history-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.7647rem;
+}
+.history-row__main { flex: 1 1 260px; color: var(--fg); overflow-wrap: anywhere; }
+.history-row__url { flex: 1 1 260px; color: var(--accent); word-break: break-all; }
+.history-row__time { color: var(--fg-muted); white-space: nowrap; }
+
+.history-rules { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.history-rule {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+}
+.history-rule__count { font-family: var(--font-mono); font-size: 0.7059rem; color: var(--fg); }
+.history-rule__last { font-family: var(--font-mono); font-size: 0.6471rem; color: var(--fg-muted); }
+
+.history-item__title {
+  margin: 10px 0 0;
+  max-width: 60ch;
+  font-size: 1.0588rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.history-item__title a { color: var(--fg); border-bottom: 0; }
+.history-item__title a:hover { color: var(--accent); }
+
+.history-item__findings { margin-top: 16px; }
+.history-item__findings summary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.7647rem;
+  color: var(--accent);
+}
+.history-item__findings .findings { margin-top: 14px; }
+
 /* ---------- campaigns ---------- */
 
 .campaign__subhead {
@@ -986,6 +1046,7 @@ a.chip--ioc:hover {
   border-bottom: 2px solid var(--plate-red);
 }
 .impersonates__target:hover { color: var(--accent); }
+.impersonates__pkg { display: inline-flex; align-items: baseline; gap: 8px; }
 
 .campaign-members {
   list-style: none;
@@ -999,6 +1060,7 @@ a.chip--ioc:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 10px;
   padding: 9px 12px;
   border: 1px solid var(--rule);

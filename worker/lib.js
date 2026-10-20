@@ -117,6 +117,158 @@ export function alertingClusters(payload) {
   })
 }
 
+/** Rules whose firing is a statement about who maintains a package. */
+const MAINTAINER_RULES = new Set([
+  'C006', 'G003', 'G005', 'H026', 'H044', 'H046', 'H058', 'H060', 'H074', 'H086',
+])
+
+const URL_RE = /https?:\/\/[^\s'"()<>\]]+/g
+
+/**
+ * Everything one notification says about one package, or null when the
+ * notification does not name it. The FTS match can be a prefix (a search for
+ * `foo` finds `foobar`), so this is the exact check the history route uses.
+ */
+export function packageFacts(payload, name) {
+  const p = payload || {}
+  const over = (p.over_threshold || []).find((o) => o.package === name) || null
+  const alerts = (p.alerts || []).filter((a) => a.package === name)
+  const refusals = (p.refusals || []).filter((r) => r.package === name)
+  const ioc = (p.ioc_matches || []).filter((m) => m.package === name)
+  const campaigns = alertingClusters(p).filter((c) => (c.members || []).includes(name))
+  const impersonation = (p.impersonation || []).filter((c) => (c.members || []).includes(name))
+  if (!over && !alerts.length && !refusals.length && !ioc.length && !campaigns.length && !impersonation.length) return null
+
+  const seen = new Set()
+  const findings = [
+    ...((over && Array.isArray(over.findings)) ? over.findings : []),
+    ...refusals.flatMap((r) => (Array.isArray(r.findings) ? r.findings : [])),
+  ].filter((f) => {
+    const key = `${f.rule_id}|${f.file}|${f.line}|${f.reason}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+
+  const rules = new Set([...(over && over.rules) || []])
+  for (const f of findings) rules.add(f.rule_id)
+  for (const a of alerts) rules.add(a.rule_id)
+  for (const c of campaigns) rules.add(c.rule_id)
+  for (const c of impersonation) rules.add('G005')
+
+  return {
+    over: Boolean(over),
+    version: (over && over.version) || '',
+    score: over && Number.isFinite(Number(over.score)) ? Number(over.score) : null,
+    last_modified: (over && over.last_modified) || '',
+    rules: [...rules].filter(Boolean),
+    findings,
+    alerts: alerts.map((a) => a.rule_id).filter(Boolean),
+    refusal: refusals.length > 0,
+    refusal_reasons: refusals.map((r) => r.reason).filter(Boolean),
+    ioc: ioc.map((m) => m.indicator).filter(Boolean),
+    campaigns: campaigns.map((c) => c.rule_id).filter(Boolean),
+    impersonation: impersonation.map((c) => c.maintainer).filter(Boolean),
+  }
+}
+
+/**
+ * Aggregate every stored notification that names a package into one history:
+ * a newest-first timeline of what each analysis said, plus the rule, maintainer
+ * and upstream facts that can be read from those analyses.
+ *
+ * The store does not hold a full PKGBUILD revision per notification, so this
+ * reports what the documents actually carry: version transitions, scores,
+ * rules and findings, maintainer-change signals, and every source URL a
+ * finding names (which is how an upstream that was used once survives after
+ * the recipe has moved on).
+ */
+export function packageHistory(rows, name) {
+  const timeline = []
+  const rules = new Map()
+  const maintainers = []
+  const upstreams = new Map()
+  let first = null
+  let last = null
+  let maxScore = null
+
+  for (const row of rows) {
+    let payload = {}
+    try { payload = JSON.parse(row.payload || '{}') } catch { /* keep {} */ }
+    const facts = packageFacts(payload, name)
+    if (!facts) continue
+
+    const time = Number(row.time) || 0
+    if (first === null || time < first) first = time
+    if (last === null || time > last) last = time
+    if (facts.score !== null && (maxScore === null || facts.score > maxScore)) maxScore = facts.score
+
+    timeline.push({
+      slug: row.slug,
+      time,
+      event: row.event,
+      title: row.title,
+      headline: pickHeadline(payload, row.title || 'watcher cycle'),
+      ...facts,
+    })
+
+    for (const id of facts.rules) {
+      const rec = rules.get(id) || { id, count: 0, last_seen: 0 }
+      rec.count++
+      if (time > rec.last_seen) rec.last_seen = time
+      rules.set(id, rec)
+    }
+
+    const namedMaint = new Set()
+    for (const who of facts.impersonation || []) {
+      namedMaint.add('G005')
+      maintainers.push({
+        rule_id: 'G005',
+        reason: `listed in an impersonation campaign submitted by ${who || 'one account'}`,
+        time,
+        slug: row.slug,
+      })
+    }
+
+    for (const f of facts.findings) {
+      const rule = String(f.rule_id || '').toUpperCase()
+      const reason = String(f.reason || '')
+      if (MAINTAINER_RULES.has(rule) || /maintainer|ownership transition|adopted|orphan/i.test(reason)) {
+        namedMaint.add(rule)
+        maintainers.push({ rule_id: f.rule_id, reason, time, slug: row.slug })
+      }
+      for (const m of reason.matchAll(URL_RE)) {
+        const url = m[0].replace(/[.,;:]+$/, '')
+        const rec = upstreams.get(url) || { url, rule_id: f.rule_id, first_seen: time, last_seen: time, reason }
+        if (time < rec.first_seen) rec.first_seen = time
+        if (time > rec.last_seen) rec.last_seen = time
+        upstreams.set(url, rec)
+      }
+    }
+
+    // Alert-only documents (a rule id and a package, no finding) still record
+    // that a maintainer-change rule fired, even though they carry no names.
+    for (const id of facts.rules) {
+      const rule = String(id || '').toUpperCase()
+      if (MAINTAINER_RULES.has(rule) && !namedMaint.has(rule)) {
+        maintainers.push({ rule_id: id, reason: '', time, slug: row.slug })
+      }
+    }
+  }
+
+  timeline.sort((a, b) => b.time - a.time)
+  return {
+    count: timeline.length,
+    first,
+    last,
+    max_score: maxScore,
+    timeline,
+    rules: [...rules.values()].sort((a, b) => (b.count - a.count) || a.id.localeCompare(b.id)),
+    maintainers: maintainers.sort((a, b) => b.time - a.time),
+    upstreams: [...upstreams.values()].sort((a, b) => (b.last_seen - a.last_seen) || a.url.localeCompare(b.url)),
+  }
+}
+
 /** A compact list-item projection derived from a stored row and its payload. */export function summarize(row) {
   let payload = {}
   try { payload = JSON.parse(row.payload || '{}') } catch { /* keep {} */ }

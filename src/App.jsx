@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks'
 import { AccessibilityMenu, ThemeSwitch, Wordmark } from './Controls.jsx'
 import { RuleChip } from './RuleChip.jsx'
-import { AUR_PACKAGE, eventBadgeClass, eventLabel, formatTime, relative } from './util.js'
+import { eventBadgeClass, eventLabel, formatTime, relative } from './util.js'
 
 const DOCS = 'https://docs.trustsight.org'
 const SECURITY = `${DOCS}/security/`
@@ -16,7 +16,7 @@ const FILTERS = [
   ['all', 'All'],
 ]
 
-function FeedItem({ item }) {
+export function FeedItem({ item }) {
   const href = `/${item.slug}/`
   const iocPackages = new Set(item.ioc_packages || [])
   const isIoc = iocPackages.size > 0 || Boolean(item.counts && item.counts.ioc)
@@ -32,7 +32,7 @@ function FeedItem({ item }) {
       </h3>
       <div className="feed-item__tags">
         {item.packages.map((name) => (
-          <a className={`chip${iocPackages.has(name) ? ' chip--ioc' : ''}`} key={`p-${name}`} href={AUR_PACKAGE(name)} target="_blank" rel="noreferrer">{name}</a>
+          <a className={`chip${iocPackages.has(name) ? ' chip--ioc' : ''}`} key={`p-${name}`} href={`/pkg/${encodeURIComponent(name)}`} data-route>{name}</a>
         ))}
         {item.rules.map((id) => <RuleChip key={`r-${id}`} id={id} />)}
       </div>
@@ -40,7 +40,7 @@ function FeedItem({ item }) {
   )
 }
 
-function FeedSkeleton() {
+export function FeedSkeleton() {
   return (
     <div className="feed-skeleton" aria-hidden="true">
       <i /><i /><i />

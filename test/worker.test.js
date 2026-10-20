@@ -1,6 +1,6 @@
 import { env, SELF } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { alertingClusters, baseSlug, buildSearchText, ftsQuery, isTrustSightNotification, parseNotification, pickHeadline, summarize } from '../worker/lib.js'
+import { alertingClusters, baseSlug, buildSearchText, ftsQuery, isTrustSightNotification, packageFacts, packageHistory, parseNotification, pickHeadline, summarize } from '../worker/lib.js'
 import { ingestDocument, REPLAY_WINDOW_SECONDS } from '../worker/ingest.js'
 
 function messageEvent(overrides = {}) {
@@ -79,6 +79,32 @@ describe('lib parsing', () => {
     // With nothing left, the headline falls through, not to a fake campaign.
     expect(pickHeadline({ campaign_cluster: [{ rule_id: 'H061', members: ['sdl2'], count: 1 }] }, 'TrustSight: alive'))
       .toBe('TrustSight: alive')
+  })
+
+  it('extracts exactly one package from a document and aggregates its history', () => {
+    const payload = {
+      over_threshold: [{
+        package: 'hot-pkg', score: 45, version: '1.0 -> 1.1',
+        rules: ['H001', 'C006'],
+        findings: [
+          { rule_id: 'C006', file: 'PKGBUILD', line: 2, reason: "maintainer changed, new domain https://evil.example/x" },
+        ],
+      }],
+      alerts: [],
+    }
+    const facts = packageFacts(payload, 'hot-pkg')
+    expect(facts.version).toBe('1.0 -> 1.1')
+    expect(facts.rules).toEqual(expect.arrayContaining(['H001', 'C006']))
+    expect(packageFacts(payload, 'hot')).toBeNull()
+
+    const history = packageHistory([
+      { slug: '2026-05-02/120000', time: 100, event: 'trustsight.alerts', title: 't', payload: JSON.stringify(payload) },
+    ], 'hot-pkg')
+    expect(history.count).toBe(1)
+    expect(history.max_score).toBe(45)
+    expect(history.maintainers).toHaveLength(1)
+    expect(history.upstreams.map((u) => u.url)).toContain('https://evil.example/x')
+    expect(history.rules.find((r) => r.id === 'H001').count).toBe(1)
   })
 
   it('summarizes packages and rules without duplicates', () => {
@@ -277,6 +303,21 @@ describe('api endpoints', () => {
     expect(rule.count).toBe(1)
     const none = await (await SELF.fetch('https://example.com/api/package/does-not-exist')).json()
     expect(none.count).toBe(0)
+  })
+
+  it('serves a package history with its score, version and rules', async () => {
+    const res = await SELF.fetch('https://example.com/api/package/hot-pkg/history')
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.package).toBe('hot-pkg')
+    expect(body.count).toBe(1)
+    expect(body.max_score).toBe(45)
+    expect(body.timeline[0].version).toBe('1.0 -> 1.1')
+    expect(body.timeline[0].score).toBe(45)
+
+    // A prefix the FTS matched but no document names exactly is not history.
+    const prefix = await (await SELF.fetch('https://example.com/api/package/some/history')).json()
+    expect(prefix.count).toBe(0)
   })
 
   it('redirects the docs spellings to the reference page', async () => {
