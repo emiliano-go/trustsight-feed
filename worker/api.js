@@ -250,7 +250,7 @@ async function stats(env) {
   const row = await env.DB.prepare(
     `SELECT COUNT(*) AS total,
             MIN(time) AS first,
-            MAX(time) AS last,
+            (SELECT MAX(time) FROM notifications) AS last,
             COALESCE(SUM(n_alerts), 0) AS alerts,
             COALESCE(SUM(n_over_threshold), 0) AS over_threshold,
             COALESCE(SUM(n_ioc), 0) AS ioc,

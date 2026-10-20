@@ -316,7 +316,7 @@ export const openapiSpec = {
     '/api/stats': {
       get: {
         tags: ['Meta'],        summary: 'Aggregate counts',
-        description: 'Totals over alert documents.',
+        description: 'Totals over alert documents. `last` is the most recent stored notification of any kind, so a heartbeat counts as a refresh.',
         responses: {
           200: {
             description: 'Aggregates.',
@@ -327,7 +327,7 @@ export const openapiSpec = {
                   properties: {
                     total: { type: 'integer' },
                     first: { type: ['integer', 'null'], description: 'Unix seconds.' },
-                    last: { type: ['integer', 'null'] },
+                    last: { type: ['integer', 'null'], description: 'Unix seconds of the most recent notification of any kind, including heartbeats.' },
                     alerts: { type: 'integer' },
                     over_threshold: { type: 'integer' },
                     ioc: { type: 'integer' },

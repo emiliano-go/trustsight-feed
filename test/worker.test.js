@@ -285,6 +285,25 @@ describe('api endpoints', () => {
     expect(message).not.toHaveProperty('tool_version')
   })
 
+  it('counts a heartbeat as a refresh, not as an alert', async () => {
+    const beat = parseNotification({
+      ...messageEvent(),
+      id: 'heartbeat-1',
+      time: 1777723260,
+      title: 'TrustSight: alive',
+      message: JSON.stringify({ event: 'trustsight.heartbeat', tool: 'trustsight', title: 'TrustSight: alive' }),
+    })
+    await env.DB.prepare(INSERT_SQL).bind(
+      beat.id, beat.time, beat.event, beat.topic, beat.title, beat.priority, beat.tags,
+      beat.day, beat.slug, beat.message_raw, beat.payload, beat.n_alerts,
+      beat.n_over_threshold, beat.n_ioc, beat.n_impersonation, beat.search_text, 0
+    ).run()
+
+    const stats = await (await SELF.fetch('https://example.com/api/stats')).json()
+    expect(stats.total).toBe(1)
+    expect(stats.last).toBe(1777723260)
+  })
+
   it('filters by date, hour and range', async () => {
     const dated = await (await SELF.fetch('https://example.com/api/date/2026-05-02')).json()
     expect(dated.count).toBe(1)
