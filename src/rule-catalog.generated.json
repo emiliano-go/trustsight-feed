@@ -449,10 +449,10 @@
   },
   "g009": {
     "id": "G009",
-    "name": "Watchlisted Maintainer",
+    "name": "Watchlisted Subject",
     "severity": "INFO",
     "categoryTitle": "Correlation",
-    "description": "Report-only, weight 0, like G006. Registration date, \"Inactive since\" and suspension state are AUR profile-page facts the pipeline never fetches, so no machine rule can compute them. Where a human has established such a fact - the pattern a triager reads by hand, \"Inactive-since ~ Last Updated and Last Packager = Package Maintainer\" - the watchlist records it and this rule names the package instead of guessing from RPC metadata.",
+    "description": "Report-only, weight 0, like G006. Registration date, \"Inactive since\" and suspension state are AUR profile-page facts the pipeline never fetches, so no machine rule can compute them. Where a human has established such a fact - the pattern a triager reads by hand, \"Inactive-since ~ Last Updated and Last Packager = Package Maintainer\" - the watchlist records it and this rule names the package instead of guessing from RPC metadata. A package can also be named directly, for the same report-only reason: the operator wants it surfaced without asserting a machine-computable signal.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g009"
   },
   "g010": {
