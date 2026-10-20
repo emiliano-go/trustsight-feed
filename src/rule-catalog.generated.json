@@ -359,6 +359,14 @@
     "description": "`provides=` or `replaces=` declares an **established package unrelated to this one**. `provides=('openssl')` or `replaces=('sudo')` installs this package in front of the real one, satisfying every dependency on it.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/naming-and-dependency/#d004"
   },
+  "d005": {
+    "id": "D005",
+    "name": "Official-Repo Name Shadow",
+    "severity": "MEDIUM",
+    "categoryTitle": "Naming and Dependencies",
+    "description": "H064 and D004 own the *added* ``provides``/``replaces``/``conflicts``. This rule owns the name the recipe carries now: a split output whose name pacman already resolves elsewhere, or a conflict whose target became an official package after the recipe declared it. The variant carve-out is the ordinary pattern - ``foo-git`` conflicting ``foo`` is suppressed - so the finding names a name claim that stands alone. \"Established\" is official-repo membership, falling back to the dependency observation proxy exactly as H064 does, and cold start fires nothing. Weight 0 until the benign corpus calibrates it; the recipe's current text is read on the fresh path, the incremental path and ``trustsight lint``.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/naming-and-dependency/#d005"
+  },
   "e001": {
     "id": "E001",
     "name": "Added-Text Compression Ratio",
@@ -404,7 +412,7 @@
     "name": "Coordinated Adoption",
     "severity": "MEDIUM",
     "categoryTitle": "Correlation",
-    "description": "Adoption is the temporal engine's own predicate - H044 (ownership transition) or H086 (orphan-to-maintained) - recorded per package, not a bare maintainer-change. The finding's `predicates` names which T instance the group joined on; H074 (mass adoption) is the cross-package aggregation this rule performs.",
+    "description": "Adoption is the temporal engine's own predicate - H044 (ownership transition) or H086 (orphan-to-maintained) - recorded per package, not a bare maintainer-change. A package absent from the previous snapshot is a first observation, not an adoption, so a newly published package cannot join the group. The finding's `predicates` names which T instance the group joined on; H074 (mass adoption) is the cross-package aggregation this rule performs.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g003"
   },
   "g004": {
@@ -412,7 +420,7 @@
     "name": "Shared Upstream Dependency",
     "severity": "HIGH",
     "categoryTitle": "Correlation",
-    "description": "The committed-manifest counterpart to G001: a dependency name and remote host that many packages gain in the same window is the same-new-upstream-dependency campaign shape. It reads the recorded `upstream_dep_additions` view (the U-series dependency additions); the engine ships and is unit-tested, and the corpus feed that fills the view is the same pending work G002's literal feed is.",
+    "description": "The committed-manifest counterpart to G001: a dependency name and remote host that many packages gain in the same window is the same-new-upstream-dependency campaign shape. It reads the recorded `upstream_dep_additions` view, which the corpus writer clears at cycle start and repopulates with the dependencies each processed package added; a prior cycle's row cannot re-fire the join.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g004"
   },
   "g005": {
@@ -1287,12 +1295,20 @@
     "description": "H092 compares the hosts the two documents name. This rule compares the fields that decide what the build installs, fetches and verifies: a metadata file that names a different install hook, a different set of checksums, or a different dependency list describes a build other than the one makepkg will run, and an AUR helper reading the metadata may resolve a different closure than the recipe builds.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h103"
   },
+  "h104": {
+    "id": "H104",
+    "name": "Placeholder Package",
+    "severity": "INFO",
+    "categoryTitle": "Naming and Dependencies",
+    "description": "A placeholder reserves a name in the AUR while installing nothing - it builds, runs, and ships an empty package. Individually it is inert, so the finding is not a payload claim: it states that the recipe claims a name it does not fill, which is worth a human's eye because a burst of them is a name-squatting campaign ([#41](https://github.com/emiliano-go/trustsight/issues/41)). The two-of-three threshold keeps a legitimate project pinned at a `0.0.0` release or an unusual-but-real package function from reading as a reservation. Weight 0 until the benign corpus calibrates it; read from the recipe text, so it fires identically whether the package is first seen, edited, or checked with `trustsight lint`.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/naming-and-dependency/#h104"
+  },
   "m001": {
     "id": "M001",
     "name": "Claim Contradicted By Structure",
     "severity": "HIGH",
     "categoryTitle": "Meta and Confluence",
-    "description": "It joins the *real* claims ledger - the P-series ids the run's declared facts imply (`trustsight.scoring.declared_claims`) - against the structural findings: checksums declared (P001) while H091 reports the arrays do not cover every source, GPG verification declared (P002) while H024 reports it removed, a source pinned (P005) while H101 reports the pinning lost, a trusted forge declared (P007) while H099 reports the host swapped.",
+    "description": "It joins the *real* claims ledger - the P-series ids the run's declared facts imply (`trustsight.scoring.declared_claims`) - against the structural findings: checksums declared (P001) while H091 reports the arrays do not cover every source, GPG verification declared (P002) while H024 reports it removed, a source pinned (P005) while H101 reports the pinning lost, a trusted forge declared (P007) while H099 reports the host swapped, a prebuilt deliverable declared (P009) while H066 reports an ELF committed to the repository outside `source=()`.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/meta/#m001"
   },
   "m002": {
@@ -1397,6 +1413,14 @@
     "severity": "INFO",
     "categoryTitle": "Declared Practice",
     "description": "A source tracks a branch or unpinned ref; upstream decides at build time what this compiles and runs. Stated so its absence is not mistaken for a pin.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/"
+  },
+  "p009": {
+    "id": "P009",
+    "name": "Prebuilt Deliverable",
+    "severity": "INFO",
+    "categoryTitle": "Declared Practice",
+    "description": "The recipe declares a prebuilt deliverable (-bin/-appimage/-wine name or a prebuilt-artifact source). M001 pairs the declaration against a committed binary the recipe did not declare.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/"
   },
   "r001": {

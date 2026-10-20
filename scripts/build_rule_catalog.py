@@ -118,6 +118,11 @@ SYNTHETIC = {
         "categoryTitle": "Declared Practice",
         "description": "A source tracks a branch or unpinned ref; upstream decides at build time what this compiles and runs. Stated so its absence is not mistaken for a pin.",
     },
+    "P009": {
+        "id": "P009", "name": "Prebuilt Deliverable", "severity": "INFO",
+        "categoryTitle": "Declared Practice",
+        "description": "The recipe declares a prebuilt deliverable (-bin/-appimage/-wine name or a prebuilt-artifact source). M001 pairs the declaration against a committed binary the recipe did not declare.",
+    },
 }
 
 
