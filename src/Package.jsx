@@ -54,9 +54,19 @@ export function Package({ name }) {
 
   const maxScore = history && history.max_score !== null && history.max_score !== undefined ? history.max_score : null
   const latest = history && history.timeline.length ? history.timeline[0] : null
-  const observedUrls = new Set(history ? history.upstreams.map((u) => u.url) : [])
-  const currentUrls = new Set([live.url, ...live.sources].filter(Boolean))
-  const urlsNotCurrent = history ? history.upstreams.filter((u) => !currentUrls.has(u.url)) : []
+  const currentUrls = [...new Set([live.url, ...live.sources].filter(Boolean))]
+  const currentUrlSet = new Set(currentUrls)
+  const pastByUrl = new Map()
+  for (const u of history ? history.upstreams : []) {
+    if (!currentUrlSet.has(u.url)) pastByUrl.set(u.url, u)
+  }
+  for (const url of live.upstreamRemoved) {
+    if (!currentUrlSet.has(url) && !pastByUrl.has(url)) {
+      pastByUrl.set(url, { url, rule_id: '', last_seen: null, reason: 'removed in the latest AUR change' })
+    }
+  }
+  const pastUrls = [...pastByUrl.values()]
+  const upstreamCount = currentUrls.length + pastUrls.length
 
   return (
     <div className="page" id="top">
@@ -90,7 +100,7 @@ export function Package({ name }) {
               <div><b>{history.count}</b>Analyses</div>
               {maxScore !== null ? <div className="stat--warn"><b>{maxScore}</b>Highest score</div> : null}
               <div><b>{history.rules.length}</b>Rules seen</div>
-              <div><b>{observedUrls.size}</b>Upstream URLs</div>
+              <div><b>{upstreamCount}</b>Upstream URLs</div>
               {latest && latest.version ? <div><b>{latest.version}</b>Latest change</div> : null}
             </div>
 
@@ -165,26 +175,31 @@ export function Package({ name }) {
             </section>
 
             <section className="detail__section">
-              <h2>Upstreams <span className="count">{observedUrls.size}</span></h2>
-              {urlsNotCurrent.length ? (
+              <h2>Upstreams <span className="count">{upstreamCount}</span></h2>
+              {upstreamCount ? (
                 <ul className="history-list">
-                  {urlsNotCurrent.map((u) => (
+                  {currentUrls.map((url) => (
+                    <li className="history-row" key={url}>
+                      <span className="badge badge--version">current</span>
+                      <a className="history-row__url" href={url} target="_blank" rel="noreferrer">{url}</a>
+                      <span className="history-row__time">declared in the PKGBUILD</span>
+                    </li>
+                  ))}
+                  {pastUrls.map((u) => (
                     <li className="history-row" key={u.url}>
-                      <RuleChip id={u.rule_id} />
+                      {u.rule_id ? <RuleChip id={u.rule_id} /> : <span className="badge">removed</span>}
                       <a className="history-row__url" href={u.url} target="_blank" rel="noreferrer">{u.url}</a>
-                      <span className="history-row__time" title={u.reason}>last seen {relative(u.last_seen)}</span>
+                      <span className="history-row__time" title={u.reason}>
+                        {u.last_seen ? `last seen ${relative(u.last_seen)}` : 'removed in the latest AUR change'}
+                      </span>
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="pkg__meta">No earlier upstream URL is recorded in the stored alerts.</p>
+                <p className="pkg__meta">No upstream URL is recorded for this package.</p>
               )}
-              {currentUrls.size ? (
-                <p className="pkg__meta">
-                  Currently declared: {[...currentUrls].map((u, i) => (
-                    <span key={u}>{i ? ', ' : ''}<a className="history-row__url" href={u} target="_blank" rel="noreferrer">{u}</a></span>
-                  ))}
-                </p>
+              {!pastUrls.length && currentUrls.length ? (
+                <p className="pkg__meta">No earlier upstream URL is recorded in the stored alerts.</p>
               ) : null}
             </section>
 

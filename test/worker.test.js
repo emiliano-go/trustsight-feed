@@ -1,6 +1,6 @@
 import { env, SELF } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { alertingClusters, baseSlug, buildSearchText, ftsQuery, isTrustSightNotification, packageFacts, packageHistory, parseNotification, pickHeadline, summarize } from '../worker/lib.js'
+import { alertingClusters, baseSlug, buildSearchText, ftsQuery, fuzzyScore, isTrustSightNotification, packageFacts, packageHistory, parseNotification, pickHeadline, summarize } from '../worker/lib.js'
 import { ingestDocument, REPLAY_WINDOW_SECONDS } from '../worker/ingest.js'
 
 function messageEvent(overrides = {}) {
@@ -61,6 +61,13 @@ describe('lib parsing', () => {
     expect(ftsQuery('some-pkg')).toBe('some* pkg*')
     expect(ftsQuery('  ')).toBeNull()
     expect(ftsQuery('H001')).toBe('h001*')
+  })
+
+  it('matches a typo within a length-scaled edit distance', () => {
+    expect(fuzzyScore('hto-pkg', 'hot-pkg H001')).toBe(1)
+    expect(fuzzyScore('pgadmni', 'pgadmin4-server')).toBe(2)
+    expect(fuzzyScore('pkg', 'some-pkg')).toBe(0)
+    expect(fuzzyScore('zzzz', 'hot-pkg')).toBeNull()
   })
 
   it('treats context hubs and one-member clusters as not-campaigns', () => {
@@ -303,6 +310,14 @@ describe('api endpoints', () => {
     expect(rule.count).toBe(1)
     const none = await (await SELF.fetch('https://example.com/api/package/does-not-exist')).json()
     expect(none.count).toBe(0)
+  })
+
+  it('falls back to a typo-tolerant match when FTS finds nothing', async () => {
+    const res = await SELF.fetch('https://example.com/api/feed?q=hto-pkg&event=all')
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.count).toBe(1)
+    expect(body.items[0].packages).toContain('hot-pkg')
   })
 
   it('serves a package history with its score, version and rules', async () => {

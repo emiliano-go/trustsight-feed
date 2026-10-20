@@ -400,3 +400,58 @@ export function ftsQuery(input) {
   if (!tokens.length) return null
   return tokens.map((t) => `${t}*`).join(' ')
 }
+
+/** How many single-character edits a token of this length may differ by. */
+function fuzzyAllowance(length) {
+  if (length <= 2) return 0
+  if (length <= 5) return 1
+  if (length <= 9) return 2
+  return 3
+}
+
+/** Optimal-string-alignment distance: edits plus adjacent transpositions. */
+function editDistance(a, b) {
+  const rows = a.length + 1
+  const cols = b.length + 1
+  const d = Array.from({ length: rows }, () => new Array(cols).fill(0))
+  for (let i = 0; i < rows; i++) d[i][0] = i
+  for (let j = 0; j < cols; j++) d[0][j] = j
+  for (let i = 1; i < rows; i++) {
+    for (let j = 1; j < cols; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost)
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1)
+      }
+    }
+  }
+  return d[a.length][b.length]
+}
+
+/**
+ * A typo-tolerant match of *input* against one indexed string, or null.
+ *
+ * Every query token must match some word exactly, by prefix, or within a
+ * length-scaled edit distance (adjacent transpositions count as one edit).
+ * Returns the summed distance, so 0 is an exact token match.
+ */
+export function fuzzyScore(input, text) {
+  const tokens = String(input || '').toLowerCase().match(/[a-z0-9_]+/g) || []
+  const words = String(text || '').toLowerCase().match(/[a-z0-9_]+/g) || []
+  if (!tokens.length || !words.length) return null
+  let total = 0
+  for (const token of tokens) {
+    const allowance = fuzzyAllowance(token.length)
+    let best = Infinity
+    for (const word of words) {
+      if (word === token) { best = 0; break }
+      if (word.startsWith(token) || token.startsWith(word)) { best = Math.min(best, 1); continue }
+      if (Math.abs(word.length - token.length) > allowance) continue
+      const distance = editDistance(token, word)
+      if (distance <= allowance) best = Math.min(best, distance)
+    }
+    if (best === Infinity) return null
+    total += best
+  }
+  return total
+}

@@ -1,7 +1,7 @@
 // Read API over the D1 store. Public data, so responses are CORS-open for
 // anyone who wants to consume the feed from another tool.
 
-import { ftsQuery, packageHistory, summarize } from './lib.js'
+import { ftsQuery, fuzzyScore, packageHistory, summarize } from './lib.js'
 import { openapiSpec } from './openapi.js'
 
 const DEFAULT_LIMIT = 50
@@ -102,6 +102,11 @@ function dateWindow(date, timeframe) {
   return null
 }
 
+// A typo leaves FTS with no rows, so the fuzzy fallback rescans a bounded
+// window and filters in JS. The corpus is small; if it outgrows this, add a
+// trigram index instead of raising the window.
+const FUZZY_CANDIDATE_LIMIT = 5000
+
 /** One paginated query shared by every list endpoint. */
 async function listQuery(env, options = {}) {
   const {
@@ -112,7 +117,6 @@ async function listQuery(env, options = {}) {
   const where = []
   const params = []
 
-  if (fts) { where.push('f.notifications_fts MATCH ?'); params.push(fts) }
   if (event && event !== 'all') { where.push('n.event = ?'); params.push(event) }
   if (day) { where.push('n.day = ?'); params.push(day) }
   if (from !== undefined && from !== null) { where.push('n.time >= ?'); params.push(from) }
@@ -122,14 +126,35 @@ async function listQuery(env, options = {}) {
     params.push(beforeTime, beforeTime, beforeRow)
   }
 
-  const fromClause = fts ? 'notifications n JOIN notifications_fts f ON f.rowid = n.rowid' : 'notifications n'
-  const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : ''
+  const order = 'ORDER BY n.time DESC, n.rowid DESC LIMIT ?'
+  const filters = where.length ? `WHERE ${where.join(' AND ')}` : ''
+  let results
 
-  const { results } = await env.DB.prepare(
-    `SELECT n.*, n.rowid AS _rowid FROM ${fromClause} ${whereClause} ORDER BY n.time DESC, n.rowid DESC LIMIT ?`
-  )
-    .bind(...params, limit)
-    .all()
+  if (fts) {
+    const ftsWhere = [`f.notifications_fts MATCH ?`, ...where].join(' AND ')
+    const attempt = await env.DB.prepare(
+      `SELECT n.*, n.rowid AS _rowid
+         FROM notifications n JOIN notifications_fts f ON f.rowid = n.rowid
+        WHERE ${ftsWhere} ${order}`
+    ).bind(fts, ...params, limit).all()
+    results = attempt.results
+
+    // Nothing matched the prefix query: retry typo-tolerantly over the same
+    // filters and the same keyset window.
+    if (!results || !results.length) {
+      const candidates = await env.DB.prepare(
+        `SELECT n.*, n.rowid AS _rowid FROM notifications n ${filters} ${order}`
+      ).bind(...params, FUZZY_CANDIDATE_LIMIT).all()
+      results = (candidates.results || [])
+        .filter((row) => fuzzyScore(q, row.search_text) !== null)
+        .slice(0, limit)
+    }
+  } else {
+    const all = await env.DB.prepare(
+      `SELECT n.*, n.rowid AS _rowid FROM notifications n ${filters} ${order}`
+    ).bind(...params, limit).all()
+    results = all.results
+  }
 
   const items = (results || []).map(summarize)
   const last = results && results.length === limit ? results[results.length - 1] : null
