@@ -1855,6 +1855,38 @@
     "description": "A real integrity signal (spec section 7.2): the resolved dependency set is not committed alongside the declaration, so what the build will actually fetch is unstated. It stays **weight 0** because VCS and library packaging legitimately omit lockfiles - the corpus must adjudicate a scored rate before it can be promoted.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/upstream-manifests/#u006"
   },
+  "u007": {
+    "id": "U007",
+    "name": "CI Exfil Shape",
+    "severity": "MEDIUM",
+    "categoryTitle": "Upstream Release Integrity",
+    "description": "The workflow content lives upstream, where A2 forbids a local read, so the shape arrives over the signed `upstream_repo` federation channel and is never fetched. A `pkgver` bump in the same diff is reported as context - the update is about to distribute whatever the upstream now builds - but is not required. A miss is uninformative, as with every indicator.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/upstream-release/#u007"
+  },
+  "u008": {
+    "id": "U008",
+    "name": "Git-History Credential Sweep",
+    "severity": "MEDIUM",
+    "categoryTitle": "Upstream Release Integrity",
+    "description": "Independent of U007's exfil clause, so a repo reported for one shape does not imply the other. The workflow content is upstream and unreadable locally (A2); the signed `upstream_repo` entry is the only source.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/upstream-release/#u008"
+  },
+  "u009": {
+    "id": "U009",
+    "name": "New CI Surface Committed",
+    "severity": "LOW",
+    "categoryTitle": "Upstream Release Integrity",
+    "description": "A new automation surface in the AUR repository. Rare (most AUR repositories carry no CI), so it is emitted as `ci_surface_gained` at **weight 0** and never scored: it is a corroboration feed for U007/U008 and for IOC hits, not a claim on its own. AUR repositories are not where a package builds, but a workflow committed beside the recipe is a surface worth naming.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/upstream-release/#u009"
+  },
+  "u010": {
+    "id": "U010",
+    "name": "Unauditable Upstream",
+    "severity": "MEDIUM",
+    "categoryTitle": "Upstream Release Integrity",
+    "description": "A malicious package wants payload nobody checks, and an authenticated or private-network upstream guarantees exactly that for every reviewer who is not the maintainer. Legitimate intranet and corporate AUR packages exist, which is why the verdict is a review-queue entry and the severity sits at MEDIUM.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/upstream-release/#u010"
+  },
   "w001": {
     "id": "W001",
     "name": "Executes Code This Analysis Did Not Read",
@@ -1934,6 +1966,22 @@
     "categoryTitle": "Unverifiable",
     "description": "Fires when a run produces more findings than `[alerts] max_rendered_findings` (default 50) and the terminal therefore groups the remainder. The per-band counts travel with it, so grouping is reported rather than silent; the JSON report is never filtered and carries every finding.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/unverifiable/#w010"
+  },
+  "w011": {
+    "id": "W011",
+    "name": "Upstream Content Not Read",
+    "severity": "INFO",
+    "categoryTitle": "Unverifiable",
+    "description": "Fires when the recipe declares a forge upstream (a git `url=`) whose content the analysis did not read. A2 forbids fetching a declared URL, so the U-series extension reads only what the recipe says about upstream, never the archive or workflow behind it. This is the standing boundary of that reach: reported once per report, shown even when nothing else fires.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/unverifiable/#w011"
+  },
+  "w012": {
+    "id": "W012",
+    "name": "Federation Not Consulted",
+    "severity": "INFO",
+    "categoryTitle": "Unverifiable",
+    "description": "Fires when a forge upstream is declared and the `upstream_repo` federation channel is cold: the IOC baseline is disabled, or the store carries no `upstream_repo` entries, or it cannot be reached. U007 and U008 are federation-fed, so a cold channel is exactly the case where no finding can be produced; not because the upstream was clean, but because nothing could be consulted.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/unverifiable/#w012"
   },
   "x001": {
     "id": "X001",
