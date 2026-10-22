@@ -396,7 +396,7 @@
     "name": "Shared Gained Host",
     "severity": "HIGH",
     "categoryTitle": "Correlation",
-    "description": "atomic-arch's signature: a new CDN added by many unrelated packages at once.",
+    "description": "atomic-arch's signature: a new CDN added by many unrelated packages at once. The feed is the hosts each package gained **this cycle**; it is cleared at cycle start, so a host gained months ago cannot re-join a later cycle. Split outputs of one pkgbase are one project, not several unrelated packages.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g001"
   },
   "g002": {
@@ -420,7 +420,7 @@
     "name": "Shared Upstream Dependency",
     "severity": "HIGH",
     "categoryTitle": "Correlation",
-    "description": "The committed-manifest counterpart to G001: a dependency name and remote host that many packages gain in the same window is the same-new-upstream-dependency campaign shape. It reads the recorded `upstream_dep_additions` view, which the corpus writer clears at cycle start and repopulates with the dependencies each processed package added; a prior cycle's row cannot re-fire the join.",
+    "description": "The committed-manifest counterpart to G001: a dependency name and remote host that many packages gain in the same window is the same-new-upstream-dependency campaign shape. It reads the recorded `upstream_dep_additions` view, which the corpus writer clears at cycle start and repopulates with the dependencies each processed package added; a prior cycle's row cannot re-fire the join. Split outputs of one pkgbase are one project, not several unrelated packages.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g004"
   },
   "g005": {
@@ -470,6 +470,30 @@
     "categoryTitle": "Correlation",
     "description": "The G001 shape with the novelty join instead of the gained-host join: only a host the corpus has not met before counts, so one honest newcomer per window is the AUR being the AUR and five is a distribution infrastructure. Weight 0 and never campaign-priming: a first contact is a statement about newness, never about intent, so G010 names the coordination and never scores, gates, or escalates a member (the Contact Ledger's plural-contact rule: strangers in company are a signal, strangers alone are a census).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g010"
+  },
+  "g012": {
+    "id": "G012",
+    "name": "Shared Payload Signal",
+    "severity": "HIGH",
+    "categoryTitle": "Correlation",
+    "description": "A per-package rule names one package's payload. This is the cross-account join: three unrelated maintainers shipping the same payload technique in one window is a campaign, not three coincidences. Only the curated payload allowlist counts (`R001`, `R002`, `R003`, `R008`, `H017`, `H035`, `H041`, `H075`, `H090`, `C016`, `C032`, `S001`-`S008`); broad practice rules such as `R010` (uses curl) or `H001` (checksum `SKIP`) are deliberately excluded so ordinary ecosystem churn cannot read as coordination.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g012"
+  },
+  "g013": {
+    "id": "G013",
+    "name": "Shared Fetch Target",
+    "severity": "HIGH",
+    "categoryTitle": "Correlation",
+    "description": "G012 joins on the rule; this joins on the endpoint. Two different payload rules that fetch the same URL meet here. The URL is read from the finding's already-bounded `reason` and `evidence` text - nothing is fetched and nothing is resolved - and a URL that cannot be parsed is dropped rather than guessed at. The canonical key keeps the scheme, lower-cased host, non-default port and path, and drops the query and fragment: that is the part an attacker can vary for free, and two packages pointing at the same endpoint should meet.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g013"
+  },
+  "g014": {
+    "id": "G014",
+    "name": "Shared Adoption Window",
+    "severity": "HIGH",
+    "categoryTitle": "Correlation",
+    "description": "G003 groups adoptions under one maintainer and G008 watches one first-seen account. This is the multi-account adoption window: different maintainers taking unrelated dormant packages in the same cycle. The dormant-target clause (`g014.min_dormant`, default 2 targets older than `g014.dormant_days`, default 180) keeps the ordinary \"a new maintainer adopts an active package they care about\" case out, in the same way G008's dormant clause does.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g014"
   },
   "h001": {
     "id": "H001",
@@ -860,7 +884,7 @@
     "name": "Source Host Changed",
     "severity": "MEDIUM",
     "categoryTitle": "Maintainer and Metadata",
-    "description": "A long-stable `source_hosts` or `source_orgs` set changed.",
+    "description": "Source removal is not a host change: when the new set is empty, H002 owns the finding and H049 stays quiet. When both `source_hosts` and `source_orgs` change in one cycle, they are two views of the same source set, so H049 emits one finding that shows both triggers and scores once.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#h049"
   },
   "h050": {
@@ -884,7 +908,7 @@
     "name": "Shared Source Repository",
     "severity": "HIGH",
     "categoryTitle": "Count-Based",
-    "description": "At least `[thresholds] h052.min_packages` (default 3) otherwise unrelated packages share a source repository, a new domain, or an adoption window.",
+    "description": "At least `[thresholds] h052.min_packages` (default 3) otherwise unrelated packages share a source repository. A shared new domain is [G001](correlation.md#g001)/[G010](correlation.md#g010); a shared adoption window from several accounts is [G014](correlation.md#g014).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/count-based/#h052"
   },
   "h053": {
@@ -932,7 +956,7 @@
     "name": "Maintainer Baseline Deviation",
     "severity": "MEDIUM",
     "categoryTitle": "Maintainer and Metadata",
-    "description": "H058 watches how much a maintainer does, not what a package contains. TrustSight counts how many packages each maintainer updates in a cycle, and after a few cycles it knows that maintainer's own normal pace. A cycle far above that pace is flagged, because a burst of updates is what a hijacked account, or an account that has just changed hands, tends to produce: the attacker publishes everything at once, under a name the reviewers already trust. This is a prompt to look, not proof. A maintainer with a genuinely busy day, or one who legitimately adopted several packages at once, can trip it; adoption is reported on its own by [H074](#h074) and [H086](#h086) from the maintainer field, without needing a burst. Bumping one project's own naming family in lockstep (a kernel's `-docs`/`-headers` splits, `foo`/`foo-bin`/`foo-qt` released together) is one logical update spread over several package names, not a deviation, so the rule stands down when every active package belongs to a single relatedness cluster.",
+    "description": "H058 watches how much a maintainer does, not what a package contains. TrustSight counts how many packages each maintainer updates in a cycle, and after a few cycles it knows that maintainer's own normal pace. A cycle far above that pace is flagged, because a burst of updates is what a hijacked account, or an account that has just changed hands, tends to produce: the attacker publishes everything at once, under a name the reviewers already trust. This is a prompt to look, not proof. A maintainer with a genuinely busy day, or one who legitimately adopted several packages at once, can trip it; adoption is reported on its own by [H074](#h074) and [H086](#h086) from the maintainer field, without needing a burst. Bumping one project's own naming family in lockstep (a kernel's `-docs`/`-headers` splits, `foo`/`foo-bin`/`foo-qt` released together) is one logical update spread over several package names, not a deviation, so the rule stands down when every active package belongs to a single relatedness cluster. The same holds for a periodic refresh of every auto-tracking recipe: `-git`, `-latest` and `-nightly` names, and packages whose `source=` is a `.git` checkout, take a new `pkgver` from upstream on each sweep, so one cycle touches unrelated upstreams by construction. When every active package is auto-tracking the rule stands down; each rebuilt package is still analysed on its own for content.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#h058"
   },
   "h059": {
@@ -940,7 +964,7 @@
     "name": "Name/Repo Divergence",
     "severity": "MEDIUM",
     "categoryTitle": "Naming and Dependencies",
-    "description": "The package name and the repository it is built from share no meaningful token.",
+    "description": "The package name and the repository it is built from share no meaningful token. A leading name token that is the acronym of consecutive words in the repository path (for example `qsc` for `Qualcomm Software Center`) counts as a match.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/naming-and-dependency/#h059"
   },
   "h060": {
