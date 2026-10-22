@@ -396,7 +396,7 @@ function safeTags(tags) {
  * (`some* pkg*`), which is what search-as-you-type wants.
  */
 export function ftsQuery(input) {
-  const tokens = String(input || '').toLowerCase().match(/[a-z0-9_]+/g) || []
+  const tokens = (String(input || '').toLowerCase().match(/[a-z0-9_]+/g) || []).slice(0, 8)
   if (!tokens.length) return null
   return tokens.map((t) => `${t}*`).join(' ')
 }

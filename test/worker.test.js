@@ -1,5 +1,6 @@
 import { env, SELF } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest'
+import worker from '../worker/index.js'
 import { alertingClusters, baseSlug, buildSearchText, ftsQuery, fuzzyScore, isTrustSightNotification, packageFacts, packageHistory, parseNotification, pickHeadline, summarize } from '../worker/lib.js'
 import { ingestDocument, REPLAY_WINDOW_SECONDS } from '../worker/ingest.js'
 
@@ -304,6 +305,54 @@ describe('api endpoints', () => {
     expect(stats.last).toBe(1777723260)
   })
 
+  it('keeps the stats rollup in step with deletes', async () => {
+    const beat = parseNotification({
+      ...messageEvent(),
+      id: 'heartbeat-2',
+      time: 1777723320,
+      event: 'message',
+      message: JSON.stringify({ event: 'trustsight.heartbeat', tool: 'trustsight' }),
+    })
+    await env.DB.prepare(INSERT_SQL).bind(
+      beat.id, beat.time, beat.event, beat.topic, beat.title, beat.priority, beat.tags,
+      beat.day, beat.slug, beat.message_raw, beat.payload, beat.n_alerts,
+      beat.n_over_threshold, beat.n_ioc, beat.n_impersonation, beat.search_text, 0
+    ).run()
+
+    await env.DB.prepare('DELETE FROM notifications WHERE event = ?').bind('trustsight.alerts').run()
+    const stats = await (await SELF.fetch('https://example.com/api/stats')).json()
+    expect(stats.total).toBe(0)
+    expect(stats.alerts).toBe(0)
+    expect(stats.first).toBeNull()
+    expect(stats.last).toBe(beat.time)
+  })
+
+  it('serves a cached read without touching D1 again', async () => {
+    const url = 'https://example.com/api/stats?cachetest=1'
+    const key = new Request(url)
+    await caches.default.delete(key)
+    const ctx = { waitUntil: (promise) => promise }
+
+    const first = await worker.fetch(new Request(url), { ...env, API_CACHE: 'on' }, ctx)
+    const firstBody = await first.json()
+    expect(firstBody.total).toBe(1)
+
+    const extra = parseNotification({ ...messageEvent(), id: 'cache-2', time: 1777723400 })
+    await env.DB.prepare(INSERT_SQL).bind(
+      extra.id, extra.time, extra.event, extra.topic, extra.title, extra.priority, extra.tags,
+      extra.day, extra.slug, extra.message_raw, extra.payload, extra.n_alerts,
+      extra.n_over_threshold, extra.n_ioc, extra.n_impersonation, extra.search_text, 0
+    ).run()
+
+    const cached = await worker.fetch(new Request(url), { ...env, API_CACHE: 'on' }, ctx)
+    expect((await cached.json()).total).toBe(1)
+
+    await caches.default.delete(key)
+    const fresh = await worker.fetch(new Request(url), { ...env, API_CACHE: 'on' }, ctx)
+    expect((await fresh.json()).total).toBe(2)
+    await caches.default.delete(key)
+  })
+
   it('filters by date, hour and range', async () => {
     const dated = await (await SELF.fetch('https://example.com/api/date/2026-05-02')).json()
     expect(dated.count).toBe(1)
@@ -320,6 +369,29 @@ describe('api endpoints', () => {
   it('rejects a bad date or timeframe', async () => {
     expect((await SELF.fetch('https://example.com/api/date/2026-02-31')).status).toBe(400)
     expect((await SELF.fetch('https://example.com/api/date/2026-05-02/25')).status).toBe(400)
+  })
+
+  it('paginates by time and rowid without repeating a same-second row', async () => {
+    const insert = async (id, time) => {
+      const row = parseNotification({ ...messageEvent(), id, time })
+      row.slug = `${row.slug}-${id}`
+      await env.DB.prepare(INSERT_SQL).bind(
+        row.id, row.time, row.event, row.topic, row.title, row.priority, row.tags,
+        row.day, row.slug, row.message_raw, row.payload, row.n_alerts,
+        row.n_over_threshold, row.n_ioc, row.n_impersonation, row.search_text, 0
+      ).run()
+    }
+    await insert('page-a', 1777723100)
+    await insert('page-b', 1777723100)
+
+    const first = await (await SELF.fetch('https://example.com/api/feed?event=all&limit=2')).json()
+    expect(first.items).toHaveLength(2)
+    const second = await (await SELF.fetch(
+      `https://example.com/api/feed?event=all&limit=2&before=${first.next.before}&beforeRow=${first.next.beforeRow}`
+    )).json()
+    expect(second.items).toHaveLength(1)
+    const seen = new Set(first.items.map((item) => item.slug))
+    expect(seen.has(second.items[0].slug)).toBe(false)
   })
 
   it('searches by package and by rule', async () => {

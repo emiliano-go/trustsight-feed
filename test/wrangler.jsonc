@@ -2,6 +2,9 @@
   "name": "trustsight-feed-test",
   "main": "../worker/index.js",
   "compatibility_date": "2025-08-01",
+  "vars": {
+    "API_CACHE": "off"
+  },
   "d1_databases": [
     {
       "binding": "DB",

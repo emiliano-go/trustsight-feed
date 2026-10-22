@@ -56,6 +56,13 @@ Same shape as trustsight.org: the single stylesheet is inlined at build time
 preloaded, and a small static shell paints before the app mounts. The feed
 page is one compressed HTML response; the app then fetches `/api/feed`.
 
+The D1 schema is shaped for the free-tier read budget: `/api/stats` reads a
+one-row rollup maintained by triggers instead of scanning every alert, list
+queries filter through `(event, time)` and `(day, time)` indexes, and read
+responses are held in the edge cache for 30 to 3600 seconds. A typo fallback
+scans only a bounded newest window and fetches payloads only for the rows that
+survive the match.
+
 ## URLs
 
 - `/` the feed, newest first, with search and event filters.
@@ -110,8 +117,10 @@ alert.
   database is unreachable. Not rate limited.
 Every endpoint is CORS open. A client is limited to 120 requests a minute by
 the Cloudflare rate limiting binding; past the cap the API answers HTTP 429
-with a `Retry-After` header. The spec is the single source of truth: the
-Worker serves it and the reference page renders from it.
+with a `Retry-After` header. Search routes (`/api/feed?q=`, `/api/package/*`
+and `/api/rule/*`) have a second 60-a-minute cap because they can trigger the
+bounded typo scan. The spec is the single source of truth: the Worker serves
+it and the reference page renders from it.
 
 The root spellings `/feed`, `/latest`, `/date/*`, `/package/*`, `/rule/*`,
 `/stats` and `/messages/*` redirect (308) to their `/api` equivalent, so a
@@ -121,7 +130,7 @@ shortened URL never falls through to the app shell.
 
 ```
 worker/          poller, API, parsing helpers, Worker entry
-migrations/      D1 schema (notifications, FTS5, meta cursor)
+migrations/      D1 schema (notifications, FTS5, stats rollup, indexes)
 src/             Preact frontend (feed, detail, rule chips, styles)
 scripts/         rule-catalog generator, CSP check
 test/            Worker tests (Miniflare + D1)

@@ -19,6 +19,61 @@ function redirect(location) {
   })
 }
 
+// Read responses served from the edge cache, so repeated polls (the feed page
+// asks for stats every 30 seconds) do not become repeated D1 queries.  The
+// first request after a TTL pays for the query; the rest are cache hits.
+const CACHE_TTLS = [
+  [/^\/api\/stats$/, 60],
+  [/^\/api\/feed$/, 30],
+  [/^\/api\/latest(?:\/\d+)?$/, 30],
+  [/^\/api\/date\//, 60],
+  [/^\/api\/package\/[^/]+\/history$/, 60],
+  [/^\/api\/package\//, 30],
+  [/^\/api\/rule\//, 30],
+  [/^\/api\/messages\//, 300],
+  [/^\/api\/maintainers$/, 3600],
+  [/^\/api\/source\//, 3600],
+  [/^\/api\/diff\//, 3600],
+  [/^\/api\/index\.json$/, 86400],
+  [/^\/api\/openapi\.json$/, 86400],
+]
+
+function cacheTtl(pathname) {
+  for (const [pattern, ttl] of CACHE_TTLS) {
+    if (pattern.test(pathname)) return ttl
+  }
+  return 0
+}
+
+function apiCache() {
+  return typeof caches !== 'undefined' && caches.default ? caches.default : null
+}
+
+/** Search routes are the only ones that can scan a fuzzy window. */
+function isSearchRequest(url) {
+  if (url.pathname.startsWith('/api/package/') || url.pathname.startsWith('/api/rule/')) return true
+  return url.pathname === '/api/feed' && Boolean((url.searchParams.get('q') || '').trim())
+}
+
+async function cachedApi(request, env, ctx, url) {
+  const ttl = cacheTtl(url.pathname)
+  const cache = apiCache()
+  if (!ttl || !cache || env.API_CACHE === 'off' || request.method !== 'GET') {
+    return handleApi(request, env, url)
+  }
+  const key = new Request(url.toString())
+  const hit = await cache.match(key)
+  if (hit) return hit
+  const response = await handleApi(request, env, url)
+  if (response && response.status === 200) {
+    const stored = new Response(response.body, response)
+    stored.headers.set('cache-control', `public, max-age=${ttl}`)
+    if (ctx && ctx.waitUntil) ctx.waitUntil(cache.put(key, stored.clone()))
+    return stored
+  }
+  return response
+}
+
 // Root spellings of the API resources. Without this, /feed and /latest fall
 // through to the SPA and silently render the home page.
 const ROOT_ALIASES = ['/feed', '/latest', '/date', '/package', '/rule', '/stats', '/messages']
@@ -64,7 +119,7 @@ async function ingest(request, env) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url)
 
     if (url.pathname === '/health' || url.pathname === '/healthz') return health(env)
@@ -87,10 +142,17 @@ export default {
         const { success } = await env.API_LIMITER.limit({ key })
         if (!success) return rateLimited()
       }
+      // A tighter cap on the routes that can trigger the typo fallback, so a
+      // single client cannot turn a miss into a large D1 scan.
+      if (env.SEARCH_LIMITER && isSearchRequest(url)) {
+        const key = `search:${request.headers.get('CF-Connecting-IP') || 'anonymous'}`
+        const { success } = await env.SEARCH_LIMITER.limit({ key })
+        if (!success) return rateLimited()
+      }
       // The signed direct-ingest route. The watcher POSTs the alert document
       // here (outbound), so the feed never polls ntfy.
       if (url.pathname === '/api/ingest') return ingest(request, env)
-      const response = await handleApi(request, env, url)
+      const response = await cachedApi(request, env, ctx, url)
       if (response) return response
       return new Response(JSON.stringify({ error: 'not_found' }), {
         status: 404,

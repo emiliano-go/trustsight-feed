@@ -102,10 +102,43 @@ function dateWindow(date, timeframe) {
   return null
 }
 
+// The list projection leaves out `message_raw`, which no list caller reads;
+// the detail route still selects the whole row.
+const LIST_COLUMNS = `n.slug, n.time, n.event, n.title, n.day, n.priority, n.tags,
+  n.n_alerts, n.n_over_threshold, n.n_ioc, n.n_impersonation, n.payload,
+  n.rowid AS _rowid`
+
 // A typo leaves FTS with no rows, so the fuzzy fallback rescans a bounded
-// window and filters in JS. The corpus is small; if it outgrows this, add a
-// trigram index instead of raising the window.
+// window.  Once the corpus is large, only the newest window is scanned; older
+// typos are not found, which is the price of a bounded D1 read budget.
 const FUZZY_CANDIDATE_LIMIT = 5000
+const FUZZY_RECENT_LIMIT = 1000
+const MAX_QUERY_CHARS = 200
+
+function asInt(value) {
+  if (value === undefined || value === null || value === '') return null
+  const n = Number(value)
+  return Number.isSafeInteger(n) ? n : null
+}
+
+function queryTokens(input) {
+  return String(input || '').toLowerCase().match(/[a-z0-9_]+/g) || []
+}
+
+/** Only a token longer than two characters can match inside the allowance. */
+function canFuzzy(input) {
+  return queryTokens(input).some((token) => token.length > 2)
+}
+
+/** The number of newest rows the typo fallback may scan. */
+async function fuzzyWindow(env) {
+  const row = await env.DB.prepare('SELECT total FROM feed_stats WHERE id = 1').first()
+  if (!row) return FUZZY_CANDIDATE_LIMIT
+  const total = Number(row.total)
+  if (!Number.isFinite(total)) return FUZZY_CANDIDATE_LIMIT
+  if (total <= 0) return 0
+  return total > FUZZY_CANDIDATE_LIMIT ? FUZZY_RECENT_LIMIT : total
+}
 
 /** One paginated query shared by every list endpoint. */
 async function listQuery(env, options = {}) {
@@ -113,45 +146,65 @@ async function listQuery(env, options = {}) {
     q, event = 'all', day, from, to, beforeTime, beforeRow,
     limit = DEFAULT_LIMIT,
   } = options
-  const fts = ftsQuery(q)
+  const term = typeof q === 'string' ? q.slice(0, MAX_QUERY_CHARS) : q
+  const fts = ftsQuery(term)
+  const fromTime = asInt(from)
+  const toTime = asInt(to)
+  const before = asInt(beforeTime)
+  const beforeId = asInt(beforeRow)
   const where = []
   const params = []
 
   if (event && event !== 'all') { where.push('n.event = ?'); params.push(event) }
   if (day) { where.push('n.day = ?'); params.push(day) }
-  if (from !== undefined && from !== null) { where.push('n.time >= ?'); params.push(from) }
-  if (to !== undefined && to !== null) { where.push('n.time <= ?'); params.push(to) }
-  if (beforeTime && beforeRow) {
-    where.push('(n.time < ? OR (n.time = ? AND n.rowid < ?))')
-    params.push(beforeTime, beforeTime, beforeRow)
+  if (fromTime !== null) { where.push('n.time >= ?'); params.push(fromTime) }
+  if (toTime !== null) { where.push('n.time <= ?'); params.push(toTime) }
+  if (before !== null && beforeId !== null) {
+    where.push('(n.time < ? OR (n.time = ? AND n.rowid > ?))')
+    params.push(before, before, beforeId)
   }
 
-  const order = 'ORDER BY n.time DESC, n.rowid DESC LIMIT ?'
+  const order = 'ORDER BY n.time DESC, n.rowid ASC LIMIT ?'
   const filters = where.length ? `WHERE ${where.join(' AND ')}` : ''
   let results
 
   if (fts) {
     const ftsWhere = [`f.notifications_fts MATCH ?`, ...where].join(' AND ')
     const attempt = await env.DB.prepare(
-      `SELECT n.*, n.rowid AS _rowid
+      `SELECT ${LIST_COLUMNS}
          FROM notifications n JOIN notifications_fts f ON f.rowid = n.rowid
         WHERE ${ftsWhere} ${order}`
     ).bind(fts, ...params, limit).all()
     results = attempt.results
 
     // Nothing matched the prefix query: retry typo-tolerantly over the same
-    // filters and the same keyset window.
-    if (!results || !results.length) {
-      const candidates = await env.DB.prepare(
-        `SELECT n.*, n.rowid AS _rowid FROM notifications n ${filters} ${order}`
-      ).bind(...params, FUZZY_CANDIDATE_LIMIT).all()
-      results = (candidates.results || [])
-        .filter((row) => fuzzyScore(q, row.search_text) !== null)
-        .slice(0, limit)
+    // filters.  Scan only rowid + search_text, then fetch the survivors, so a
+    // miss never drags thousands of full payloads out of D1.
+    if ((!results || !results.length) && canFuzzy(term)) {
+      const window = await fuzzyWindow(env)
+      if (window > 0) {
+        const candidates = await env.DB.prepare(
+          `SELECT n.rowid AS _rowid, n.search_text FROM notifications n ${filters} ${order}`
+        ).bind(...params, window).all()
+        const matched = (candidates.results || [])
+          .filter((row) => fuzzyScore(term, row.search_text) !== null)
+          .slice(0, limit)
+        if (matched.length) {
+          const ids = matched.map((row) => row._rowid)
+          const rows = await env.DB.prepare(
+            `SELECT ${LIST_COLUMNS} FROM notifications n
+              WHERE n.rowid IN (${ids.map(() => '?').join(',')})`
+          ).bind(...ids).all()
+          const byId = new Map((rows.results || []).map((row) => [row._rowid, row]))
+          results = ids.map((id) => byId.get(id)).filter(Boolean)
+        } else {
+          results = []
+        }
+      }
     }
   } else {
     const all = await env.DB.prepare(
-      `SELECT n.*, n.rowid AS _rowid FROM notifications n ${filters} ${order}`
+      `SELECT ${LIST_COLUMNS} FROM notifications n ${filters} ${order}`
     ).bind(...params, limit).all()
     results = all.results
   }
@@ -174,12 +227,15 @@ function listResponse(env, url, { query, ...options }) {
     json({ count: items.length, query, items, next }))
 }
 
-async function getBySlug(env, slug) {
-  const row = await env.DB.prepare('SELECT * FROM notifications WHERE slug = ?').bind(slug).first()
-  if (!row) return null
+function messageFromRow(row) {
   let payload = {}
   try { payload = JSON.parse(row.payload || '{}') } catch { /* keep {} */ }
   return { ...summarize(row), payload, message_raw: row.message_raw }
+}
+
+async function getBySlug(env, slug) {
+  const row = await env.DB.prepare('SELECT * FROM notifications WHERE slug = ?').bind(slug).first()
+  return row ? messageFromRow(row) : null
 }
 
 async function feed(env, url) {
@@ -193,11 +249,12 @@ async function feed(env, url) {
   })
 }
 
-async function latestOne(env, url) {
-  const { items } = await listQuery(env, { ...pageFrom(url), limit: 1 })
-  if (!items.length) return json({ error: 'empty' }, 404)
-  const full = await getBySlug(env, items[0].slug)
-  return json({ query: { source: 'latest', limit: 1 }, item: full })
+async function latestOne(env) {
+  const row = await env.DB.prepare(
+    'SELECT * FROM notifications ORDER BY time DESC, rowid ASC LIMIT 1'
+  ).first()
+  if (!row) return json({ error: 'empty' }, 404)
+  return json({ query: { source: 'latest', limit: 1 }, item: messageFromRow(row) })
 }
 
 async function latestN(env, url, n) {
@@ -226,7 +283,7 @@ async function packageHistoryResponse(env, name) {
        FROM notifications n
        JOIN notifications_fts f ON f.rowid = n.rowid
       WHERE f.notifications_fts MATCH ?
-      ORDER BY n.time DESC, n.rowid DESC
+      ORDER BY n.time DESC, n.rowid ASC
       LIMIT 500`
   ).bind(fts).all()
   return json({ package: name, ...packageHistory(results || [], name) })
@@ -247,26 +304,23 @@ async function message(env, slug) {
 }
 
 async function stats(env) {
+  // feed_stats is maintained by triggers, so this is one row, not a scan.
   const row = await env.DB.prepare(
-    `SELECT COUNT(*) AS total,
-            MIN(time) AS first,
-            (SELECT MAX(time) FROM notifications) AS last,
-            COALESCE(SUM(n_alerts), 0) AS alerts,
-            COALESCE(SUM(n_over_threshold), 0) AS over_threshold,
-            COALESCE(SUM(n_ioc), 0) AS ioc,
-            COALESCE(SUM(n_impersonation), 0) AS impersonation
-       FROM notifications
-      WHERE event = 'trustsight.alerts'`
-  ).first()
+    `SELECT total, first, last, alerts, over_threshold, ioc, impersonation
+       FROM feed_stats WHERE id = 1`
+  ).first() || {
+    total: 0, first: null, last: null,
+    alerts: 0, over_threshold: 0, ioc: 0, impersonation: 0,
+  }
   // The version of the latest alert document, from its stored payload. Older
   // stored notifications carry no tool_version, so the field is omitted.
   const latest = await env.DB.prepare(
     `SELECT payload FROM notifications WHERE event = 'trustsight.alerts'
-      ORDER BY time DESC, rowid DESC LIMIT 1`
+      ORDER BY time DESC, rowid ASC LIMIT 1`
   ).first()
   const tool_version = extractToolVersion(latest && latest.payload)
-  if (row && tool_version) row.tool_version = tool_version
-  return json(row || {})
+  if (tool_version) row.tool_version = tool_version
+  return json(row)
 }
 
 /** The tool_version a stored payload JSON carries, when it has one. */
@@ -347,13 +401,16 @@ async function maintainers(env, url) {
   }
   if (missing.length) {
     const fetched = await fetchMaintainers(missing)
-    for (const name of missing) {
-      const value = fetched[name] || ''
-      result[name] = value
+    for (const name of missing) result[name] = fetched[name] || ''
+    // One multi-row upsert instead of one write per package.
+    if (missing.length) {
+      const values = missing.map((name) => [name, result[name], now])
       await env.DB.prepare(
-        `INSERT INTO maintainer_cache (package, maintainer, fetched_at) VALUES (?, ?, ?)
-         ON CONFLICT(package) DO UPDATE SET maintainer = excluded.maintainer, fetched_at = excluded.fetched_at`
-      ).bind(name, value, now).run()
+        `INSERT INTO maintainer_cache (package, maintainer, fetched_at)
+         VALUES ${values.map(() => '(?, ?, ?)').join(', ')}
+         ON CONFLICT(package) DO UPDATE SET
+           maintainer = excluded.maintainer, fetched_at = excluded.fetched_at`
+      ).bind(...values.flat()).run()
     }
   }
   return new Response(JSON.stringify({ maintainers: result }), {
@@ -523,7 +580,7 @@ export async function handleApi(request, env, url) {
   if (path === '/api/openapi.json') return json(openapiSpec)
   if (path === '/api/feed') return feed(env, url)
   if (path === '/api/stats') return stats(env)
-  if (path === '/api/latest') return latestOne(env, url)
+  if (path === '/api/latest') return latestOne(env)
 
   let match
   if ((match = path.match(/^\/api\/latest\/(\d+)$/))) {

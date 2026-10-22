@@ -140,8 +140,8 @@ export const openapiSpec = {
       + 'This is evidence, not proof of safety: a notification means a published rule matched '
       + 'a package change, never that a package is safe. No endpoint mutates data, and no '
       + 'request reaches the source package. '
-      + 'The API is public and CORS-open. Each client is limited to 120 requests a minute; a '
-      + 'response over the cap is HTTP 429 with a Retry-After header.',
+      + 'The API is public and CORS-open. Each client is limited to 120 requests a minute, and '
+      + 'search routes to 60; a response over either cap is HTTP 429 with a Retry-After header.',
     license: { name: 'MIT', url: 'https://github.com/emiliano-go/trustsight-feed/blob/main/LICENSE' },
   },
   servers: [{ url: 'https://watcher.trustsight.org', description: 'Production' }],
