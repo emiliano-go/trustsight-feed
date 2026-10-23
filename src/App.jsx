@@ -5,6 +5,7 @@ import { eventBadgeClass, eventLabel, formatTime, relative } from './util.js'
 
 const DOCS = 'https://docs.trustsight.org'
 const SECURITY = `${DOCS}/security/`
+const STATS_URL = '/api/stats?v=2'
 const GITHUB = 'https://github.com/emiliano-go/trustsight'
 const FEED_REPO = 'https://github.com/emiliano-go/trustsight-feed'
 const NTFY = 'https://ntfy.sh/trustsight-aur-1d8a3fd2'
@@ -85,7 +86,7 @@ export function App() {
   // relative "last refreshed" clock, so neither freezes on a stale first paint.
   useEffect(() => {
     let live = true
-    const refresh = () => fetch('/api/stats')
+    const refresh = () => fetch(STATS_URL)
       .then((r) => r.json())
       .then((d) => { if (live) setStats(d) })
       .catch(() => {})
@@ -114,7 +115,7 @@ export function App() {
   function manualRefresh() {
     setNow(Date.now())
     setRefreshTick((t) => t + 1)
-    fetch('/api/stats').then((r) => r.json()).then(setStats).catch(() => {})
+    fetch(STATS_URL).then((r) => r.json()).then(setStats).catch(() => {})
   }
 
   return (

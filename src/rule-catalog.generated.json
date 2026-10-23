@@ -172,7 +172,7 @@
     "name": "Array Order Manipulation",
     "severity": "MEDIUM",
     "categoryTitle": "Integrity and Verification",
-    "description": "Set semantics discard position, so a hash shuffled away from the slot a reviewer checks was invisible. A pure reformat - reorder with no content change and no `SKIP` movement - stands down via `[thresholds] c014.require_content_change` (default true). Measured on the locked benign corpus: 0/3,739.",
+    "description": "Set semantics discard position, so a hash shuffled away from the slot a reviewer checks was invisible. A pure reformat - reorder with no content change and no `SKIP` movement - stands down via `[thresholds] c014.require_content_change` (default true). Measured on the locked benign corpus: 0 on the v1 corpus.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c014"
   },
   "c015": {
@@ -180,7 +180,7 @@
     "name": "Fetch In package()",
     "severity": "HIGH",
     "categoryTitle": "Fetch and Execution",
-    "description": "Reads `RecipeDoc.functions[\"package\"]` only. A client name inside a quoted dependency list or a comment is not a fetch, and `python -m pip install .` (a local install) stands down because the interpreter arm requires a scheme-bearing address on the line. Measured on the locked benign corpus: 7/3,739 (0.19%).",
+    "description": "Reads `RecipeDoc.functions[\"package\"]` only. A client name inside a quoted dependency list or a comment is not a fetch, and `python -m pip install .` (a local install) stands down because the interpreter arm requires a scheme-bearing address on the line. Measured on the locked benign corpus: 7 on the v1 corpus (0.19%).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#c015"
   },
   "c016": {
@@ -196,7 +196,7 @@
     "name": "Install Hook Writes To A User-Writable Location",
     "severity": "HIGH",
     "categoryTitle": "Install and Persistence",
-    "description": "System destinations (`/etc/skel`, `/usr/...`) are not this rule's business; the S-series and H032/H038 own hook writes to system paths. Measured on the locked benign corpus: 0/3,739.",
+    "description": "System destinations (`/etc/skel`, `/usr/...`) are not this rule's business; the S-series and H032/H038 own hook writes to system paths. Measured on the locked benign corpus: 0 on the v1 corpus.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#c017"
   },
   "c018": {
@@ -204,7 +204,7 @@
     "name": "Executable File Committed",
     "severity": "MEDIUM",
     "categoryTitle": "Integrity and Verification",
-    "description": "A projection of the typed `DiffFile.new_mode`; no new walker. Measured on the locked benign corpus: 0/3,739.",
+    "description": "A projection of the typed `DiffFile.new_mode`; no new walker. Measured on the locked benign corpus: 0 on the v1 corpus.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c018"
   },
   "c019": {
@@ -212,7 +212,7 @@
     "name": "File Renamed",
     "severity": "INFO",
     "categoryTitle": "Integrity and Verification",
-    "description": "A projection of the typed `DiffFile.rename_from`/`rename_to`. A pure rename carries no hunk, so the parser materialises the file from its rename metadata alone. Measured on the locked benign corpus: 0/3,739.",
+    "description": "A projection of the typed `DiffFile.rename_from`/`rename_to`. A pure rename carries no hunk, so the parser materialises the file from its rename metadata alone. Measured on the locked benign corpus: 0 on the v1 corpus.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c019"
   },
   "c020": {
@@ -220,7 +220,7 @@
     "name": "Credentials In A Source URL",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "The evidence names the host only; the credential value itself is never printed. Measured on the locked benign corpus: 0/3,739.",
+    "description": "The evidence names the host only; the credential value itself is never printed. Measured on the locked benign corpus: 0 on the v1 corpus.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c020"
   },
   "c021": {
@@ -228,7 +228,7 @@
     "name": "Dependency Removal During A Build Change",
     "severity": "HIGH",
     "categoryTitle": "Composition",
-    "description": "Dropping `checkdepends` eliminates the test-suite execution that would catch a payload; the conjunction with a build change is what makes the removal suspicious rather than hygienic. `optdepends` removal is far more often ordinary cleanup, so it stays MEDIUM. Measured on the locked benign corpus: 27/3,739 (0.72%) combined, the published calibration floor; the fire-rate gate clears `checkdepends` for HIGH.",
+    "description": "Dropping `checkdepends` eliminates the test-suite execution that would catch a payload; the conjunction with a build change is what makes the removal suspicious rather than hygienic. `optdepends` removal is far more often ordinary cleanup, so it stays MEDIUM. Measured on the locked benign corpus: 27 on the v1 corpus (0.72%) combined, the published calibration floor; the fire-rate gate clears `checkdepends` for HIGH.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/composition/#c021"
   },
   "c022": {
@@ -236,7 +236,7 @@
     "name": "Checksum Strength Downgraded",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "Stands down when every checksum array was removed together - H002 owns that shape. Measured on the locked benign corpus: 43/3,739 (1.15%), every firing a declared strongest-array removal; the rate is published as the calibration floor.",
+    "description": "Stands down when every checksum array was removed together - H002 owns that shape. Measured on the locked benign corpus: 43 on the v1 corpus (1.15%), every firing a declared strongest-array removal; the rate is published as the calibration floor.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c022"
   },
   "c023": {
@@ -244,7 +244,7 @@
     "name": "IP-Literal Source Host",
     "severity": "MEDIUM",
     "categoryTitle": "Integrity and Verification",
-    "description": "Direct-IP fetches are a C2 shape that generic novelty under-weights. Measured on the locked benign corpus: 0/3,739.",
+    "description": "Direct-IP fetches are a C2 shape that generic novelty under-weights. Measured on the locked benign corpus: 0 on the v1 corpus.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c023"
   },
   "c024": {
@@ -252,7 +252,7 @@
     "name": "Install Script Not Declared",
     "severity": "MEDIUM",
     "categoryTitle": "Composition",
-    "description": "The dangling-declaration half (an `install=` naming an absent file) needs tree knowledge and is not yet filed. Measured on the locked benign corpus: 12/3,739 (0.32%).",
+    "description": "The dangling-declaration half (an `install=` naming an absent file) needs tree knowledge and is not yet filed. Measured on the locked benign corpus: 12 on the v1 corpus (0.32%).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/composition/#c024"
   },
   "c025": {
@@ -260,7 +260,7 @@
     "name": "Hardening Option Disabled",
     "severity": "LOW",
     "categoryTitle": "Staging and Reconnaissance",
-    "description": "Debug packages set these routinely, so the benign fire rate is the published number that decides this rule's weight. Measured on the locked benign corpus: 20/3,739 (0.53%).",
+    "description": "Debug packages set these routinely, so the benign fire rate is the published number that decides this rule's weight. Measured on the locked benign corpus: 20 on the v1 corpus (0.53%).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/staging-and-recon/#c025"
   },
   "c026": {
@@ -268,7 +268,7 @@
     "name": "Empty File Added",
     "severity": "INFO",
     "categoryTitle": "Integrity and Verification",
-    "description": "A projection of the typed `DiffFile` status and hunk count. Measured on the locked benign corpus: 0/3,739.",
+    "description": "A projection of the typed `DiffFile` status and hunk count. Measured on the locked benign corpus: 0 on the v1 corpus.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c026"
   },
   "c027": {
@@ -308,7 +308,7 @@
     "name": "Boot Or System Image Tool Run During Build",
     "severity": "HIGH",
     "categoryTitle": "Install and Persistence",
-    "description": "H095 covers the same tools when they name a path from the source tree; this covers the tool run against the live host (`mkinitcpio -P`, `grub-install /dev/sda`, `update-initramfs -u`), which names no build path. A package that builds must not rewrite the builder's boot configuration. Install hooks are where these legitimately run, so `post_upgrade() { mkinitcpio -P; }` stays silent; only the build-time functions are in scope. Measured on the locked benign corpus: 0/3,739.",
+    "description": "H095 covers the same tools when they name a path from the source tree; this covers the tool run against the live host (`mkinitcpio -P`, `grub-install /dev/sda`, `update-initramfs -u`), which names no build path. A package that builds must not rewrite the builder's boot configuration. Install hooks are where these legitimately run, so `post_upgrade() { mkinitcpio -P; }` stays silent; only the build-time functions are in scope. Measured on the locked benign corpus: 0 on the v1 corpus.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#c031"
   },
   "c032": {
@@ -1340,7 +1340,7 @@
     "name": "Weak Signal Across Layers",
     "severity": "MEDIUM,",
     "categoryTitle": "Meta and Confluence",
-    "description": "An attacker who spreads weak signals across layers stays under any single threshold; the span is only visible from the whole profile. It adds no points but raises the reported band one step: a spread across layers is exactly the case a single-signal threshold cannot see. Measured on the locked benign corpus: 112/3,739 (3.0%).",
+    "description": "An attacker who spreads weak signals across layers stays under any single threshold; the span is only visible from the whole profile. It adds no points but raises the reported band one step: a spread across layers is exactly the case a single-signal threshold cannot see. Measured on the locked benign corpus: 112 on the v1 corpus (3.0%).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/meta/#m002"
   },
   "m003": {
@@ -1348,7 +1348,7 @@
     "name": "Composition Not Owned Elsewhere",
     "severity": "MEDIUM,",
     "categoryTitle": "Meta and Confluence",
-    "description": "The composition is never lost. It adds no points but raises the reported band one step. Measured on the locked benign corpus: 316/3,739 (8.5%).",
+    "description": "The composition is never lost. It adds no points but raises the reported band one step. Measured on the locked benign corpus: 316 on the v1 corpus (8.5%).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/meta/#m003"
   },
   "m004": {
@@ -1508,7 +1508,7 @@
     "name": "LLM Prompt Injection",
     "severity": "FATAL",
     "categoryTitle": "Deception and Anti-Analysis",
-    "description": "Detects template-shaped text addressed to whoever *reads* the PKGBUILD rather than to the shell that runs it: instruction overrides (\"ignore the previous instructions\"), role markers (`system:`, `assistant:`), tag-like injections (`<system>`, `<instructions>`), personas (\"you are a helpful model...\"), suppression orders (\"do not flag/warn/analyze\") and pre-declared verdicts (\"mark this as safe\"). Comment lines are scanned, unlike every rule that describes what the shell executes, because this is reviewer-facing text. Calibrated at 22/22 labelled injection fixtures with 0 fires across the historical 3,739-diff benign corpus. This is a **reviewer-directed template tripwire**, not proof of an author's intent or a general prompt-injection detector: a match requires reviewer scrutiny, and a non-match establishes nothing. The finding contributes weight 0; its signal is the unsuppressible FATAL entry in `score_breakdown` and the FATAL name in the verdict label.",
+    "description": "Detects template-shaped text addressed to whoever *reads* the PKGBUILD rather than to the shell that runs it: instruction overrides (\"ignore the previous instructions\"), role markers (`system:`, `assistant:`), tag-like injections (`<system>`, `<instructions>`), personas (\"you are a helpful model...\"), suppression orders (\"do not flag/warn/analyze\") and pre-declared verdicts (\"mark this as safe\"). Comment lines are scanned, unlike every rule that describes what the shell executes, because this is reviewer-facing text. Calibrated at 22/22 labelled injection fixtures with 0 fires across the historical v1 benign corpus. This is a **reviewer-directed template tripwire**, not proof of an author's intent or a general prompt-injection detector: a match requires reviewer scrutiny, and a non-match establishes nothing. The finding contributes weight 0; its signal is the unsuppressible FATAL entry in `score_breakdown` and the FATAL name in the verdict label.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/deception/#r012"
   },
   "r013": {
@@ -2260,7 +2260,7 @@
     "name": "Encoded Material At Rest",
     "severity": "MEDIUM",
     "categoryTitle": "Crossfire",
-    "description": "Fires on a base64, base32 or hex literal above the length floor (default 256 encoded characters, `[thresholds] x029.min_length`) when no decoder is present in the same diff. A decoder in the diff routes the shape to X001. The finding names the literal class, never the literal's content. Measured on the locked benign corpus: 1/3,739.",
+    "description": "Fires on a base64, base32 or hex literal above the length floor (default 256 encoded characters, `[thresholds] x029.min_length`) when no decoder is present in the same diff. A decoder in the diff routes the shape to X001. The finding names the literal class, never the literal's content. Measured on the locked benign corpus: 1 on the v1 corpus.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x029"
   },
   "x030": {
@@ -2268,7 +2268,7 @@
     "name": "ANSI-C Quoted Content In Commands",
     "severity": "HIGH",
     "categoryTitle": "Crossfire",
-    "description": "Fires on a command-position `$'...'` literal with two or more hex/octal escapes (or a control escape) whose decoded value is not a benign single token (a path, a flag, a filename). Formatting-only escapes (` `, `\t`) are ordinary. Measured on the locked benign corpus: 0/3,739.",
+    "description": "Fires on a command-position `$'...'` literal with two or more hex/octal escapes (or a control escape) whose decoded value is not a benign single token (a path, a flag, a filename). Formatting-only escapes (` `, `\t`) are ordinary. Measured on the locked benign corpus: 0 on the v1 corpus.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x030"
   },
   "x031": {
@@ -2276,7 +2276,7 @@
     "name": "Build Reads Non-Code Text",
     "severity": "HIGH",
     "categoryTitle": "Crossfire",
-    "description": "Fires when `build()`/`prepare()`/`package()` reads its own PKGBUILD (by name, or through `$srcdir`/`$startdir`) and pipes the content through a transformation into a shell or `eval`. Reading a different file, or reading the recipe for metadata without execution, stands down. Measured on the locked benign corpus: 0/3,739.",
+    "description": "Fires when `build()`/`prepare()`/`package()` reads its own PKGBUILD (by name, or through `$srcdir`/`$startdir`) and pipes the content through a transformation into a shell or `eval`. Reading a different file, or reading the recipe for metadata without execution, stands down. Measured on the locked benign corpus: 0 on the v1 corpus.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/crossfire/#x031"
   },
   "x032": {
