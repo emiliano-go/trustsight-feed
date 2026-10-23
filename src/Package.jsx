@@ -4,6 +4,14 @@ import { Findings, diffValues, parsePkgbuild, sourceUrlsFromDiff } from './Messa
 import { RuleChip } from './RuleChip.jsx'
 import { AUR_PACKAGE, AUR_PKGBUILD, eventBadgeClass, eventLabel, formatTime, relative } from './util.js'
 
+const FP_DOCS = 'https://docs.trustsight.org/guides/tuning-false-positives/'
+const FP_ISSUE = 'https://github.com/emiliano-go/trustsight/issues/new?template=false_positive.yml'
+
+function fpIssueUrl(name) {
+  const title = encodeURIComponent(`[False positive]: ${name}`)
+  return `${FP_ISSUE}&title=${title}`
+}
+
 /** Every stored alert that names one package, and everything they record about it. */
 export function Package({ name }) {
   const [history, setHistory] = useState(null)
@@ -103,6 +111,13 @@ export function Package({ name }) {
               <div><b>{upstreamCount}</b>Upstream URLs</div>
               {latest && latest.version ? <div><b>{latest.version}</b>Latest change</div> : null}
             </div>
+
+            <p className="detail__explain">
+              Scores are calibrated, but false-positive tuning is ongoing. If a rule fired with
+              no bad practice or malicious behavior behind it,{' '}
+              <a href={fpIssueUrl(name)} target="_blank" rel="noreferrer">report the bad rule trigger for {name}</a>.
+              Read <a href={FP_DOCS} target="_blank" rel="noreferrer">the distinction</a>.
+            </p>
 
             {!history.count ? (
               <p className="feed-empty">No stored alerts name {name}.</p>

@@ -7,6 +7,9 @@ const DOCS = 'https://docs.trustsight.org'
 const SECURITY = `${DOCS}/security/`
 const STATS_URL = '/api/stats?v=2'
 const GITHUB = 'https://github.com/emiliano-go/trustsight'
+const ISSUES = `${GITHUB}/issues`
+const FP_DOCS = `${DOCS}/guides/tuning-false-positives/`
+const FP_ISSUE = `${GITHUB}/issues/new?template=false_positive.yml`
 const FEED_REPO = 'https://github.com/emiliano-go/trustsight-feed'
 const NTFY = 'https://ntfy.sh/trustsight-aur-1d8a3fd2'
 const SITE = 'https://trustsight.org'
@@ -135,6 +138,11 @@ export function App() {
           TrustSight reports evidence, not verdicts. It never runs a PKGBUILD or changes your
           system, and a clean result only means no published rule matched. It is not a reason to
           install. Read the <a href={SECURITY} target="_blank" rel="noreferrer">security model</a>.
+          The rules are calibrated against a locked corpus, but false-positive tuning is ongoing.
+          A hit on a genuine bad practice is a real finding, not a rule bug. If a rule fired with
+          no bad practice or malicious behavior behind it,{' '}
+          <a href={FP_ISSUE} target="_blank" rel="noreferrer">report the bad rule trigger</a>.
+          Read <a href={FP_DOCS} target="_blank" rel="noreferrer">the distinction</a>.
         </p>
         <div className="masthead-stats">
           <div title={stats ? `${stats.total} alerts + ${stats.alive || 0} alive` : undefined}>
@@ -161,6 +169,7 @@ export function App() {
           <a href={NTFY} target="_blank" rel="noreferrer">ntfy channel ↗</a>
           <a href={SITE} target="_blank" rel="noreferrer">trustsight.org ↗</a>
           <a href={GITHUB} target="_blank" rel="noreferrer">Tool source ↗</a>
+          <a href={ISSUES} target="_blank" rel="noreferrer">Issues ↗</a>
           <a href={FEED_REPO} target="_blank" rel="noreferrer">Feed source ↗</a>
         </nav>
       </header>

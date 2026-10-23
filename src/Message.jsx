@@ -6,7 +6,14 @@ import { alertingClusters } from '../worker/lib.js'
 import { renderMarkdown, renderInlineCode } from './markdown.jsx'
 
 const SECURITY = 'https://docs.trustsight.org/security/'
+const FP_DOCS = 'https://docs.trustsight.org/guides/tuning-false-positives/'
+const FP_ISSUE = 'https://github.com/emiliano-go/trustsight/issues/new?template=false_positive.yml'
 const NTFY = 'https://ntfy.sh/trustsight-aur-1d8a3fd2'
+
+function fpIssueUrl(packageName) {
+  const title = encodeURIComponent(`[False positive]: ${packageName}`)
+  return `${FP_ISSUE}&title=${title}`
+}
 
 /** The SPA route for a package's stored history. */
 export const packageHref = (name) => `/pkg/${encodeURIComponent(name)}`
@@ -20,7 +27,7 @@ function PackageHistoryLink({ name }) {
 // reader knows what they are looking at before the list.
 export const ENTRY_TYPES = {
   alert: 'A rule firing: one published pattern matched one package change. A firing is a reason to look, not a verdict.',
-  over_threshold: 'A package whose weighted score crossed the alerting bar (default 30, the benign corpus 95th percentile). It carries the version transition and every rule that fired.',
+  over_threshold: 'A package whose weighted score crossed the alerting bar (default 35, the benign corpus 95th percentile). It carries the version transition and every rule that fired.',
   ioc: 'A match against signed, federated known-bad indicators. Reported outside the heuristic score, so it is shown whatever the package scored.',
   campaign_cluster: 'A pattern shared across packages in a window (a host, a literal, an adopter). A campaign invisible in any single diff becomes visible in the set.',
   impersonation: 'Many name-clones of a popular package published under one account. The one alert a reviewer must not skim past.',
@@ -1035,6 +1042,18 @@ function FindingsOrSource({ packageName, findings }) {
   )
 }
 
+function CalibrationNote() {
+  return (
+    <p className="detail__explain">
+      TrustSight is calibrated, but false-positive tuning is ongoing. A hit on a genuine bad
+      practice is a real finding, not a rule bug. If a rule fired with no bad practice or
+      malicious behavior behind it,{' '}
+      <a href={FP_ISSUE} target="_blank" rel="noreferrer">report the bad rule trigger</a>.
+      Read <a href={FP_DOCS} target="_blank" rel="noreferrer">the distinction</a>.
+    </p>
+  )
+}
+
 function PackageSections({ packages, iocPackages }) {
   if (!packages.length) return null
   return (
@@ -1057,6 +1076,7 @@ function PackageSections({ packages, iocPackages }) {
               {pkg.score !== undefined && pkg.score !== null ? <span className="badge badge--alerts">score {pkg.score}</span> : null}
               <PackageHistoryLink name={pkg.package} />
               <a className="pkg__action" href={AUR_PKGBUILD(pkg.package)} target="_blank" rel="noreferrer">See PKGBUILD ↗</a>
+              <a className="pkg__action" href={fpIssueUrl(pkg.package)} target="_blank" rel="noreferrer">Report bad rule trigger ↗</a>
             </header>
             {pkg.last_modified ? <p className="pkg__meta">AUR change: {pkg.last_modified}</p> : null}
             {findings.some(isPartialFinding) ? <PartialBanner /> : null}
@@ -1243,6 +1263,7 @@ export function Message({ slug }) {
               </div>
             ) : null}
 
+            {data.event === 'trustsight.alerts' ? <CalibrationNote /> : null}
             <MaintainersSection packages={allPackages} />
             <Refusals refusals={payload.refusals || []} />
             <IocSection matches={ioc} />
