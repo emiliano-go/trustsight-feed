@@ -10,9 +10,29 @@ const FP_DOCS = 'https://docs.trustsight.org/guides/tuning-false-positives/'
 const FP_ISSUE = 'https://github.com/emiliano-go/trustsight/issues/new?template=false_positive.yml'
 const NTFY = 'https://ntfy.sh/trustsight-aur-1d8a3fd2'
 
-function fpIssueUrl(packageName) {
-  const title = encodeURIComponent(`[False positive]: ${packageName}`)
+function fpIssueUrl(packageName, ruleIds = []) {
+  const suffix = ruleIds.length ? ` ${ruleIds.join(' ')}` : ''
+  const title = encodeURIComponent(`[False positive]: ${packageName}${suffix}`)
   return `${FP_ISSUE}&title=${title}`
+}
+
+/** A ready-to-paste body for the false-positive issue form. */
+function fpIssueBody({ slug, packages, ruleIds, payload, toolVersion }) {
+  const field = (label, value) => `### ${label}\n\n${value}\n`
+  const report = JSON.stringify(payload, null, 2)
+  return [
+    field('What kind of report is this?', 'Bad rule trigger (malicious false positive)'),
+    field('TrustSight version', toolVersion ? `trustsight ${toolVersion}` : '_No response_'),
+    field('AUR package', packages.join(', ') || '_No response_'),
+    field('Feed alert URL', `https://watcher.trustsight.org/${slug}/`),
+    field('Rule id', ruleIds.join(', ') || '_No response_'),
+    field('What TrustSight reported', '```json\n' + report + '\n```'),
+    field('Why this is a bad rule trigger',
+      '<!-- What did the rule misread? Why is there no bad practice or malicious behavior? -->'),
+    field('PKGBUILD or diff', '<!-- Paste the PKGBUILD or the diff here. -->'),
+    field('Command or mode', 'watcher feed'),
+    field('Config fingerprint', payload.config_fingerprint || '_No response_'),
+  ].join('\n')
 }
 
 /** The SPA route for a package's stored history. */
@@ -1076,7 +1096,7 @@ function PackageSections({ packages, iocPackages }) {
               {pkg.score !== undefined && pkg.score !== null ? <span className="badge badge--alerts">score {pkg.score}</span> : null}
               <PackageHistoryLink name={pkg.package} />
               <a className="pkg__action" href={AUR_PKGBUILD(pkg.package)} target="_blank" rel="noreferrer">See PKGBUILD ↗</a>
-              <a className="pkg__action" href={fpIssueUrl(pkg.package)} target="_blank" rel="noreferrer">Report bad rule trigger ↗</a>
+              <a className="pkg__action" href={fpIssueUrl(pkg.package, [...(pkg.rules || []), ...findings.map((f) => f.rule_id)])} target="_blank" rel="noreferrer">Report bad rule trigger ↗</a>
             </header>
             {pkg.last_modified ? <p className="pkg__meta">AUR change: {pkg.last_modified}</p> : null}
             {findings.some(isPartialFinding) ? <PartialBanner /> : null}
@@ -1178,6 +1198,7 @@ export function Message({ slug }) {
   const [loading, setLoading] = useState(true)
   const [showJson, setShowJson] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [fpCopied, setFpCopied] = useState(false)
 
   useEffect(() => {
     let live = true
@@ -1219,6 +1240,30 @@ export function Message({ slug }) {
       setTimeout(() => setCopied(false), 2000)
     } catch {
       setCopied(false)
+    }
+  }
+
+  const fpRuleIds = [...new Set([
+    ...alerts.map((a) => a.rule_id).filter(Boolean),
+    ...packages.flatMap((p) => [
+      ...(p.rules || []),
+      ...(p.findings || []).map((f) => f.rule_id),
+    ]),
+  ].filter(Boolean))]
+
+  async function copyFpReport() {
+    try {
+      await navigator.clipboard.writeText(fpIssueBody({
+        slug,
+        packages: allPackages,
+        ruleIds: fpRuleIds,
+        payload,
+        toolVersion: data ? data.tool_version : '',
+      }))
+      setFpCopied(true)
+      setTimeout(() => setFpCopied(false), 2000)
+    } catch {
+      setFpCopied(false)
     }
   }
 
@@ -1294,6 +1339,14 @@ export function Message({ slug }) {
                   aria-label="Copy the full JSON document to the clipboard"
                 >
                   {copied ? 'Copied ✓' : 'Copy JSON'}
+                </button>
+                <button
+                  type="button"
+                  className="load-more"
+                  onClick={copyFpReport}
+                  aria-label="Copy a false-positive issue body for this alert"
+                >
+                  {fpCopied ? 'Copied ✓' : 'Copy FP report'}
                 </button>
               </div>
               {showJson ? <div className="json" id="full-json"><RuleHighlight text={pretty} /></div> : null}
