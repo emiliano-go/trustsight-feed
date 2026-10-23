@@ -302,7 +302,9 @@ describe('api endpoints', () => {
 
     const stats = await (await SELF.fetch('https://example.com/api/stats')).json()
     expect(stats.total).toBe(1)
+    expect(stats.alive).toBe(1)
     expect(stats.last).toBe(1777723260)
+    expect(stats.last_alive).toBe(1777723260)
   })
 
   it('keeps the stats rollup in step with deletes', async () => {
@@ -323,8 +325,10 @@ describe('api endpoints', () => {
     const stats = await (await SELF.fetch('https://example.com/api/stats')).json()
     expect(stats.total).toBe(0)
     expect(stats.alerts).toBe(0)
+    expect(stats.alive).toBe(1)
     expect(stats.first).toBeNull()
     expect(stats.last).toBe(beat.time)
+    expect(stats.last_alive).toBe(beat.time)
   })
 
   it('serves a cached read without touching D1 again', async () => {

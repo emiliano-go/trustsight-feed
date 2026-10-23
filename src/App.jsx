@@ -136,13 +136,16 @@ export function App() {
           install. Read the <a href={SECURITY} target="_blank" rel="noreferrer">security model</a>.
         </p>
         <div className="masthead-stats">
+          <div title={stats ? `${stats.total} alerts + ${stats.alive || 0} alive` : undefined}>
+            <b>{stats ? stats.total + (stats.alive || 0) : '…'}</b>Total scans
+          </div>
           <div><b>{stats ? stats.total : '…'}</b>Alerts</div>
           {stats && Number.isFinite(stats.last) ? (
-            <div title={`last stored notification: ${formatTime(stats.last)}`}>
-              <b>{relative(stats.last, now)}</b>Last refreshed
+            <div title={`last alert: ${formatTime(stats.last_alert)}; last alive: ${formatTime(stats.last_alive)}`}>
+              <b>{relative(Math.max(stats.last_alert || 0, stats.last_alive || 0), now)}</b>Last refreshed
             </div>
           ) : null}
-          {stats ? <div className="stat--warn"><b>{stats.over_threshold}</b>Over threshold</div> : null}
+          {stats ? <div className="stat--warn"><b>{stats.over_threshold}</b>Packages over threshold</div> : null}
           {stats ? <div className="stat--ioc"><b>{stats.ioc}</b>IOC matches</div> : null}
           {stats && stats.tool_version ? (
             <div className="stat--version" title="TrustSight version that produced these analyses">

@@ -306,10 +306,15 @@ async function message(env, slug) {
 async function stats(env) {
   // feed_stats is maintained by triggers, so this is one row, not a scan.
   const row = await env.DB.prepare(
-    `SELECT total, first, last, alerts, over_threshold, ioc, impersonation
+    `SELECT total, alive, first, last, alerts, over_threshold, ioc, impersonation,
+            (SELECT MAX(time) FROM notifications
+              WHERE event = 'trustsight.alerts') AS last_alert,
+            (SELECT MAX(time) FROM notifications
+              WHERE event = 'trustsight.heartbeat') AS last_alive
        FROM feed_stats WHERE id = 1`
   ).first() || {
-    total: 0, first: null, last: null,
+    total: 0, alive: 0, first: null, last: null,
+    last_alert: null, last_alive: null,
     alerts: 0, over_threshold: 0, ioc: 0, impersonation: 0,
   }
   // The version of the latest alert document, from its stored payload. Older
