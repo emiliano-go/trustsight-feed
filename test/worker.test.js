@@ -1,8 +1,8 @@
 import { env, SELF } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest'
-import worker from '../worker/index.js'
+import worker, { readBodyCapped } from '../worker/index.js'
 import { alertingClusters, baseSlug, buildSearchText, ftsQuery, fuzzyScore, isTrustSightNotification, packageFacts, packageHistory, parseNotification, pickHeadline, summarize } from '../worker/lib.js'
-import { ingestDocument, REPLAY_WINDOW_SECONDS } from '../worker/ingest.js'
+import { ingestDocument, REPLAY_WINDOW_SECONDS, verifyIngest } from '../worker/ingest.js'
 
 function messageEvent(overrides = {}) {
   return {
@@ -484,6 +484,28 @@ describe('api endpoints', () => {
     expect(body.schema).toBe('1')
     expect(body.last).toBe(1777723200)
     expect(res.headers.get('cache-control')).toBe('no-store')
+  })
+})
+
+describe('ingest bounds', () => {
+  it('stops reading a request body past the cap', async () => {
+    const req = new Request('https://example.com/api/ingest', {
+      method: 'POST', body: 'x'.repeat(64),
+    })
+    const result = await readBodyCapped(req, 16)
+    expect(result.tooLarge).toBe(true)
+    expect(result.text).toBe('')
+  })
+
+  it('refuses oversized webhook headers before signature work', async () => {
+    const headers = new Headers({
+      'webhook-id': 'a'.repeat(201),
+      'webhook-timestamp': String(Math.floor(Date.now() / 1000)),
+      'webhook-signature': 'v1=' + 'b'.repeat(64),
+    })
+    const result = await verifyIngest({}, headers, '{}')
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('signature_headers_too_large')
   })
 })
 

@@ -102,16 +102,40 @@ async function health(env) {
   }
 }
 
+/** Read a request body without trusting its declared length (A4). */
+export async function readBodyCapped(request, limit = MAX_BODY_BYTES) {
+  const declared = Number(request.headers.get('content-length') || 0)
+  if (declared > limit) return { tooLarge: true, text: '' }
+  if (!request.body) return { tooLarge: false, text: '' }
+  const reader = request.body.getReader()
+  const decoder = new TextDecoder()
+  let text = ''
+  let size = 0
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    size += value.byteLength
+    if (size > limit) {
+      await reader.cancel()
+      return { tooLarge: true, text: '' }
+    }
+    text += decoder.decode(value, { stream: true })
+  }
+  text += decoder.decode()
+  return { tooLarge: false, text }
+}
+
 /** POST /api/ingest: verify the Ed25519 signature, then store the document. */
 async function ingest(request, env) {
   const json = { 'content-type': 'application/json; charset=utf-8' }
   if (request.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'method_not_allowed' }), { status: 405, headers: json })
   }
-  const raw = await request.text()
-  if (raw.length > MAX_BODY_BYTES) {
+  const payload = await readBodyCapped(request, MAX_BODY_BYTES)
+  if (payload.tooLarge) {
     return new Response(JSON.stringify({ error: 'too_large' }), { status: 413, headers: json })
   }
+  const raw = payload.text
   const result = await ingestDocument(env, raw, request.headers)
   const status = result.status || (result.ok ? 200 : 401)
   const body = result.ok ? { stored: result.stored, id: result.id } : { error: result.error }

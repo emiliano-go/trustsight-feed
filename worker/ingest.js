@@ -9,6 +9,9 @@ import { storeRow } from './store.js'
 
 export const MAX_BODY_BYTES = 1_000_000
 export const REPLAY_WINDOW_SECONDS = 300
+export const MAX_WEBHOOK_ID_CHARS = 200
+export const MAX_KEY_ID_CHARS = 128
+export const MAX_SIGNATURE_CHARS = 512
 
 function b64ToBytes(value) {
   const bin = atob(value)
@@ -47,6 +50,10 @@ export async function verifyIngest(env, headers, rawBody) {
   const sigB64 = sigRaw.startsWith('v1=') ? sigRaw.slice(3) : sigRaw
   if (!id || !Number.isFinite(time) || !sigB64) {
     return { ok: false, status: 400, error: 'missing_signature_headers' }
+  }
+  if (id.length > MAX_WEBHOOK_ID_CHARS || keyId.length > MAX_KEY_ID_CHARS
+      || sigB64.length > MAX_SIGNATURE_CHARS) {
+    return { ok: false, status: 400, error: 'signature_headers_too_large' }
   }
   if (Math.abs(Math.floor(Date.now() / 1000) - time) > REPLAY_WINDOW_SECONDS) {
     return { ok: false, status: 401, error: 'stale' }
