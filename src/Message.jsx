@@ -414,19 +414,45 @@ function campaignType(id) {
 }
 
 /** The affected packages of a campaign, each linked to its AUR page and PKGBUILD. */
-function MemberList({ names, iocPackages }) {
+function MemberList({ names, details = [], iocPackages }) {
   if (!names.length) return <p className="pkg__meta">No member packages named.</p>
+  const byName = new Map(details.map((d) => [d.package, d]))
   return (
     <ul className="campaign-members">
-      {names.map((name) => (
-        <li key={name}>
-          <a className="member__name" href={AUR_PACKAGE(name)} target="_blank" rel="noreferrer">{name}</a>
-          {iocPackages && iocPackages.has(name) ? <span className="badge badge--ioc">IOC match</span> : null}
-          <a className="member__pkgbuild" href={AUR_PKGBUILD(name)} target="_blank" rel="noreferrer" title={`PKGBUILD for ${name}`}>PKGBUILD ↗</a>
-          <PackageHistoryLink name={name} />
-        </li>
-      ))}
+      {names.map((name) => {
+        const detail = byName.get(name) || null
+        return (
+          <li key={name}>
+            <a className="member__name" href={AUR_PACKAGE(name)} target="_blank" rel="noreferrer">{name}</a>
+            {iocPackages && iocPackages.has(name) ? <span className="badge badge--ioc">IOC match</span> : null}
+            <a className="member__pkgbuild" href={AUR_PKGBUILD(name)} target="_blank" rel="noreferrer" title={`PKGBUILD for ${name}`}>PKGBUILD ↗</a>
+            <PackageHistoryLink name={name} />
+            {detail ? <MemberOwnership detail={detail} /> : null}
+          </li>
+        )
+      })}
     </ul>
+  )
+}
+
+/** The ownership and version context a campaign member carries, when known. */
+function MemberOwnership({ detail }) {
+  const current = detail.maintainer || ''
+  const previous = detail.previous_maintainer || ''
+  const changed = Boolean(previous && current && previous !== current)
+  return (
+    <span className="member__ownership">
+      {current || previous ? (
+        <>
+          <span className="member__label">maintainer</span>
+          {changed ? <code className="md-code">{previous}</code> : null}
+          {changed ? ' -> ' : null}
+          {current ? <code className="md-code">{current}</code> : null}
+          {!current ? <span>orphan</span> : null}
+        </>
+      ) : null}
+      {detail.version ? <span className="member__version">{detail.version}</span> : null}
+    </span>
   )
 }
 
@@ -454,15 +480,48 @@ function groupAlerts(alerts) {
       bare.push(entry)
       continue
     }
-    if (!byRule.has(entry.rule_id)) byRule.set(entry.rule_id, { rule: entry.rule_id, packages: new Set() })
-    byRule.get(entry.rule_id).packages.add(entry.package)
+    if (!byRule.has(entry.rule_id)) byRule.set(entry.rule_id, { rule: entry.rule_id, entries: [] })
+    byRule.get(entry.rule_id).entries.push(entry)
   }
   const order = sortRuleIds([...byRule.keys()])
   const rank = (id) => (isCampaignRule(id) ? 0 : 1)
   const rules = [...byRule.values()]
-    .map((group) => ({ ...group, packages: [...group.packages].sort() }))
+    .map((group) => ({ ...group, packages: [...new Set(group.entries.map((e) => e.package))].sort() }))
     .sort((a, b) => rank(a.rule) - rank(b.rule) || order.indexOf(a.rule) - order.indexOf(b.rule))
   return { rules, bare }
+}
+
+/** The maintainer facts one alert carries, when the watcher recorded them. */
+function MaintainerChange({ entry }) {
+  const current = entry.new || entry.maintainer || ''
+  const previous = typeof entry.old === 'string' ? entry.old : ''
+  if (!current && !previous) return null
+  const changed = Boolean(previous && current && previous !== current)
+  return (
+    <p className="pkg__meta pkg__meta--owner">
+      Maintainer{' '}
+      {changed ? <code className="md-code">{previous}</code> : null}
+      {changed ? ' -> ' : null}
+      {current ? <code className="md-code">{current}</code> : null}
+      {!current ? <span>orphan</span> : null}
+      {previous && !current ? <span> (was <code className="md-code">{previous}</code>)</span> : null}
+    </p>
+  )
+}
+
+/** One bare-alert package, with the ownership detail the entry records. */
+function AlertPackage({ entry, iocPackages }) {
+  return (
+    <article className={`pkg alert-package${iocPackages.has(entry.package) ? ' pkg--ioc' : ''}`}>
+      <header className="pkg__head">
+        <a className="pkg__name" href={AUR_PACKAGE(entry.package)} target="_blank" rel="noreferrer">{entry.package}</a>
+        {iocPackages.has(entry.package) ? <span className="badge badge--ioc">IOC match</span> : null}
+        <PackageHistoryLink name={entry.package} />
+        <a className="pkg__action" href={AUR_PKGBUILD(entry.package)} target="_blank" rel="noreferrer">See PKGBUILD ↗</a>
+      </header>
+      <MaintainerChange entry={entry} />
+    </article>
+  )
 }
 
 function AlertList({ alerts, overPackages, iocPackages }) {
@@ -473,8 +532,12 @@ function AlertList({ alerts, overPackages, iocPackages }) {
   const { rules: allRules, bare } = groupAlerts(alerts)
   const hidden = new Set()
   const groups = allRules
-    .map((group) => ({ ...group, packages: group.packages.filter((p) => (overPackages.has(p) ? (hidden.add(p), false) : true)) }))
-    .filter((group) => group.packages.length)
+    .map((group) => ({
+      ...group,
+      entries: group.entries.filter((e) => (overPackages.has(e.package) ? (hidden.add(e.package), false) : true)),
+    }))
+    .map((group) => ({ ...group, packages: [...new Set(group.entries.map((e) => e.package))].sort() }))
+    .filter((group) => group.entries.length)
   const bareVisible = bare.filter((entry) => {
     if (overPackages.has(entry.package)) {
       hidden.add(entry.package)
@@ -500,17 +563,19 @@ function AlertList({ alerts, overPackages, iocPackages }) {
           <div className="alert__rules">
             <RuleSection id={group.rule} />
           </div>
-          <MemberList names={group.packages} iocPackages={iocPackages} />
+          {group.entries.some((e) => e.old || e.new) ? (
+            <div className="alert__packages">
+              {group.entries.map((entry, i) => (
+                <AlertPackage entry={entry} iocPackages={iocPackages} key={`${entry.package}-${i}`} />
+              ))}
+            </div>
+          ) : (
+            <MemberList names={group.packages} iocPackages={iocPackages} />
+          )}
         </article>
       ))}
       {bareVisible.map((entry, i) => (
-        <article className={`pkg${iocPackages.has(entry.package) ? ' pkg--ioc' : ''}`} key={`${entry.package}-${i}`}>
-          <header className="pkg__head">
-            <a className="pkg__name" href={AUR_PACKAGE(entry.package)} target="_blank" rel="noreferrer">{entry.package}</a>
-            {iocPackages.has(entry.package) ? <span className="badge badge--ioc">IOC match</span> : null}
-            <PackageHistoryLink name={entry.package} />
-          </header>
-        </article>
+        <AlertPackage entry={entry} iocPackages={iocPackages} key={`${entry.package}-${i}`} />
       ))}
     </section>
   )
@@ -1184,7 +1249,7 @@ function Campaigns({ payload }) {
               <span className="pkg__version">{type.label} · {members.length} packages</span>
             </header>
             <h3 className="campaign__subhead">Flagged packages <span className="count">{members.length}</span></h3>
-            <MemberList names={members} />
+            <MemberList names={members} details={cluster.members_detail || []} />
           </article>
         )
       })}

@@ -75,9 +75,14 @@ export function isTrustSightNotification(row) {
 export function buildSearchText({ event, title, day, payload }) {
   const parts = [title, day, event, payload && payload.tool, payload && payload.event]
   const push = (v) => { if (v !== undefined && v !== null && v !== '') parts.push(String(v)) }
-  for (const a of (payload && payload.alerts) || []) { push(a.package); push(a.rule_id) }
+  for (const a of (payload && payload.alerts) || []) {
+    push(a.package); push(a.rule_id)
+    // Ownership alerts name the handover, so both accounts are searchable.
+    push(a.maintainer); push(a.old); push(a.new)
+  }
   for (const o of (payload && payload.over_threshold) || []) {
     push(o.package); push(o.version)
+    push(o.maintainer); push(o.previous_maintainer)
     for (const r of o.rules || []) push(r)
     // The located findings: the rule id (again) and the file it fired in, so
     // a search for a filename or a zero-weight rule still matches.
@@ -87,6 +92,9 @@ export function buildSearchText({ event, title, day, payload }) {
   for (const c of (payload && payload.campaign_cluster) || []) {
     push(c.rule_id)
     for (const x of c.members || []) push(x)
+    for (const d of c.members_detail || []) {
+      push(d.package); push(d.maintainer); push(d.previous_maintainer)
+    }
   }
   for (const im of (payload && payload.impersonation) || []) {
     push(im.maintainer)
@@ -156,6 +164,26 @@ export function packageFacts(payload, name) {
   for (const c of campaigns) rules.add(c.rule_id)
   for (const c of impersonation) rules.add('G005')
 
+  // Ownership rules publish the transition they recorded; older documents
+  // carry only package and rule_id.  A campaign member carries the same facts
+  // under its own rule when the alert entry did not.  A current maintainer
+  // alone is not a transition: only a recorded old side, or an ownership rule
+  // that names the adopter, is.
+  const transitions = [
+    ...alerts.map((a) => ({
+      rule_id: a.rule_id,
+      old: typeof a.old === 'string' ? a.old : '',
+      new: typeof a.new === 'string' ? a.new : (a.maintainer || ''),
+    })),
+    ...campaigns.flatMap((c) => (c.members_detail || [])
+      .filter((d) => d.package === name)
+      .map((d) => ({
+        rule_id: c.rule_id,
+        old: d.previous_maintainer || '',
+        new: d.maintainer || '',
+      }))),
+  ].filter((t) => t.old || (t.new && MAINTAINER_RULES.has(String(t.rule_id || '').toUpperCase())))
+
   return {
     over: Boolean(over),
     version: (over && over.version) || '',
@@ -164,6 +192,7 @@ export function packageFacts(payload, name) {
     rules: [...rules].filter(Boolean),
     findings,
     alerts: alerts.map((a) => a.rule_id).filter(Boolean),
+    transitions,
     refusal: refusals.length > 0,
     refusal_reasons: refusals.map((r) => r.reason).filter(Boolean),
     ioc: ioc.map((m) => m.indicator).filter(Boolean),
@@ -225,6 +254,22 @@ export function packageHistory(rows, name) {
       maintainers.push({
         rule_id: 'G005',
         reason: `listed in an impersonation campaign submitted by ${who || 'one account'}`,
+        time,
+        slug: row.slug,
+      })
+    }
+
+    const seenTransition = new Set()
+    for (const t of facts.transitions || []) {
+      const key = `${t.rule_id}|${t.old}|${t.new}`
+      if (seenTransition.has(key)) continue
+      seenTransition.add(key)
+      namedMaint.add(String(t.rule_id || '').toUpperCase())
+      maintainers.push({
+        rule_id: t.rule_id,
+        reason: `maintainer changed from '${t.old || 'orphan'}' to '${t.new || 'orphan'}'`,
+        old: t.old,
+        new: t.new,
         time,
         slug: row.slug,
       })

@@ -55,7 +55,20 @@ const NOTIFICATION = {
           description: 'The full TrustSight document as published to ntfy. `over_threshold[].findings` carries one object per located finding (see the Finding schema); `campaign_cluster[]` and `impersonation[]` name the affected packages per campaign.',
           additionalProperties: true,
           properties: {
-            alerts: { type: 'array', items: { type: 'object', properties: { package: { type: 'string' }, rule_id: { type: 'string' } } } },
+            alerts: {
+              type: 'array',
+              description: 'One entry per package/rule pair first seen this cycle. Ownership rules (H044/H026) carry the transition they recorded: `old` is the previous maintainer (empty for an orphan) and `new` the adopter. Older documents carry only package and rule_id.',
+              items: {
+                type: 'object',
+                properties: {
+                  package: { type: 'string' },
+                  rule_id: { type: 'string' },
+                  maintainer: { type: 'string', description: 'Current maintainer of the package, when the watcher recorded it.' },
+                  old: { type: 'string', description: 'Previous maintainer, when the rule recorded a transition.' },
+                  new: { type: 'string', description: 'New maintainer, when the rule recorded a transition.' },
+                },
+              },
+            },
             over_threshold: {
               type: 'array',
               items: {
@@ -66,13 +79,15 @@ const NOTIFICATION = {
                   aur: { type: 'string', format: 'uri' },
                   version: { type: 'string' },
                   last_modified: { type: 'string' },
+                  maintainer: { type: 'string', description: 'Current maintainer, when the watcher recorded it.' },
+                  previous_maintainer: { type: 'string', description: 'Maintainer in the previous snapshot, when the watcher recorded it.' },
                   rules: { type: 'array', items: { type: 'string' }, description: 'Every rule id that fired, including zero-weight ones.' },
                   findings: { type: 'array', items: { $ref: '#/components/schemas/Finding' } },
                 },
               },
             },
             ioc_matches: { type: 'array', items: { type: 'object', properties: { package: { type: 'string' }, indicator: { type: 'string' }, aur: { type: 'string', format: 'uri' } } } },
-            campaign_cluster: { type: 'array', items: { type: 'object', properties: { rule_id: { type: 'string' }, members: { type: 'array', items: { type: 'string' } }, count: { type: 'integer' } } } },
+            campaign_cluster: { type: 'array', items: { type: 'object', properties: { rule_id: { type: 'string' }, members: { type: 'array', items: { type: 'string' } }, count: { type: 'integer' }, members_detail: { type: 'array', description: 'Per-member ownership and version context, when the watcher recorded it.', items: { type: 'object', properties: { package: { type: 'string' }, maintainer: { type: 'string' }, previous_maintainer: { type: 'string' }, version: { type: 'string' }, last_modified: { type: 'string' } } } } } } },
             impersonation: { type: 'array', items: { type: 'object', properties: { maintainer: { type: 'string' }, members: { type: 'array', items: { type: 'string' } }, targets: { type: 'array', items: { type: 'string' } }, count: { type: 'integer' } } } },
             refusals: { type: 'array', description: 'Packages whose analysis hit a parser refusal (X026/X027): the change was not fully read, so they alert regardless of score.', items: { type: 'object', properties: { package: { type: 'string' }, aur: { type: 'string', format: 'uri' } } } },
           },
@@ -310,6 +325,32 @@ export const openapiSpec = {
             },
           },
           400: BAD_REQUEST, 429: RATE_LIMITED,
+        },
+      },
+    },
+    '/api/maintainers': {
+      get: {
+        tags: ['Facets'],
+        summary: 'Current AUR maintainers for a batch',
+        description: 'The current AUR maintainer for up to 100 packages, cached server-side so a list view does not spend one RPC per row. A package the RPC did not answer maps to the empty string; an unknown package is not distinguished from an orphan.',
+        parameters: [
+          { name: 'packages', in: 'query', description: 'Comma-separated package names (maximum 100).', schema: { type: 'string' }, example: 'yay,paru' },
+        ],
+        responses: {
+          200: {
+            description: 'Package name to maintainer (empty when unknown).',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    maintainers: { type: 'object', additionalProperties: { type: 'string' } },
+                  },
+                },
+              },
+            },
+          },
+          429: RATE_LIMITED,
         },
       },
     },

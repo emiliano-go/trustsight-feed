@@ -115,6 +115,66 @@ describe('lib parsing', () => {
     expect(history.rules.find((r) => r.id === 'H001').count).toBe(1)
   })
 
+  it('surfaces an ownership transition from the alert entry', () => {
+    const payload = {
+      alerts: [{ package: 'adopted', rule_id: 'H026', old: 'oldm', new: 'newm' }],
+      over_threshold: [],
+    }
+    const facts = packageFacts(payload, 'adopted')
+    expect(facts.transitions).toEqual([
+      { rule_id: 'H026', old: 'oldm', new: 'newm' },
+    ])
+    const history = packageHistory([
+      { slug: '2026-05-02/120000', time: 100, event: 'trustsight.alerts', title: 't', payload: JSON.stringify(payload) },
+    ], 'adopted')
+    expect(history.maintainers[0]).toMatchObject({
+      rule_id: 'H026', old: 'oldm', new: 'newm',
+      reason: "maintainer changed from 'oldm' to 'newm'",
+    })
+  })
+
+  it('surfaces ownership from a campaign member detail', () => {
+    const payload = {
+      alerts: [],
+      over_threshold: [],
+      campaign_cluster: [{
+        rule_id: 'G003',
+        members: ['adopted', 'other'],
+        count: 2,
+        members_detail: [{
+          package: 'adopted', maintainer: 'newm', previous_maintainer: 'oldm',
+          version: '1 -> 2',
+        }],
+      }],
+    }
+    const facts = packageFacts(payload, 'adopted')
+    expect(facts.transitions).toEqual([
+      { rule_id: 'G003', old: 'oldm', new: 'newm' },
+    ])
+    const history = packageHistory([
+      { slug: '2026-05-02/120000', time: 100, event: 'trustsight.alerts', title: 't', payload: JSON.stringify(payload) },
+    ], 'adopted')
+    expect(history.maintainers[0]).toMatchObject({
+      rule_id: 'G003', old: 'oldm', new: 'newm',
+    })
+  })
+
+  it('indexes both sides of a maintainer change for search', () => {
+    const text = buildSearchText({
+      event: 'trustsight.alerts',
+      title: 't',
+      payload: {
+        alerts: [{ package: 'adopted', rule_id: 'H026', old: 'oldm', new: 'newm' }],
+        campaign_cluster: [{
+          rule_id: 'G003', members: ['adopted', 'other'],
+          members_detail: [{ package: 'adopted', maintainer: 'newm', previous_maintainer: 'oldm' }],
+        }],
+      },
+    })
+    expect(text).toContain('oldm')
+    expect(text).toContain('newm')
+  })
+
   it('summarizes packages and rules without duplicates', () => {
     const row = parseNotification(messageEvent())
     const summary = summarize({ ...row, payload: row.payload })
