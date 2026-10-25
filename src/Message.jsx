@@ -2,7 +2,7 @@ import { useEffect, useState } from 'preact/hooks'
 import { AccessibilityMenu, ThemeSwitch, Wordmark } from './Controls.jsx'
 import { RuleChip, RuleHighlight, RuleSection, ruleInfo, sortRuleIds } from './RuleChip.jsx'
 import { AUR_PACKAGE, AUR_PKGBUILD, eventBadgeClass, eventLabel, formatTime, locationLabel, relative } from './util.js'
-import { alertingClusters, campaignEvents } from '../worker/lib.js'
+import { alertingClusters, campaignCommon, campaignEvents } from '../worker/lib.js'
 import { renderMarkdown, renderInlineCode } from './markdown.jsx'
 
 const SECURITY = 'https://docs.trustsight.org/security/'
@@ -600,7 +600,7 @@ function AlertPackage({ entry, iocPackages }) {
   )
 }
 
-function AlertList({ alerts, overPackages, iocPackages }) {
+function AlertList({ alerts, overPackages, iocPackages, campaigns = [] }) {
   if (!alerts.length) return null
   // A package that also crossed the threshold is rendered once, in full, by
   // the over-threshold section below - so it is not repeated here.  Its rule
@@ -636,6 +636,14 @@ function AlertList({ alerts, overPackages, iocPackages }) {
             <RuleChip id={group.rule} />
             <span className="pkg__version">{group.packages.length} package{group.packages.length === 1 ? '' : 's'}</span>
           </header>
+          {(() => {
+            const common = campaignCommon(campaigns.find((cluster) => cluster.rule_id === group.rule))
+            return common ? (
+              <p className="pkg__meta campaign__common">
+                {common.label}: <code className="md-code">{common.value}</code>
+              </p>
+            ) : null
+          })()}
           <div className="alert__rules">
             <RuleSection id={group.rule} />
           </div>
@@ -1334,6 +1342,14 @@ function Campaigns({ payload }) {
                 return id ? <a className="pkg__history" href={`/campaign/${encodeURIComponent(id)}`} data-route>campaign page</a> : null
               })()}
             </header>
+            {(() => {
+              const common = campaignCommon(cluster)
+              return common ? (
+                <p className="pkg__meta campaign__common">
+                  {common.label}: <code className="md-code">{common.value}</code>
+                </p>
+              ) : null
+            })()}
             <h3 className="campaign__subhead">Flagged packages <span className="count">{members.length}</span></h3>
             <MemberList names={members} details={cluster.members_detail || []} />
           </article>
@@ -1465,7 +1481,7 @@ export function Message({ slug }) {
             <Refusals refusals={payload.refusals || []} />
             <IocSection matches={ioc} />
             <Campaigns payload={payload} />
-            <AlertList alerts={alerts} overPackages={overPackages} iocPackages={iocPackages} />
+            <AlertList alerts={alerts} overPackages={overPackages} iocPackages={iocPackages} campaigns={alertingClusters(payload)} />
             <PackageSections packages={packages} iocPackages={iocPackages} />
 
             {!alerts.length && !packages.length && !ioc.length && !alertingClusters(payload).length && !(payload.impersonation || []).length && !(payload.refusals || []).length ? (

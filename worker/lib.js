@@ -182,6 +182,47 @@ export function campaignEvents(payload) {
   return rows
 }
 
+/**
+ * The element a campaign's members share.  The watcher's campaign id is
+ * `<rule>:<key>`; the key is the host, literal, dependency, maintainer,
+ * signal, URL or window the correlation joined on.  A legacy document with no
+ * published id falls back to a unanimous maintainer when the member detail
+ * records one.
+ */
+const CAMPAIGN_COMMON = {
+  G001: 'Shared host',
+  G002: 'Shared added literal',
+  G003: 'Common adopter',
+  G004: 'Shared dependency',
+  G005: 'Impersonated by',
+  G006: 'Campaign neighbourhood',
+  G007: 'Campaign corroboration',
+  G008: 'First-seen adopter',
+  G009: 'Watchlist campaign',
+  G010: 'First-seen host census',
+  G011: 'Campaign',
+  G012: 'Shared payload signal',
+  G013: 'Shared payload URL',
+  G014: 'Adoption window',
+}
+
+export function campaignCommon(campaign) {
+  if (!campaign) return null
+  const rule = String(campaign.rule_id || campaign.campaign_id || '').split(':')[0]
+  const id = String(campaign.campaign_id || '')
+  if (id.startsWith(`${rule}:`)) {
+    const value = id.slice(rule.length + 1)
+    const label = CAMPAIGN_COMMON[rule]
+    if (value && label) return { label, value }
+  }
+  const details = Array.isArray(campaign.members_detail) ? campaign.members_detail : []
+  const maintainers = [...new Set(details.map((detail) => detail.maintainer).filter(Boolean))]
+  if (maintainers.length === 1) {
+    return { label: CAMPAIGN_COMMON[rule] || 'Common maintainer', value: maintainers[0] }
+  }
+  return null
+}
+
 /** Every maintainer/package transition one notification records. */
 export function maintainerEvents(payload) {
   const rows = []

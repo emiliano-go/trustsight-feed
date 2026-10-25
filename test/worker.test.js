@@ -1,7 +1,7 @@
 import { env, SELF } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest'
 import worker, { readBodyCapped } from '../worker/index.js'
-import { alertingClusters, baseSlug, buildSearchText, ftsQuery, fuzzyScore, isTrustSightNotification, packageFacts, packageHistory, parseNotification, pickHeadline, summarize } from '../worker/lib.js'
+import { alertingClusters, baseSlug, buildSearchText, campaignCommon, ftsQuery, fuzzyScore, isTrustSightNotification, packageFacts, packageHistory, parseNotification, pickHeadline, summarize } from '../worker/lib.js'
 import { ingestDocument, REPLAY_WINDOW_SECONDS, verifyIngest } from '../worker/ingest.js'
 
 function messageEvent(overrides = {}) {
@@ -211,6 +211,19 @@ describe('lib parsing', () => {
     } })
     expect(text).toContain('evil.install')
     expect(text).toContain('R001')
+  })
+
+  it('names the element a campaign shares', () => {
+    expect(campaignCommon({ rule_id: 'G001', campaign_id: 'G001:ftp.mozilla.org' }))
+      .toEqual({ label: 'Shared host', value: 'ftp.mozilla.org' })
+    expect(campaignCommon({ rule_id: 'G003', campaign_id: 'G003:Sving1024' }))
+      .toEqual({ label: 'Common adopter', value: 'Sving1024' })
+    expect(campaignCommon({ rule_id: 'G004', campaign_id: 'G004:foo:github.com' }))
+      .toEqual({ label: 'Shared dependency', value: 'foo:github.com' })
+    expect(campaignCommon({ rule_id: 'G014', campaign_id: 'G014:adoption-window' }))
+      .toEqual({ label: 'Adoption window', value: 'adoption-window' })
+    expect(campaignCommon({ rule_id: 'G003', members_detail: [{ maintainer: 'x' }, { maintainer: 'x' }] }))
+      .toEqual({ label: 'Common adopter', value: 'x' })
   })
 
   it('names the top signal in the headline, deterministically', () => {

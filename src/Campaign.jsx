@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks'
 import { AccessibilityMenu, ThemeSwitch, Wordmark } from './Controls.jsx'
 import { RuleChip } from './RuleChip.jsx'
+import { campaignCommon } from '../worker/lib.js'
 import { AUR_PACKAGE, formatTime, relative } from './util.js'
 import { packageHref } from './Message.jsx'
 
@@ -52,6 +53,14 @@ export function Campaign({ id }) {
               <span>last seen {relative(campaign.last)}</span>
             </div>
             <h1>Campaign {campaign.id}</h1>
+            {(() => {
+              const common = campaignCommon(campaign)
+              return common ? (
+                <p className="pkg__meta campaign__common">
+                  {common.label}: <code className="md-code">{common.value}</code>
+                </p>
+              ) : null
+            })()}
             <p className="detail__explain">
               A campaign is packages changing together in one window. Membership is evidence,
               not a verdict; read each package&rsquo;s alert before acting.
