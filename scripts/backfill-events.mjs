@@ -64,10 +64,11 @@ async function flush(events) {
   if (dryRun) return
   const chunks = []
   const push = (table, columns, rows) => {
-    // SQLite accepts at most 999 variables per statement.  Campaign rows use
-    // nine columns, so 200-row batches failed with "too many SQL variables".
-    for (let i = 0; i < rows.length; i += 100) {
-      const batch = rows.slice(i, i + 100)
+    // D1 accepts at most 100 bound parameters per query.  Size each batch
+    // for its table: 11 campaign rows, 14 maintainer rows, or 25 IOC rows.
+    const batchSize = Math.max(1, Math.floor(100 / columns.length))
+    for (let i = 0; i < rows.length; i += batchSize) {
+      const batch = rows.slice(i, i + batchSize)
       const statement = insertSql(table, columns, batch)
       if (statement) chunks.push(statement)
     }
