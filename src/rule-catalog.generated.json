@@ -1476,7 +1476,7 @@
     "name": "Install File Modification",
     "severity": "MEDIUM",
     "categoryTitle": "Install and Persistence",
-    "description": "Fires when a `.install` file is added or modified in the diff. Install scripts run with root privileges and are a common vector for persistent backdoors.",
+    "description": "Fires when a `.install` file is added or modified in the diff. Install scripts run with root privileges and are a common vector for persistent backdoors. A modified hook whose added and context lines only print a notice stands down; commands that change files, permissions, services, or other system state still fire.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#r007"
   },
   "r008": {
