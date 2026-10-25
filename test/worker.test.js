@@ -348,6 +348,36 @@ describe('api endpoints', () => {
     expect(stats.tool_version).toBe('0.20.2')
   })
 
+  it('uses the newest analyzer version across alerts and heartbeats', async () => {
+    await seed()
+    const beat = parseNotification({
+      ...messageEvent(), id: 'beat-new', time: 1777723500,
+      title: 'TrustSight: alive',
+      message: JSON.stringify({ event: 'trustsight.heartbeat', tool: 'trustsight', tool_version: '0.25.0', title: 'TrustSight: alive' }),
+    })
+    await env.DB.prepare(INSERT_SQL).bind(
+      beat.id, beat.time, beat.event, beat.topic, beat.title, beat.priority, beat.tags,
+      beat.day, beat.slug, beat.message_raw, beat.payload, beat.n_alerts,
+      beat.n_over_threshold, beat.n_ioc, beat.n_impersonation, beat.search_text, 0
+    ).run()
+    let stats = await (await SELF.fetch('https://example.com/api/stats')).json()
+    expect(stats.tool_version).toBe('0.25.0')
+
+    const doc = JSON.parse(messageEvent().message)
+    doc.tool_version = '0.26.0'
+    const alert = parseNotification({
+      ...messageEvent(), id: 'alert-new', time: 1777723600,
+      title: 'TrustSight: newer', message: JSON.stringify(doc),
+    })
+    await env.DB.prepare(INSERT_SQL).bind(
+      alert.id, alert.time, alert.event, alert.topic, alert.title, alert.priority, alert.tags,
+      alert.day, alert.slug, alert.message_raw, alert.payload, alert.n_alerts,
+      alert.n_over_threshold, alert.n_ioc, alert.n_impersonation, alert.search_text, 0
+    ).run()
+    stats = await (await SELF.fetch('https://example.com/api/stats')).json()
+    expect(stats.tool_version).toBe('0.26.0')
+  })
+
   it('omits tool_version when the stored payload has none', async () => {
     const doc = JSON.parse(messageEvent().message)
     delete doc.tool_version

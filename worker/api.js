@@ -678,14 +678,27 @@ async function stats(env) {
     last_alert: null, last_alive: null,
     alerts: 0, over_threshold: 0, ioc: 0, impersonation: 0,
   }
-  // The version of the latest alert document, from its stored payload. Older
-  // stored notifications carry no tool_version, so the field is omitted.
-  const latest = await env.DB.prepare(
-    `SELECT payload FROM notifications WHERE event = 'trustsight.alerts'
+  // The analyzer version is the newest version any notification reports.
+  // Reading only the latest alert made the stat stick at the pre-upgrade
+  // version until the next alert, even though a heartbeat already proved the
+  // watcher had restarted.  Keep both candidates so a payload without a
+  // version cannot hide a newer one.
+  const latestAlert = await env.DB.prepare(
+    `SELECT time, payload FROM notifications WHERE event = 'trustsight.alerts'
       ORDER BY time DESC, rowid ASC LIMIT 1`
   ).first()
-  const tool_version = extractToolVersion(latest && latest.payload)
-  if (tool_version) row.tool_version = tool_version
+  const latestBeat = await env.DB.prepare(
+    `SELECT time, payload FROM notifications WHERE event = 'trustsight.heartbeat'
+      ORDER BY time DESC, rowid ASC LIMIT 1`
+  ).first()
+  const versions = [latestAlert, latestBeat]
+    .map((entry) => ({
+      time: Number(entry && entry.time) || 0,
+      version: extractToolVersion(entry && entry.payload),
+    }))
+    .filter((entry) => entry.version)
+    .sort((a, b) => b.time - a.time)
+  if (versions.length) row.tool_version = versions[0].version
   const counts = await env.DB.prepare(
     `SELECT (SELECT COUNT(*) FROM campaign_events) AS campaigns,
             (SELECT COUNT(*) FROM maintainer_events) AS maintainers,
