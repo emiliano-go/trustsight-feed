@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
 import { AccessibilityMenu, ThemeSwitch, Wordmark } from './Controls.jsx'
-import { Findings, diffValues, parsePkgbuild, sourceUrlsFromDiff } from './Message.jsx'
+import { AnalysedDiff, Findings, LimitsNote, diffValues, parsePkgbuild, sourceUrlsFromDiff } from './Message.jsx'
 import { RuleChip } from './RuleChip.jsx'
 import { AUR_PACKAGE, AUR_PKGBUILD, eventBadgeClass, eventLabel, formatTime, relative } from './util.js'
 
@@ -95,6 +95,7 @@ export function Package({ name }) {
         <div className="detail__meta">
           <a href={AUR_PACKAGE(name)} target="_blank" rel="noreferrer">AUR package ↗</a>
           <a href={AUR_PKGBUILD(name)} target="_blank" rel="noreferrer">PKGBUILD ↗</a>
+          <button type="button" className="pkg__action" onClick={() => navigator.clipboard?.writeText(window.location.href)}>Copy permalink</button>
           {history && history.first ? <span title={formatTime(history.first)}>first seen {relative(history.first)}</span> : null}
           {history && history.last ? <span title={formatTime(history.last)}>last seen {relative(history.last)}</span> : null}
         </div>
@@ -253,7 +254,19 @@ export function Package({ name }) {
                     <p className="pkg__meta">Indicators: {item.ioc.map((indicator) => <code className="md-code" key={indicator}>{indicator}</code>)}</p>
                   ) : null}
                   {item.alerts.length ? <p className="pkg__meta">New alerts: {item.alerts.join(', ')}</p> : null}
-                  {item.campaigns.length ? <p className="pkg__meta">Campaigns: {item.campaigns.join(', ')}</p> : null}
+                  {item.campaign_ids && item.campaign_ids.length ? (
+                    <p className="pkg__meta">
+                      Campaigns:{' '}
+                      {item.campaign_ids.map((id, i) => (
+                        <span key={id}>
+                          {i ? ', ' : ''}
+                          <a href={`/campaign/${encodeURIComponent(id)}`} data-route>{id}</a>
+                        </span>
+                      ))}
+                    </p>
+                  ) : item.campaigns.length ? (
+                    <p className="pkg__meta">Campaigns: {item.campaigns.join(', ')}</p>
+                  ) : null}
                   {item.rules.length ? (
                     <div className="feed-item__tags">
                       {item.rules.map((id) => <RuleChip key={`${item.slug}-${id}`} id={id} />)}
@@ -265,9 +278,11 @@ export function Package({ name }) {
                       <Findings findings={item.findings} />
                     </details>
                   ) : null}
+                  <AnalysedDiff entry={item} />
                 </article>
               ))}
             </section>
+            <LimitsNote />
           </>
         ) : null}
       </main>

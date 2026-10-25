@@ -3,10 +3,14 @@ import { ApiDocs } from './ApiDocs.jsx'
 import { App } from './App.jsx'
 import { Message } from './Message.jsx'
 import { Package } from './Package.jsx'
+import { Campaign } from './Campaign.jsx'
+import { Maintainer } from './Maintainer.jsx'
 import { RuleModal } from './RuleModal.jsx'
 
 const DETAIL_RE = /^\d{4}-\d{2}-\d{2}\/\d{6}/
 const PACKAGE_RE = /^pkg\/(.+)$/
+const CAMPAIGN_RE = /^campaign\/(.+)$/
+const MAINTAINER_RE = /^maintainer\/(.+)$/
 
 function parseRoute(pathname) {
   const clean = pathname.replace(/^\/+|\/+$/g, '')
@@ -14,6 +18,10 @@ function parseRoute(pathname) {
   if (DETAIL_RE.test(clean)) return { view: 'message', slug: clean }
   const pkg = clean.match(PACKAGE_RE)
   if (pkg) return { view: 'package', slug: decodeURIComponent(pkg[1]) }
+  const campaign = clean.match(CAMPAIGN_RE)
+  if (campaign) return { view: 'campaign', slug: decodeURIComponent(campaign[1]) }
+  const maintainer = clean.match(MAINTAINER_RE)
+  if (maintainer) return { view: 'maintainer', slug: decodeURIComponent(maintainer[1]) }
   return { view: 'feed', slug: '' }
 }
 
@@ -48,7 +56,7 @@ export function Router() {
 
   return (
     <>
-      {route.view === 'api' ? <ApiDocs /> : route.view === 'message' ? <Message slug={route.slug} /> : route.view === 'package' ? <Package name={route.slug} /> : <App />}
+      {route.view === 'api' ? <ApiDocs /> : route.view === 'message' ? <Message slug={route.slug} /> : route.view === 'package' ? <Package name={route.slug} /> : route.view === 'campaign' ? <Campaign id={route.slug} /> : route.view === 'maintainer' ? <Maintainer name={route.slug} /> : <App />}
       <RuleModal />
     </>
   )

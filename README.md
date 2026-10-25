@@ -21,6 +21,12 @@ that evidence:
 - A notification means a published rule matched the change under review. It is
   not a verdict, and it is not permission to install.
 - The absence of a signal is a statement about detection, not about the update.
+- The feed renders untrusted text inertly: Preact escapes it, Atom escapes XML,
+  CSV neutralises formula prefixes, and a notification's analysed diff is
+  sanitised of escapes, controls and bidi overrides before it is stored.
+- Ingest verifies an Ed25519 signature over the raw document. The signature,
+  key id and body hash are stored so `/api/messages/{slug}` can be checked
+  later; `/api/keys` exposes only the public keys.
 
 The full model is at
 [docs.trustsight.org/security](https://docs.trustsight.org/security/). The rule
@@ -97,6 +103,20 @@ A read-only JSON API over the same store, with an OpenAPI 3.1 description:
   and the upstream URLs those analyses record. The page at `/pkg/{name}` renders
   it beside the live AUR maintainer and current PKGBUILD.
 - `/api/messages/{slug}`, `/api/stats`.
+- `/api/feed.atom` and `/api/feed.json` the same alerts as Atom 1.0 and
+  JSON Feed 1.1, with the same filters and a 100-item cap.
+- `/api/campaigns` and `/api/campaign/{id}` campaign summaries and a durable
+  timeline. `campaign_id` is published by the watcher for corroborated
+  G-series clusters; older documents get a deterministic `legacy:` id.
+- `/api/maintainer/{name}` packages, ownership transitions, campaigns and
+  IOC packages for one maintainer. Names are matched by email identity when
+  the display string carries one.
+- `/api/iocs?format=json|ndjson|csv|stix` deduplicated IOC matches. CSV cells
+  are quoted and formula-prefixed so a value cannot execute in a spreadsheet.
+- `/api/keys` the public Ed25519 keys that sign ingest requests.
+  `/api/messages/{slug}` carries the stored `verification` object.
+  `node scripts/verify-feed.mjs <slug>` checks the Ed25519 signature and the
+  body hash against the published key without trusting the store.
 - `/api/source/{package}?file=PKGBUILD` the analysed AUR file, unmodified, so a
   client can show the flagged lines. Only AUR repository files resolve; the
   host is fixed and the path is validated, so a finding cannot make the Worker

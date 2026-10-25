@@ -55,6 +55,8 @@ export function FeedSkeleton() {
 export function App() {
   const [query, setQuery] = useState('')
   const [event, setEvent] = useState('trustsight.alerts')
+  const [campaign, setCampaign] = useState(() => new URLSearchParams(window.location.search).get('campaign') || '')
+  const [maintainer, setMaintainer] = useState(() => new URLSearchParams(window.location.search).get('maintainer') || '')
   const [items, setItems] = useState([])
   const [next, setNext] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -69,6 +71,8 @@ export function App() {
     const params = new URLSearchParams()
     const term = (q ?? query).trim()
     if (term) params.set('q', term)
+    if (campaign.trim()) params.set('campaign', campaign.trim())
+    if (maintainer.trim()) params.set('maintainer', maintainer.trim())
     params.set('event', ev ?? event)
     params.set('limit', '30')
     if (before) { params.set('before', before); params.set('beforeRow', beforeRow) }
@@ -188,6 +192,24 @@ export function App() {
                 onInput={(e) => setQuery(e.target.value)}
               />
             </label>
+            <label className="search">
+              <span className="visually-hidden">Filter by campaign id</span>
+              <input
+                type="search"
+                value={campaign}
+                placeholder="Campaign id (optional)"
+                onInput={(e) => setCampaign(e.target.value)}
+              />
+            </label>
+            <label className="search">
+              <span className="visually-hidden">Filter by maintainer</span>
+              <input
+                type="search"
+                value={maintainer}
+                placeholder="Maintainer (optional)"
+                onInput={(e) => setMaintainer(e.target.value)}
+              />
+            </label>
             <div className="filters" role="group" aria-label="Filter by event">
               {FILTERS.map(([value, label]) => (
                 <button
@@ -251,6 +273,9 @@ export function App() {
             <li><a href={SITE} target="_blank" rel="noreferrer">trustsight.org ↗</a></li>
             <li><a href={DOCS} target="_blank" rel="noreferrer">Documentation ↗</a></li>
             <li><a href={`${DOCS}/reference/rules/`} target="_blank" rel="noreferrer">Rules reference ↗</a></li>
+            <li><a href="/api/feed.atom">Atom feed</a></li>
+            <li><a href="/api/feed.json">JSON feed</a></li>
+            <li><a href="/api/iocs?format=json">IOC export</a></li>
             <li><a href={NTFY} target="_blank" rel="noreferrer">ntfy channel ↗</a></li>
             <li><a href={GITHUB} target="_blank" rel="noreferrer">Tool source on GitHub ↗</a></li>
             <li><a href={FEED_REPO} target="_blank" rel="noreferrer">Feed source on GitHub ↗</a></li>

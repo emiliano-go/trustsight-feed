@@ -25,6 +25,12 @@ function redirect(location) {
 const CACHE_TTLS = [
   [/^\/api\/stats$/, 60],
   [/^\/api\/feed$/, 30],
+  [/^\/api\/feed\.(?:atom|json)$/, 60],
+  [/^\/api\/campaigns$/, 60],
+  [/^\/api\/campaign\//, 60],
+  [/^\/api\/maintainer\//, 60],
+  [/^\/api\/iocs$/, 60],
+  [/^\/api\/keys$/, 3600],
   [/^\/api\/latest(?:\/\d+)?$/, 30],
   [/^\/api\/date\//, 60],
   [/^\/api\/package\/[^/]+\/history$/, 60],
@@ -76,7 +82,7 @@ async function cachedApi(request, env, ctx, url) {
 
 // Root spellings of the API resources. Without this, /feed and /latest fall
 // through to the SPA and silently render the home page.
-const ROOT_ALIASES = ['/feed', '/latest', '/date', '/package', '/rule', '/stats', '/messages']
+const ROOT_ALIASES = ['/feed', '/feed.atom', '/feed.json', '/latest', '/date', '/package', '/rule', '/stats', '/messages']
 
 // A cheap liveness and readiness check. Not rate limited, so a monitor is
 // never throttled, and no-store so it is always current.

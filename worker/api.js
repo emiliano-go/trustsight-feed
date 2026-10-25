@@ -1,7 +1,8 @@
 // Read API over the D1 store. Public data, so responses are CORS-open for
 // anyone who wants to consume the feed from another tool.
 
-import { ftsQuery, fuzzyScore, packageHistory, summarize } from './lib.js'
+import { campaignEvents, ftsQuery, fuzzyScore, iocEvents, maintainerEvents, maintainerKey, packageHistory, summarize } from './lib.js'
+import { atomFeed, jsonFeed } from './feeds.js'
 import { openapiSpec } from './openapi.js'
 
 const DEFAULT_LIMIT = 50
@@ -13,7 +14,9 @@ const ENDPOINTS = [
   'GET /api/index.json',
   'GET /api/docs (redirects to /api)',
   'GET /api/openapi.json',
-  'GET /api/feed?q=&event=&day=&from=&to=&limit=&before=&beforeRow=',
+  'GET /api/feed?q=&event=&day=&from=&to=&campaign=&maintainer=&limit=&before=&beforeRow=',
+  'GET /api/feed.atom',
+  'GET /api/feed.json',
   'GET /api/latest',
   'GET /api/latest/{n}',
   'GET /api/date/{YYYY-MM-DD}',
@@ -25,6 +28,11 @@ const ENDPOINTS = [
   'GET /api/source/{package}?file=PKGBUILD',
   'GET /api/diff/{package}',
   'GET /api/maintainers?packages=a,b,c',
+  'GET /api/campaigns',
+  'GET /api/campaign/{id}',
+  'GET /api/maintainer/{name}',
+  'GET /api/iocs?format=json|ndjson|csv|stix',
+  'GET /api/keys',
   'GET /api/stats',
 ]
 
@@ -144,7 +152,7 @@ async function fuzzyWindow(env) {
 async function listQuery(env, options = {}) {
   const {
     q, event = 'all', day, from, to, beforeTime, beforeRow,
-    limit = DEFAULT_LIMIT,
+    campaign, maintainer, limit = DEFAULT_LIMIT,
   } = options
   const term = typeof q === 'string' ? q.slice(0, MAX_QUERY_CHARS) : q
   const fts = ftsQuery(term)
@@ -157,6 +165,14 @@ async function listQuery(env, options = {}) {
 
   if (event && event !== 'all') { where.push('n.event = ?'); params.push(event) }
   if (day) { where.push('n.day = ?'); params.push(day) }
+  if (campaign) {
+    where.push('EXISTS (SELECT 1 FROM campaign_events ce WHERE ce.slug = n.slug AND ce.campaign_id = ?)')
+    params.push(String(campaign).slice(0, 255))
+  }
+  if (maintainer) {
+    where.push('EXISTS (SELECT 1 FROM maintainer_events me WHERE me.slug = n.slug AND me.maintainer_key = ?)')
+    params.push(maintainerKey(maintainer))
+  }
   if (fromTime !== null) { where.push('n.time >= ?'); params.push(fromTime) }
   if (toTime !== null) { where.push('n.time <= ?'); params.push(toTime) }
   if (before !== null && beforeId !== null) {
@@ -230,7 +246,15 @@ function listResponse(env, url, { query, ...options }) {
 function messageFromRow(row) {
   let payload = {}
   try { payload = JSON.parse(row.payload || '{}') } catch { /* keep {} */ }
-  return { ...summarize(row), payload, message_raw: row.message_raw }
+  const verification = row.signature ? {
+    algorithm: 'Ed25519',
+    webhook_id: row.webhook_id || '',
+    key_id: row.key_id || '',
+    signed_at: row.signed_at || null,
+    signature: row.signature,
+    body_sha256: row.body_sha256 || '',
+  } : null
+  return { ...summarize(row), payload, message_raw: row.message_raw, verification }
 }
 
 async function getBySlug(env, slug) {
@@ -246,6 +270,8 @@ async function feed(env, url) {
     day: url.searchParams.get('day') || undefined,
     from: url.searchParams.get('from') || undefined,
     to: url.searchParams.get('to') || undefined,
+    campaign: url.searchParams.get('campaign') || undefined,
+    maintainer: url.searchParams.get('maintainer') || undefined,
   })
 }
 
@@ -301,6 +327,331 @@ async function message(env, slug) {
   const item = await getBySlug(env, slug)
   if (!item) return json({ error: 'not_found' }, 404)
   return json(item)
+}
+
+const PUBLIC_ID_RE = /^[^\x00-\x1f\x7f/]{1,255}$/
+
+function publicId(value, max = 255) {
+  const text = String(value || '').trim()
+  if (!text || text.length > max || !PUBLIC_ID_RE.test(text)) return ''
+  return text
+}
+
+/** Rebuild a legacy campaign's rows from stored payloads, bounded. */
+async function legacyCampaignRows(env, campaignId) {
+  const rule = campaignId.startsWith('legacy:') ? campaignId.split(':')[1] : ''
+  if (!rule) return []
+  const fts = ftsQuery(rule)
+  if (!fts) return []
+  const { results } = await env.DB.prepare(
+    `SELECT n.slug, n.time, n.payload
+       FROM notifications n
+       JOIN notifications_fts f ON f.rowid = n.rowid
+      WHERE f.notifications_fts MATCH ? AND n.event = 'trustsight.alerts'
+      ORDER BY n.time DESC, n.rowid ASC
+      LIMIT 500`
+  ).bind(fts).all()
+  const rows = []
+  for (const row of results || []) {
+    let payload = {}
+    try { payload = JSON.parse(row.payload || '{}') } catch { continue }
+    for (const event of campaignEvents(payload)) {
+      if (event.campaign_id !== campaignId) continue
+      rows.push({
+        ...event, time: row.time, slug: row.slug,
+        maintainer: event.maintainer || '',
+        previous_maintainer: event.previous_maintainer || '',
+        version: event.version || '',
+      })
+    }
+  }
+  return rows.sort((a, b) => a.time - b.time || a.slug.localeCompare(b.slug))
+}
+
+async function campaigns(env, url) {
+  const limit = clampInt(url.searchParams.get('limit'), DEFAULT_LIMIT, 1, MAX_LIMIT)
+  const { results } = await env.DB.prepare(
+    `SELECT campaign_id, rule_id, MIN(time) AS first, MAX(time) AS last,
+            COUNT(DISTINCT package) AS members, COUNT(DISTINCT slug) AS notifications,
+            MAX(legacy) AS legacy
+       FROM campaign_events
+      GROUP BY campaign_id, rule_id
+      ORDER BY last DESC, campaign_id ASC
+      LIMIT ?`
+  ).bind(limit).all()
+  return json({ count: (results || []).length, items: results || [] })
+}
+
+async function campaignDetail(env, id) {
+  const campaignId = publicId(id)
+  if (!campaignId) return json({ error: 'bad_campaign' }, 400)
+  const { results } = await env.DB.prepare(
+    `SELECT e.rule_id, e.package, e.time, e.slug, e.maintainer,
+            e.previous_maintainer, e.version, e.legacy
+       FROM campaign_events e
+      WHERE e.campaign_id = ?
+      ORDER BY e.time ASC, e.slug ASC, e.package ASC`
+  ).bind(campaignId).all()
+  const rows = (results && results.length)
+    ? results
+    : await legacyCampaignRows(env, campaignId)
+  if (!rows.length) return json({ error: 'not_found' }, 404)
+  const events = new Map()
+  const members = new Map()
+  for (const row of rows) {
+    const event = events.get(row.slug) || {
+      time: row.time, slug: row.slug, rule_id: row.rule_id, packages: [],
+      ownership: [], versions: [],
+    }
+    event.packages.push(row.package)
+    if (row.maintainer || row.previous_maintainer) {
+      event.ownership.push({
+        package: row.package,
+        maintainer: row.maintainer || '',
+        previous_maintainer: row.previous_maintainer || '',
+      })
+    }
+    if (row.version) event.versions.push({ package: row.package, version: row.version })
+    events.set(row.slug, event)
+    const member = members.get(row.package) || {
+      package: row.package, first: row.time, last: row.time,
+      maintainer: '', previous_maintainer: '', version: '',
+    }
+    member.last = row.time
+    if (row.maintainer) member.maintainer = row.maintainer
+    if (row.previous_maintainer) member.previous_maintainer = row.previous_maintainer
+    if (row.version) member.version = row.version
+    members.set(row.package, member)
+  }
+  return json({
+    id: campaignId,
+    rule_id: rows[0].rule_id,
+    legacy: Boolean(rows[0].legacy),
+    first: rows[0].time,
+    last: rows[rows.length - 1].time,
+    members: [...members.values()].sort((a, b) => a.package.localeCompare(b.package)),
+    timeline: [...events.values()].sort((a, b) => b.time - a.time),
+    notifications: [...new Set(rows.map((row) => row.slug))].sort().reverse(),
+  })
+}
+
+/** Rebuild a maintainer's rows from stored payloads, bounded. */
+async function legacyMaintainerRows(env, key) {
+  const { results } = await env.DB.prepare(
+    `SELECT slug, time, payload FROM notifications
+      WHERE event = 'trustsight.alerts'
+      ORDER BY time DESC, rowid ASC
+      LIMIT 500`
+  ).all()
+  const rows = []
+  for (const row of results || []) {
+    let payload = {}
+    try { payload = JSON.parse(row.payload || '{}') } catch { continue }
+    for (const event of maintainerEvents(payload)) {
+      if (event.maintainer_key !== key) continue
+      rows.push({ ...event, time: row.time, slug: row.slug })
+    }
+  }
+  return rows.sort((a, b) => b.time - a.time || b.slug.localeCompare(a.slug))
+}
+
+async function maintainerDetail(env, name, url) {
+  const display = String(name || '').trim()
+  if (!display || display.length > 255) return json({ error: 'bad_maintainer' }, 400)
+  const key = maintainerKey(display)
+  const limit = clampInt(url.searchParams.get('limit'), 100, 1, MAX_LIMIT)
+  const { results } = await env.DB.prepare(
+    `SELECT maintainer, package, previous_maintainer, rule_id, time, slug
+       FROM maintainer_events
+      WHERE maintainer_key = ?
+      ORDER BY time DESC, slug DESC
+      LIMIT ?`
+  ).bind(key, limit).all()
+  const rows = (results && results.length)
+    ? results
+    : await legacyMaintainerRows(env, key)
+  if (!rows.length) {
+    return json({ maintainer: display, key, available: false, packages: [],
+                  transitions: [], campaigns: [], recent_alerts: [] })
+  }
+  const packages = new Map()
+  for (const row of rows) {
+    const pkg = packages.get(row.package) || {
+      package: row.package, first: row.time, last: row.time,
+      previous_maintainer: '', rule_ids: [],
+    }
+    pkg.last = Math.max(pkg.last, row.time)
+    pkg.first = Math.min(pkg.first, row.time)
+    if (row.previous_maintainer) pkg.previous_maintainer = row.previous_maintainer
+    if (row.rule_id && !pkg.rule_ids.includes(row.rule_id)) pkg.rule_ids.push(row.rule_id)
+    packages.set(row.package, pkg)
+  }
+  const campaignRows = await env.DB.prepare(
+    `SELECT DISTINCT ce.campaign_id
+       FROM maintainer_events me
+       JOIN campaign_events ce ON ce.slug = me.slug AND ce.package = me.package
+      WHERE me.maintainer_key = ?
+      ORDER BY ce.campaign_id`
+  ).bind(key).all()
+  const iocRows = await env.DB.prepare(
+    `SELECT DISTINCT package FROM ioc_events WHERE package IN (${[...packages.keys()].map(() => '?').join(',') || "''"})`
+  ).bind(...[...packages.keys()]).all()
+  return json({
+    maintainer: rows[0].maintainer || display,
+    key,
+    available: true,
+    first: rows[rows.length - 1].time,
+    last: rows[0].time,
+    packages: [...packages.values()].sort((a, b) => b.last - a.last),
+    transitions: rows.filter((row) => row.previous_maintainer || row.rule_id).slice(0, 200),
+    campaigns: (campaignRows.results || []).map((row) => row.campaign_id),
+    ioc_packages: (iocRows.results || []).map((row) => row.package),
+    recent_alerts: [...new Set(rows.map((row) => row.slug))].slice(0, 50),
+  })
+}
+
+function csvCell(value) {
+  let text = String(value ?? '')
+  // A spreadsheet treats a leading = + - @ as a formula.  Prefix it so an
+  // IOC value is inert when the CSV is opened, not only when it is read.
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`
+  return `"${text.replace(/"/g, '""')}"`
+}
+
+function iocStix(rows) {
+  const objects = rows.map((row, index) => {
+    const safe = (text) => String(text || '').replace(/[\\'\r\n\u0000-\u001f\u007f-\u009f]/g, '')
+    const indicator = safe(row.indicator)
+    const [kind, ...rest] = indicator.split(':')
+    const value = safe(rest.join(':'))
+    const pattern = kind === 'hash'
+      ? `[file:hashes.'SHA-256' = '${value}']`
+      : kind === 'domain'
+        ? `[domain-name:value = '${value}']`
+        : kind === 'url'
+          ? `[url:value = '${value}']`
+          : kind === 'ip'
+            ? `[ipv4-addr:value = '${value}']`
+            : `[x-trustsight-indicator:value = '${safe(indicator)}']`
+    return {
+      type: 'indicator',
+      spec_version: '2.1',
+      id: `indicator--${index + 1}`,
+      created: new Date((row.first || 0) * 1000).toISOString(),
+      modified: new Date((row.last || 0) * 1000).toISOString(),
+      name: indicator,
+      pattern,
+      pattern_type: 'stix',
+      valid_from: new Date((row.first || 0) * 1000).toISOString(),
+      labels: ['malicious-activity'],
+      x_trustsight_package: row.package,
+    }
+  })
+  return { type: 'bundle', id: 'bundle--trustsight-iocs', objects }
+}
+
+async function legacyIocRows(env) {
+  const { results } = await env.DB.prepare(
+    `SELECT slug, time, payload FROM notifications
+      WHERE event = 'trustsight.alerts'
+      ORDER BY time DESC, rowid ASC
+      LIMIT 500`
+  ).all()
+  const rows = []
+  for (const row of results || []) {
+    let payload = {}
+    try { payload = JSON.parse(row.payload || '{}') } catch { continue }
+    for (const event of iocEvents(payload)) {
+      rows.push({ ...event, first: row.time, last: row.time, count: 1, last_slug: row.slug })
+    }
+  }
+  return rows
+}
+
+async function iocs(env, url) {
+  const limit = clampInt(url.searchParams.get('limit'), MAX_LIMIT, 1, MAX_LIMIT)
+  const where = []
+  const params = []
+  const since = asInt(url.searchParams.get('since'))
+  const until = asInt(url.searchParams.get('until'))
+  const pkg = String(url.searchParams.get('package') || '').trim()
+  if (since !== null) { where.push('time >= ?'); params.push(since) }
+  if (until !== null) { where.push('time <= ?'); params.push(until) }
+  if (pkg) { where.push('package = ?'); params.push(pkg.slice(0, 255)) }
+  const filters = where.length ? `WHERE ${where.join(' AND ')}` : ''
+  const { results } = await env.DB.prepare(
+    `SELECT indicator, package, MIN(time) AS first, MAX(time) AS last,
+            COUNT(*) AS count, MAX(slug) AS last_slug
+       FROM ioc_events ${filters}
+      GROUP BY indicator, package
+      ORDER BY last DESC, indicator ASC
+      LIMIT ?`
+  ).bind(...params, limit).all()
+  let rows = results || []
+  if (!rows.length) {
+    // Fall back only when the event index is empty overall.  A filter that
+    // matched nothing must stay empty, not resurrect the unscanned corpus.
+    const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM ioc_events').first()
+    if (!count || !Number(count.n)) rows = await legacyIocRows(env)
+  }
+  const format = String(url.searchParams.get('format') || 'json').toLowerCase()
+  if (format === 'csv') {
+    const lines = ['indicator,package,first_seen,last_seen,count,last_slug']
+    for (const row of rows) {
+      lines.push([row.indicator, row.package,
+        new Date((row.first || 0) * 1000).toISOString(),
+        new Date((row.last || 0) * 1000).toISOString(),
+        row.count, row.last_slug].map(csvCell).join(','))
+    }
+    return new Response(`${lines.join('\n')}\n`, {
+      headers: {
+        'content-type': 'text/csv; charset=utf-8',
+        'content-disposition': 'attachment; filename="trustsight-iocs.csv"',
+        'cache-control': 'public, max-age=60',
+        ...CORS,
+      },
+    })
+  }
+  if (format === 'ndjson') {
+    return new Response(rows.map((row) => JSON.stringify(row)).join('\n') + (rows.length ? '\n' : ''), {
+      headers: { 'content-type': 'application/x-ndjson; charset=utf-8', 'cache-control': 'public, max-age=60', ...CORS },
+    })
+  }
+  if (format === 'stix') return json(iocStix(rows))
+  return json({ count: rows.length, items: rows })
+}
+
+async function syndication(env, url, format) {
+  const { items } = await listQuery(env, {
+    ...pageFrom(url),
+    q: url.searchParams.get('q'),
+    event: url.searchParams.get('event') || 'trustsight.alerts',
+    day: url.searchParams.get('day') || undefined,
+    from: url.searchParams.get('from') || undefined,
+    to: url.searchParams.get('to') || undefined,
+    campaign: url.searchParams.get('campaign') || undefined,
+    maintainer: url.searchParams.get('maintainer') || undefined,
+    limit: clampInt(url.searchParams.get('limit'), 50, 1, 100),
+  })
+  const baseUrl = new URL(url).origin
+  if (format === 'atom') {
+    return new Response(atomFeed(items, { baseUrl }), {
+      headers: { 'content-type': 'application/atom+xml; charset=utf-8', 'cache-control': 'public, max-age=60', ...CORS },
+    })
+  }
+  return new Response(JSON.stringify(jsonFeed(items, { baseUrl })),
+    { headers: { 'content-type': 'application/feed+json; charset=utf-8', 'cache-control': 'public, max-age=60', ...CORS } })
+}
+
+function publicKeys(env) {
+  const keys = []
+  if (env.INGEST_KEY_ID && env.INGEST_PUBLIC_KEY) {
+    keys.push({ id: env.INGEST_KEY_ID, public_key: env.INGEST_PUBLIC_KEY, current: true })
+  }
+  if (env.INGEST_PREVIOUS_KEY_ID && env.INGEST_PUBLIC_KEY_PREVIOUS) {
+    keys.push({ id: env.INGEST_PREVIOUS_KEY_ID, public_key: env.INGEST_PUBLIC_KEY_PREVIOUS, current: false })
+  }
+  return json({ keys })
 }
 
 async function stats(env) {
@@ -583,6 +934,11 @@ export async function handleApi(request, env, url) {
   // The reference page lives in the SPA at /api; send both docs spellings there.
   if (path === '/api/docs' || path === '/api/reference') return redirect('/api')
   if (path === '/api/openapi.json') return json(openapiSpec)
+  if (path === '/api/feed.atom') return syndication(env, url, 'atom')
+  if (path === '/api/feed.json') return syndication(env, url, 'json')
+  if (path === '/api/keys') return publicKeys(env)
+  if (path === '/api/campaigns') return campaigns(env, url)
+  if (path === '/api/iocs') return iocs(env, url)
   if (path === '/api/feed') return feed(env, url)
   if (path === '/api/stats') return stats(env)
   if (path === '/api/latest') return latestOne(env)
@@ -602,6 +958,12 @@ export async function handleApi(request, env, url) {
   }
   if ((match = path.match(/^\/api\/package\/(.+)$/))) {
     return bySearch(env, url, decodeURIComponent(match[1]))
+  }
+  if ((match = path.match(/^\/api\/campaign\/(.+)$/))) {
+    return campaignDetail(env, decodeURIComponent(match[1]))
+  }
+  if ((match = path.match(/^\/api\/maintainer\/(.+)$/))) {
+    return maintainerDetail(env, decodeURIComponent(match[1]), url)
   }
   if ((match = path.match(/^\/api\/rule\/(.+)$/))) {
     return bySearch(env, url, decodeURIComponent(match[1]))

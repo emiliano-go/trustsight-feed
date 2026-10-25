@@ -2,7 +2,7 @@ import { useEffect, useState } from 'preact/hooks'
 import { AccessibilityMenu, ThemeSwitch, Wordmark } from './Controls.jsx'
 import { RuleChip, RuleHighlight, RuleSection, ruleInfo, sortRuleIds } from './RuleChip.jsx'
 import { AUR_PACKAGE, AUR_PKGBUILD, eventBadgeClass, eventLabel, formatTime, locationLabel, relative } from './util.js'
-import { alertingClusters } from '../worker/lib.js'
+import { alertingClusters, campaignEvents } from '../worker/lib.js'
 import { renderMarkdown, renderInlineCode } from './markdown.jsx'
 
 const SECURITY = 'https://docs.trustsight.org/security/'
@@ -445,9 +445,9 @@ function MemberOwnership({ detail }) {
       {current || previous ? (
         <>
           <span className="member__label">maintainer</span>
-          {changed ? <code className="md-code">{previous}</code> : null}
+          {changed ? <MaintainerLink name={previous} /> : null}
           {changed ? ' -> ' : null}
-          {current ? <code className="md-code">{current}</code> : null}
+          {current ? <MaintainerLink name={current} /> : null}
           {!current ? <span>orphan</span> : null}
         </>
       ) : null}
@@ -491,6 +491,14 @@ function groupAlerts(alerts) {
   return { rules, bare }
 }
 
+/** A maintainer name links to the account's recorded history. */
+function MaintainerLink({ name }) {
+  if (!name) return null
+  return (
+    <a className="md-code" href={`/maintainer/${encodeURIComponent(name)}`} data-route>{name}</a>
+  )
+}
+
 /** The maintainer facts one alert carries, when the watcher recorded them. */
 function MaintainerChange({ entry }) {
   const current = entry.new || entry.maintainer || ''
@@ -500,12 +508,79 @@ function MaintainerChange({ entry }) {
   return (
     <p className="pkg__meta pkg__meta--owner">
       Maintainer{' '}
-      {changed ? <code className="md-code">{previous}</code> : null}
+      {changed ? <MaintainerLink name={previous} /> : null}
       {changed ? ' -> ' : null}
-      {current ? <code className="md-code">{current}</code> : null}
+      {current ? <MaintainerLink name={current} /> : null}
       {!current ? <span>orphan</span> : null}
       {previous && !current ? <span> (was <code className="md-code">{previous}</code>)</span> : null}
     </p>
+  )
+}
+
+/** The exact PKGBUILD change the watcher analysed, when the payload carries it. */
+export function AnalysedDiff({ entry }) {
+  if (!entry) return null
+  const digest = entry.pkgbuild_sha256 || entry.diff_sha256 || ''
+  if (entry.diff) {
+    return (
+      <details className="history-item__findings">
+        <summary>Analysed change (exact revision)</summary>
+        <pre className="finding__diff">{entry.diff}</pre>
+        {digest ? <p className="pkg__meta">PKGBUILD sha256: <code className="md-code">{digest}</code></p> : null}
+      </details>
+    )
+  }
+  if (entry.diff_truncated || digest) {
+    return (
+      <p className="pkg__meta">
+        Analysed revision recorded
+        {digest ? <> (<code className="md-code">{digest}</code>)</> : null}
+        ; the diff was too large to include, so the feed cannot show it.
+      </p>
+    )
+  }
+  return null
+}
+
+/** The arithmetic behind an over-threshold package, without hiding the inputs. */
+function ScoreBreakdown({ pkg }) {
+  const findings = Array.isArray(pkg.findings) ? pkg.findings : []
+  if (!findings.length) return null
+  const sum = findings.reduce((total, finding) => total + (Number(finding.weight) || 0), 0)
+  return (
+    <details className="history-item__findings">
+      <summary>Why this score</summary>
+      <p className="pkg__meta">
+        The weighted findings sum to <strong>{sum}</strong>. A zero-weight finding is context,
+        not arithmetic. The alerting bar is a review threshold, not a safety verdict.
+      </p>
+      <ul className="findings">
+        {findings.map((finding, i) => (
+          <li className="finding" key={`${finding.rule_id}-${i}`}>
+            <div className="finding__head">
+              <RuleChip id={finding.rule_id} />
+              <span className="finding__loc">weight {Number(finding.weight) || 0}</span>
+            </div>
+            {finding.reason ? <p className="finding__reason">{renderInlineCode(finding.reason)}</p> : null}
+          </li>
+        ))}
+      </ul>
+    </details>
+  )
+}
+
+/** The boundary every page repeats: evidence, not a certificate. */
+export function LimitsNote() {
+  return (
+    <section className="detail__section">
+      <h2>What this does not prove</h2>
+      <p className="detail__explain">
+        TrustSight reads recipes; it never runs them and never fetches a URL a package declares.
+        A notification means a published rule matched the change that was examined. It is not a
+        verdict, and no notification is permission to install. A clean result means no rule
+        matched, not that the package is safe.
+      </p>
+    </section>
   )
 }
 
@@ -520,6 +595,7 @@ function AlertPackage({ entry, iocPackages }) {
         <a className="pkg__action" href={AUR_PKGBUILD(entry.package)} target="_blank" rel="noreferrer">See PKGBUILD ↗</a>
       </header>
       <MaintainerChange entry={entry} />
+      <AnalysedDiff entry={entry} />
     </article>
   )
 }
@@ -1171,6 +1247,8 @@ function PackageSections({ packages, iocPackages }) {
             ) : (
               <p className="pkg__meta">No located findings in this entry.</p>
             )}
+            <ScoreBreakdown pkg={pkg} />
+            <AnalysedDiff entry={pkg} />
             {rules.length ? (
               <div className="rule-sections">
                 {sortRuleIds(rules).map((id) => <RuleSection key={id} id={id} />)}
@@ -1190,6 +1268,10 @@ function IocSection({ matches }) {
   return (
     <section className="detail__section detail__section--ioc">
       <h2>Indicators of compromise <span className="count">{matches.length}</span></h2>
+      <p className="pkg__meta">
+        Export: <a href="/api/iocs?format=json">JSON</a>, <a href="/api/iocs?format=csv">CSV</a>,
+        {' '}<a href="/api/iocs?format=stix">STIX 2.1</a>.
+      </p>
       <div className="ioc-list">
         {matches.map((m, i) => (
           <div className="ioc-row" key={`${m.package}-${i}`}>
@@ -1247,6 +1329,10 @@ function Campaigns({ payload }) {
               <span className="badge">campaign</span>
               <RuleChip id={cluster.rule_id} />
               <span className="pkg__version">{type.label} · {members.length} packages</span>
+              {(() => {
+                const id = cluster.campaign_id || campaignEvents({ campaign_cluster: [cluster] })[0]?.campaign_id
+                return id ? <a className="pkg__history" href={`/campaign/${encodeURIComponent(id)}`} data-route>campaign page</a> : null
+              })()}
             </header>
             <h3 className="campaign__subhead">Flagged packages <span className="count">{members.length}</span></h3>
             <MemberList names={members} details={cluster.members_detail || []} />
@@ -1362,6 +1448,7 @@ export function Message({ slug }) {
                 : null}
               {ioc.length ? <span className="badge badge--ioc">IOC match</span> : null}
               <a href={NTFY} target="_blank" rel="noreferrer">ntfy channel ↗</a>
+              <button type="button" className="pkg__action" onClick={() => navigator.clipboard?.writeText(window.location.href)}>Copy permalink</button>
             </div>
 
             {payload.cycle ? (
@@ -1384,6 +1471,8 @@ export function Message({ slug }) {
             {!alerts.length && !packages.length && !ioc.length && !alertingClusters(payload).length && !(payload.impersonation || []).length && !(payload.refusals || []).length ? (
               <p className="feed-empty">This document carries no alerts, packages, indicators or campaigns.</p>
             ) : null}
+
+            <LimitsNote />
 
             <section className="detail__section">
               <h2>Raw document</h2>

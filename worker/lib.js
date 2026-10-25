@@ -90,7 +90,7 @@ export function buildSearchText({ event, title, day, payload }) {
   }
   for (const m of (payload && payload.ioc_matches) || []) { push(m.package); push(m.indicator) }
   for (const c of (payload && payload.campaign_cluster) || []) {
-    push(c.rule_id)
+    push(c.rule_id); push(c.campaign_id)
     for (const x of c.members || []) push(x)
     for (const d of c.members_detail || []) {
       push(d.package); push(d.maintainer); push(d.previous_maintainer)
@@ -131,6 +131,110 @@ const MAINTAINER_RULES = new Set([
 ])
 
 const URL_RE = /https?:\/\/[^\s'"()<>\]]+/g
+
+/** The account identity behind a maintainer display string. */
+export function maintainerKey(value) {
+  const text = String(value || '').trim().slice(0, 255)
+  const email = text.match(/<([^<>]+)>/)
+  if (email && email[1].trim()) return `email:${email[1].trim().toLowerCase()}`
+  return `name:${text.split(/\s+/).filter(Boolean).join(' ').toLowerCase()}`
+}
+
+/** A short deterministic key for a legacy campaign with no published id. */
+function legacyCampaignKey(rule, members) {
+  const text = `${rule}:${[...members].sort().join(',')}`
+  let hash = 0x811c9dc5
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193) >>> 0
+  }
+  return `legacy:${rule}:${hash.toString(16).padStart(8, '0')}`
+}
+
+/**
+ * The campaign/member rows one notification contributes to the event index.
+ * A campaign without a published id (older documents) gets a deterministic
+ * legacy key over its rule and sorted members, so its page is still stable.
+ */
+export function campaignEvents(payload) {
+  const clusters = alertingClusters(payload)
+  const rows = []
+  for (const cluster of clusters) {
+    const rule = String(cluster.rule_id || '')
+    const members = [...new Set((cluster.members || []).map(String).filter(Boolean))]
+    const published = typeof cluster.campaign_id === 'string' ? cluster.campaign_id.trim() : ''
+    const campaignId = published || legacyCampaignKey(rule, members)
+    const detailByName = new Map((cluster.members_detail || [])
+      .map((detail) => [detail.package, detail]))
+    for (const member of members) {
+      const detail = detailByName.get(member) || {}
+      rows.push({
+        campaign_id: campaignId.slice(0, 255),
+        rule_id: rule.slice(0, 64),
+        package: member.slice(0, 255),
+        maintainer: String(detail.maintainer || '').slice(0, 255),
+        previous_maintainer: String(detail.previous_maintainer || '').slice(0, 255),
+        version: String(detail.version || '').slice(0, 255),
+        legacy: published ? 0 : 1,
+      })
+    }
+  }
+  return rows
+}
+
+/** Every maintainer/package transition one notification records. */
+export function maintainerEvents(payload) {
+  const rows = []
+  const add = (packageName, maintainer, previous, rule) => {
+    const current = String(maintainer || '').trim()
+    const before = String(previous || '').trim()
+    for (const name of [current, before]) {
+      if (!name) continue
+      rows.push({
+        maintainer_key: maintainerKey(name),
+        maintainer: name.slice(0, 255),
+        package: String(packageName || '').slice(0, 255),
+        previous_maintainer: before === name ? '' : before.slice(0, 255),
+        rule_id: String(rule || '').slice(0, 64),
+      })
+    }
+  }
+  for (const alert of (payload && payload.alerts) || []) {
+    add(alert.package, alert.new || alert.maintainer, alert.old, alert.rule_id)
+  }
+  for (const cluster of (payload && payload.campaign_cluster) || []) {
+    for (const detail of cluster.members_detail || []) {
+      add(detail.package, detail.maintainer, detail.previous_maintainer, cluster.rule_id)
+    }
+  }
+  for (const over of (payload && payload.over_threshold) || []) {
+    add(over.package, over.maintainer, over.previous_maintainer, 'over_threshold')
+  }
+  return rows
+}
+
+/** Every IOC one notification records. */
+export function iocEvents(payload) {
+  return ((payload && payload.ioc_matches) || [])
+    .filter((match) => match && match.indicator && match.package)
+    .map((match) => ({
+      indicator: String(match.indicator).slice(0, 512),
+      package: String(match.package).slice(0, 255),
+    }))
+}
+
+/** The complete event index for one notification. */
+export function buildEventIndex(payload) {
+  // A notification is bounded, but a hostile document can still name many
+  // members.  Cap each derived index so one ingest cannot turn into an
+  // unbounded D1 batch; the notification itself remains complete.
+  const MAX_EVENTS = 200
+  return {
+    campaigns: campaignEvents(payload || {}).slice(0, MAX_EVENTS),
+    maintainers: maintainerEvents(payload || {}).slice(0, MAX_EVENTS),
+    iocs: iocEvents(payload || {}).slice(0, MAX_EVENTS),
+  }
+}
 
 /**
  * Everything one notification says about one package, or null when the
@@ -184,11 +288,17 @@ export function packageFacts(payload, name) {
       }))),
   ].filter((t) => t.old || (t.new && MAINTAINER_RULES.has(String(t.rule_id || '').toUpperCase())))
 
+  const analysed = over || alerts.find((a) => a.diff || a.pkgbuild_sha256) || null
   return {
     over: Boolean(over),
     version: (over && over.version) || '',
     score: over && Number.isFinite(Number(over.score)) ? Number(over.score) : null,
     last_modified: (over && over.last_modified) || '',
+    pkgbuild_sha256: (analysed && analysed.pkgbuild_sha256) || '',
+    previous_pkgbuild_sha256: (analysed && analysed.previous_pkgbuild_sha256) || '',
+    diff: (analysed && analysed.diff) || '',
+    diff_sha256: (analysed && analysed.diff_sha256) || '',
+    diff_truncated: Boolean(analysed && analysed.diff_truncated),
     rules: [...rules].filter(Boolean),
     findings,
     alerts: alerts.map((a) => a.rule_id).filter(Boolean),
@@ -197,6 +307,7 @@ export function packageFacts(payload, name) {
     refusal_reasons: refusals.map((r) => r.reason).filter(Boolean),
     ioc: ioc.map((m) => m.indicator).filter(Boolean),
     campaigns: campaigns.map((c) => c.rule_id).filter(Boolean),
+    campaign_ids: campaigns.map((c) => c.campaign_id).filter(Boolean),
     impersonation: impersonation.map((c) => c.maintainer).filter(Boolean),
   }
 }

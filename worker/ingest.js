@@ -77,7 +77,7 @@ export async function verifyIngest(env, headers, rawBody) {
     valid = false
   }
   if (!valid) return { ok: false, status: 401, error: 'bad_signature' }
-  return { ok: true, id, time }
+  return { ok: true, id, time, keyId, signedAt: time, signature: sigB64 }
 }
 
 /**
@@ -98,6 +98,15 @@ export async function ingestDocument(env, rawBody, headers) {
   } catch {
     return { ok: false, status: 400, error: 'malformed' }
   }
-  const stored = await storeRow(env, row)
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(rawBody))
+  const bodySha256 = [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, '0')).join('')
+  const stored = await storeRow(env, row, {
+    webhookId: verdict.id,
+    keyId: verdict.keyId,
+    signedAt: verdict.signedAt,
+    signature: verdict.signature,
+    bodySha256,
+  })
   return { ok: true, status: 200, stored, id: verdict.id }
 }
