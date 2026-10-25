@@ -529,10 +529,30 @@ describe('api endpoints', () => {
     expect((await SELF.fetch('https://example.com/api/source/bad%20name')).status).toBe(400)
   })
 
+  it('applies the heavy-read limiter to campaign pages', async () => {
+    const limiter = { limit: async () => ({ success: false }) }
+    const res = await worker.fetch(
+      new Request('https://example.com/api/campaign/g003:x'),
+      { ...env, SEARCH_LIMITER: limiter },
+      { waitUntil: () => {} },
+    )
+    expect(res.status).toBe(429)
+  })
+
   it('handles CORS preflight', async () => {
     const res = await SELF.fetch('https://example.com/api/latest', { method: 'OPTIONS' })
     expect(res.status).toBe(204)
     expect(res.headers.get('access-control-allow-methods')).toContain('GET')
+  })
+
+  it('fails health closed on a schema mismatch', async () => {
+    await env.DB.prepare("UPDATE meta SET value = '1' WHERE key = 'schema'").run()
+    const res = await SELF.fetch('https://example.com/health')
+    expect(res.status).toBe(503)
+    const body = await res.json()
+    expect(body.ready).toBe(false)
+    expect(body.expected_schema).toBe('12')
+    await env.DB.prepare("UPDATE meta SET value = '12' WHERE key = 'schema'").run()
   })
 
   it('reports health from the database', async () => {
@@ -541,7 +561,9 @@ describe('api endpoints', () => {
     const body = await res.json()
     expect(body.status).toBe('ok')
     expect(body.db).toBe('ok')
-    expect(body.schema).toBe('1')
+    expect(body.schema).toBe('12')
+    expect(body.expected_schema).toBe('12')
+    expect(body.ready).toBe(true)
     expect(body.last).toBe(1777723200)
     expect(res.headers.get('cache-control')).toBe('no-store')
   })
@@ -678,6 +700,33 @@ describe('signed direct ingest', () => {
     expect(second.stored).toBe(false)
     const n = await env.DB.prepare('SELECT COUNT(*) AS n FROM notifications').first()
     expect(n.n).toBe(1)
+  })
+
+  it('deduplicates the same signed body under a new id', async () => {
+    const { privateKey, env: e } = await withKeys()
+    const ts = Math.floor(Date.now() / 1000)
+    const doc = '{"event":"trustsight.alerts","tool":"trustsight","title":"same"}'
+    const first = await ingestDocument(e, doc, headersFor('body-a', ts, await sign(privateKey, 'body-a', ts, doc)))
+    const second = await ingestDocument(e, doc, headersFor('body-b', ts, await sign(privateKey, 'body-b', ts, doc)))
+    expect(first.stored).toBe(true)
+    expect(second.ok).toBe(true)
+    expect(second.stored).toBe(false)
+    const n = await env.DB.prepare('SELECT COUNT(*) AS n FROM notifications').first()
+    expect(n.n).toBe(1)
+  })
+
+  it('verifies the signature over raw bytes, not a re-encoding', async () => {
+    const { privateKey, env: e } = await withKeys()
+    const ts = Math.floor(Date.now() / 1000)
+    const doc = '{"event":"trustsight.alerts","tool":"trustsight","title":"caf\u00e9"}'
+    const bytes = enc.encode(doc)
+    const sig = await sign(privateKey, 'bytes-1', ts, doc)
+    const res = await ingestDocument(e, bytes, headersFor('bytes-1', ts, sig))
+    expect(res.ok).toBe(true)
+    expect(res.stored).toBe(true)
+    const row = await env.DB.prepare('SELECT message_raw, body_sha256 FROM notifications WHERE id = ?').bind('bytes-1').first()
+    expect(row.message_raw).toBe(doc)
+    expect(row.body_sha256).toMatch(/^[0-9a-f]{64}$/)
   })
 
   it('refuses an unknown key id rather than falling back', async () => {

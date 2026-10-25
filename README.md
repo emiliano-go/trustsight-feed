@@ -27,6 +27,9 @@ that evidence:
 - Ingest verifies an Ed25519 signature over the raw document. The signature,
   key id and body hash are stored so `/api/messages/{slug}` can be checked
   later; `/api/keys` exposes only the public keys.
+- A daily checkpoint signs a Merkle root over a batch of notifications and
+  chains to the previous root, so deletion or reordering is detectable. Its
+  private key is a separate feed secret, never exposed by the API.
 
 The full model is at
 [docs.trustsight.org/security](https://docs.trustsight.org/security/). The rule
@@ -38,21 +41,22 @@ cannot quote an explanation the tool does not hold.
 Everything runs on Cloudflare free tiers. If a step ever requires a paid
 resource, stop.
 
-- **Cloudflare Worker** on a Cron Trigger polls the ntfy JSON API every five
-  minutes (`since=<cursor>`, so a cycle is one small request), parses each
-  `message` event, and upserts it into D1 keyed by the ntfy message id. A
-  document larger than ntfy's body limit arrives as an attachment (the body
-  is "You received a file"), so the poller fetches the attachment JSON before
-  parsing; an off-host attachment URL is refused. A cycle that gets a 5xx or a
-  network error is retried once, and a miss is harmless because ntfy caches
-  the message for the next cycle.
-- **D1 (SQLite)** stores the notifications, with an FTS5 index over package
-  names, rule ids, versions, titles and days for search.
+- **Cloudflare Worker** receives the watcher's signed POST at `/api/ingest`,
+  verifies the Ed25519 signature over the raw body, and stores one row per
+  notification in D1. The ntfy-shaped parser is kept as a parity path, not as
+  a poller.
+- **D1 (SQLite)** stores the notifications, the derived campaign/maintainer/
+  IOC event indexes, and the signed checkpoints. FTS5 indexes package names,
+  rule ids, versions, titles and days.
+- **A daily Cron Trigger** builds a signed Merkle checkpoint over the
+  notifications stored since the previous checkpoint.
 - **Static Assets** serve the Preact frontend from the same Worker. The
   detail routes (`/<YYYY-MM-DD>/<HHMMSS>/`) fall back to the app shell.
 
 ```
-ntfy topic  ->  Worker cron  ->  D1  ->  Worker /api  ->  Preact feed
+watcher --signed POST--> Worker --verify--> D1 --/api--> Preact feed
+                              |
+                              +--daily cron--> signed checkpoint
 ```
 
 ## Performance
@@ -113,10 +117,14 @@ A read-only JSON API over the same store, with an OpenAPI 3.1 description:
   the display string carries one.
 - `/api/iocs?format=json|ndjson|csv|stix` deduplicated IOC matches. CSV cells
   are quoted and formula-prefixed so a value cannot execute in a spreadsheet.
-- `/api/keys` the public Ed25519 keys that sign ingest requests.
+- `/api/keys` the public Ed25519 keys for ingest and archive checkpoints.
   `/api/messages/{slug}` carries the stored `verification` object.
   `node scripts/verify-feed.mjs <slug>` checks the Ed25519 signature and the
   body hash against the published key without trusting the store.
+- `/api/checkpoints`, `/api/checkpoints/{id}` and
+  `/api/checkpoints/{id}/proof?slug=...` the signed archive checkpoints and a
+  Merkle inclusion proof. `node scripts/verify-checkpoint.mjs <id> <slug>`
+  verifies the checkpoint signature and the notification's inclusion.
 - `/api/source/{package}?file=PKGBUILD` the analysed AUR file, unmodified, so a
   client can show the flagged lines. Only AUR repository files resolve; the
   host is fixed and the path is validated, so a finding cannot make the Worker
@@ -176,9 +184,20 @@ npm run verify:csp                      # inline theme script hash still pinned
 ```bash
 npx wrangler d1 create trustsight-feed          # put the id in wrangler.jsonc
 npm run db:apply                                # apply migrations (local or remote)
+npm run backfill:events -- --require-complete   # required once after 0008/0009
 npm run build
 npx wrangler deploy
 ```
+
+The backfill is mandatory before the Worker that reads the event indexes is
+deployed. CI runs it after migrations and before `wrangler deploy`; a failure
+stops the deployment. It is idempotent and can be re-run.
+
+The signed-checkpoint cron needs feed-owned secrets, set with `wrangler secret
+put`: `FEED_CHECKPOINT_PRIVATE_KEY` (Ed25519 PKCS#8, base64) and
+`FEED_CHECKPOINT_KEY_ID`; the public half is
+`FEED_CHECKPOINT_PUBLIC_KEY` (and optional `..._PREVIOUS_*` during rotation).
+The private key is never exposed by the API.
 
 Then attach the `watcher.trustsight.org` custom domain to the Worker.
 

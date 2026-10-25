@@ -47,6 +47,11 @@
   "routes": [
     { "pattern": "watcher.trustsight.org", "custom_domain": true }
   ],
+  // Daily signed checkpoint over the stored notification archive.  The
+  // private key is a Wrangler secret, never a var.
+  "triggers": {
+    "crons": ["0 0 * * *"]
+  },
   "vars": {
     "NTFY_SERVER": "https://ntfy.sh",
     "NTFY_TOPIC": "trustsight-aur-1d8a3fd2"

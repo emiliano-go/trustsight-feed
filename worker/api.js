@@ -1,8 +1,9 @@
 // Read API over the D1 store. Public data, so responses are CORS-open for
 // anyone who wants to consume the feed from another tool.
 
-import { campaignEvents, ftsQuery, fuzzyScore, iocEvents, maintainerEvents, maintainerKey, packageHistory, summarize } from './lib.js'
+import { ftsQuery, fuzzyScore, maintainerKey, packageHistory, summarize } from './lib.js'
 import { atomFeed, jsonFeed } from './feeds.js'
+import { merkleProof } from './checkpoints.js'
 import { openapiSpec } from './openapi.js'
 
 const DEFAULT_LIMIT = 50
@@ -33,6 +34,9 @@ const ENDPOINTS = [
   'GET /api/maintainer/{name}',
   'GET /api/iocs?format=json|ndjson|csv|stix',
   'GET /api/keys',
+  'GET /api/checkpoints',
+  'GET /api/checkpoints/{id}',
+  'GET /api/checkpoints/{id}/proof?slug=',
   'GET /api/stats',
 ]
 
@@ -40,10 +44,23 @@ const ENDPOINTS = [
 const TIMEFRAME_RE = /^(\d{2})(\d{2})?-(\d{2})(\d{2})?$/
 const HOUR_RE = /^(\d{2})$/
 
+function safeDecode(value) {
+  try { return decodeURIComponent(value) } catch { return null }
+}
+
+const EVENTS = new Set(['all', 'trustsight.alerts', 'trustsight.heartbeat'])
+
+function eventFilter(url, fallback) {
+  const value = url.searchParams.get('event') || fallback
+  return EVENTS.has(value) ? value : null
+}
+
 const CORS = {
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'GET, HEAD, OPTIONS',
   'access-control-allow-headers': 'content-type',
+  'x-content-type-options': 'nosniff',
+  'referrer-policy': 'no-referrer',
 }
 
 function json(data, status = 200) {
@@ -263,10 +280,12 @@ async function getBySlug(env, slug) {
 }
 
 async function feed(env, url) {
+  const event = eventFilter(url, 'trustsight.alerts')
+  if (event === null) return json({ error: 'bad_event' }, 400)
   return listResponse(env, url, {
     query: { source: 'feed' },
     q: url.searchParams.get('q'),
-    event: url.searchParams.get('event') || 'trustsight.alerts',
+    event,
     day: url.searchParams.get('day') || undefined,
     from: url.searchParams.get('from') || undefined,
     to: url.searchParams.get('to') || undefined,
@@ -290,11 +309,13 @@ async function latestN(env, url, n) {
 async function byDate(env, url, date, timeframe) {
   const window = dateWindow(date, timeframe)
   if (!window) return json({ error: 'bad_date_or_timeframe', date, timeframe }, 400)
+  const event = eventFilter(url, 'all')
+  if (event === null) return json({ error: 'bad_event' }, 400)
   return listResponse(env, url, {
     query: { source: 'date', date, timeframe: timeframe || null },
     from: window.from,
     to: window.to,
-    event: url.searchParams.get('event') || 'all',
+    event,
   })
 }
 
@@ -329,43 +350,12 @@ async function message(env, slug) {
   return json(item)
 }
 
-const PUBLIC_ID_RE = /^[^\x00-\x1f\x7f/]{1,255}$/
+const PUBLIC_ID_RE = /^[^\x00-\x1f\x7f/\\]{1,255}$/
 
 function publicId(value, max = 255) {
   const text = String(value || '').trim()
   if (!text || text.length > max || !PUBLIC_ID_RE.test(text)) return ''
   return text
-}
-
-/** Rebuild a legacy campaign's rows from stored payloads, bounded. */
-async function legacyCampaignRows(env, campaignId) {
-  const rule = campaignId.startsWith('legacy:') ? campaignId.split(':')[1] : ''
-  if (!rule) return []
-  const fts = ftsQuery(rule)
-  if (!fts) return []
-  const { results } = await env.DB.prepare(
-    `SELECT n.slug, n.time, n.payload
-       FROM notifications n
-       JOIN notifications_fts f ON f.rowid = n.rowid
-      WHERE f.notifications_fts MATCH ? AND n.event = 'trustsight.alerts'
-      ORDER BY n.time DESC, n.rowid ASC
-      LIMIT 500`
-  ).bind(fts).all()
-  const rows = []
-  for (const row of results || []) {
-    let payload = {}
-    try { payload = JSON.parse(row.payload || '{}') } catch { continue }
-    for (const event of campaignEvents(payload)) {
-      if (event.campaign_id !== campaignId) continue
-      rows.push({
-        ...event, time: row.time, slug: row.slug,
-        maintainer: event.maintainer || '',
-        previous_maintainer: event.previous_maintainer || '',
-        version: event.version || '',
-      })
-    }
-  }
-  return rows.sort((a, b) => a.time - b.time || a.slug.localeCompare(b.slug))
 }
 
 async function campaigns(env, url) {
@@ -392,9 +382,7 @@ async function campaignDetail(env, id) {
       WHERE e.campaign_id = ?
       ORDER BY e.time ASC, e.slug ASC, e.package ASC`
   ).bind(campaignId).all()
-  const rows = (results && results.length)
-    ? results
-    : await legacyCampaignRows(env, campaignId)
+  const rows = results || []
   if (!rows.length) return json({ error: 'not_found' }, 404)
   const events = new Map()
   const members = new Map()
@@ -435,29 +423,11 @@ async function campaignDetail(env, id) {
   })
 }
 
-/** Rebuild a maintainer's rows from stored payloads, bounded. */
-async function legacyMaintainerRows(env, key) {
-  const { results } = await env.DB.prepare(
-    `SELECT slug, time, payload FROM notifications
-      WHERE event = 'trustsight.alerts'
-      ORDER BY time DESC, rowid ASC
-      LIMIT 500`
-  ).all()
-  const rows = []
-  for (const row of results || []) {
-    let payload = {}
-    try { payload = JSON.parse(row.payload || '{}') } catch { continue }
-    for (const event of maintainerEvents(payload)) {
-      if (event.maintainer_key !== key) continue
-      rows.push({ ...event, time: row.time, slug: row.slug })
-    }
-  }
-  return rows.sort((a, b) => b.time - a.time || b.slug.localeCompare(a.slug))
-}
-
 async function maintainerDetail(env, name, url) {
   const display = String(name || '').trim()
-  if (!display || display.length > 255) return json({ error: 'bad_maintainer' }, 400)
+  if (!display || display.length > 255 || /[\x00-\x1f\x7f]/.test(display)) {
+    return json({ error: 'bad_maintainer' }, 400)
+  }
   const key = maintainerKey(display)
   const limit = clampInt(url.searchParams.get('limit'), 100, 1, MAX_LIMIT)
   const { results } = await env.DB.prepare(
@@ -467,9 +437,7 @@ async function maintainerDetail(env, name, url) {
       ORDER BY time DESC, slug DESC
       LIMIT ?`
   ).bind(key, limit).all()
-  const rows = (results && results.length)
-    ? results
-    : await legacyMaintainerRows(env, key)
+  const rows = results || []
   if (!rows.length) {
     return json({ maintainer: display, key, available: false, packages: [],
                   transitions: [], campaigns: [], recent_alerts: [] })
@@ -514,7 +482,7 @@ function csvCell(value) {
   let text = String(value ?? '')
   // A spreadsheet treats a leading = + - @ as a formula.  Prefix it so an
   // IOC value is inert when the CSV is opened, not only when it is read.
-  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`
+  if (/^[ \t\r]*[=+\-@]/.test(text)) text = `'${text}`
   return `"${text.replace(/"/g, '""')}"`
 }
 
@@ -536,7 +504,7 @@ function iocStix(rows) {
     return {
       type: 'indicator',
       spec_version: '2.1',
-      id: `indicator--${index + 1}`,
+      id: `indicator--${crypto.randomUUID()}`,
       created: new Date((row.first || 0) * 1000).toISOString(),
       modified: new Date((row.last || 0) * 1000).toISOString(),
       name: indicator,
@@ -548,24 +516,6 @@ function iocStix(rows) {
     }
   })
   return { type: 'bundle', id: 'bundle--trustsight-iocs', objects }
-}
-
-async function legacyIocRows(env) {
-  const { results } = await env.DB.prepare(
-    `SELECT slug, time, payload FROM notifications
-      WHERE event = 'trustsight.alerts'
-      ORDER BY time DESC, rowid ASC
-      LIMIT 500`
-  ).all()
-  const rows = []
-  for (const row of results || []) {
-    let payload = {}
-    try { payload = JSON.parse(row.payload || '{}') } catch { continue }
-    for (const event of iocEvents(payload)) {
-      rows.push({ ...event, first: row.time, last: row.time, count: 1, last_slug: row.slug })
-    }
-  }
-  return rows
 }
 
 async function iocs(env, url) {
@@ -587,14 +537,11 @@ async function iocs(env, url) {
       ORDER BY last DESC, indicator ASC
       LIMIT ?`
   ).bind(...params, limit).all()
-  let rows = results || []
-  if (!rows.length) {
-    // Fall back only when the event index is empty overall.  A filter that
-    // matched nothing must stay empty, not resurrect the unscanned corpus.
-    const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM ioc_events').first()
-    if (!count || !Number(count.n)) rows = await legacyIocRows(env)
-  }
+  const rows = results || []
   const format = String(url.searchParams.get('format') || 'json').toLowerCase()
+  if (!['json', 'ndjson', 'csv', 'stix'].includes(format)) {
+    return json({ error: 'bad_format' }, 400)
+  }
   if (format === 'csv') {
     const lines = ['indicator,package,first_seen,last_seen,count,last_slug']
     for (const row of rows) {
@@ -622,10 +569,12 @@ async function iocs(env, url) {
 }
 
 async function syndication(env, url, format) {
+  const event = eventFilter(url, 'trustsight.alerts')
+  if (event === null) return json({ error: 'bad_event' }, 400)
   const { items } = await listQuery(env, {
     ...pageFrom(url),
     q: url.searchParams.get('q'),
-    event: url.searchParams.get('event') || 'trustsight.alerts',
+    event,
     day: url.searchParams.get('day') || undefined,
     from: url.searchParams.get('from') || undefined,
     to: url.searchParams.get('to') || undefined,
@@ -643,13 +592,74 @@ async function syndication(env, url, format) {
     { headers: { 'content-type': 'application/feed+json; charset=utf-8', 'cache-control': 'public, max-age=60', ...CORS } })
 }
 
+async function checkpoints(env, url) {
+  const limit = clampInt(url.searchParams.get('limit'), DEFAULT_LIMIT, 1, MAX_LIMIT)
+  const { results } = await env.DB.prepare(
+    `SELECT id, generated_at, from_rowid, through_rowid, count, previous_id,
+            previous_root, root_hash, key_id, algorithm, signature
+       FROM feed_checkpoints
+      WHERE complete = 1
+      ORDER BY generated_at DESC, id DESC
+      LIMIT ?`
+  ).bind(limit).all()
+  return json({ count: (results || []).length, items: results || [] })
+}
+
+async function checkpointDetail(env, id) {
+  const checkpointId = publicId(id)
+  if (!checkpointId) return json({ error: 'bad_checkpoint' }, 400)
+  const checkpoint = await env.DB.prepare(
+    'SELECT * FROM feed_checkpoints WHERE id = ? AND complete = 1'
+  ).bind(checkpointId).first()
+  if (!checkpoint) return json({ error: 'not_found' }, 404)
+  return json(checkpoint)
+}
+
+async function checkpointProof(env, id, url) {
+  const checkpointId = publicId(id)
+  if (!checkpointId) return json({ error: 'bad_checkpoint' }, 400)
+  const slug = String(url.searchParams.get('slug') || '')
+  if (!/^\d{4}-\d{2}-\d{2}\/\d{6}(?:-[A-Za-z0-9_-]+)?$/.test(slug)) {
+    return json({ error: 'bad_slug' }, 400)
+  }
+  const checkpoint = await env.DB.prepare(
+    'SELECT * FROM feed_checkpoints WHERE id = ? AND complete = 1'
+  ).bind(checkpointId).first()
+  if (!checkpoint) return json({ error: 'not_found' }, 404)
+  const { results } = await env.DB.prepare(
+    `SELECT slug, leaf_hash, leaf_index
+       FROM feed_checkpoint_leaves
+      WHERE checkpoint_id = ?
+      ORDER BY leaf_index ASC`
+  ).bind(checkpointId).all()
+  const rows = results || []
+  const index = rows.findIndex((row) => row.slug === slug)
+  if (index < 0) return json({ error: 'not_in_checkpoint' }, 404)
+  const { path, root } = await merkleProof(rows.map((row) => row.leaf_hash), index)
+  return json({
+    checkpoint_id: checkpointId,
+    slug,
+    leaf_hash: rows[index].leaf_hash,
+    leaf_index: index,
+    audit_path: path,
+    root_hash: root,
+    checkpoint_root: checkpoint.root_hash,
+  })
+}
+
 function publicKeys(env) {
   const keys = []
   if (env.INGEST_KEY_ID && env.INGEST_PUBLIC_KEY) {
-    keys.push({ id: env.INGEST_KEY_ID, public_key: env.INGEST_PUBLIC_KEY, current: true })
+    keys.push({ id: env.INGEST_KEY_ID, public_key: env.INGEST_PUBLIC_KEY, current: true, purpose: 'ingest' })
   }
   if (env.INGEST_PREVIOUS_KEY_ID && env.INGEST_PUBLIC_KEY_PREVIOUS) {
-    keys.push({ id: env.INGEST_PREVIOUS_KEY_ID, public_key: env.INGEST_PUBLIC_KEY_PREVIOUS, current: false })
+    keys.push({ id: env.INGEST_PREVIOUS_KEY_ID, public_key: env.INGEST_PUBLIC_KEY_PREVIOUS, current: false, purpose: 'ingest' })
+  }
+  if (env.FEED_CHECKPOINT_KEY_ID && env.FEED_CHECKPOINT_PUBLIC_KEY) {
+    keys.push({ id: env.FEED_CHECKPOINT_KEY_ID, public_key: env.FEED_CHECKPOINT_PUBLIC_KEY, current: true, purpose: 'checkpoint' })
+  }
+  if (env.FEED_CHECKPOINT_PREVIOUS_KEY_ID && env.FEED_CHECKPOINT_PUBLIC_KEY_PREVIOUS) {
+    keys.push({ id: env.FEED_CHECKPOINT_PREVIOUS_KEY_ID, public_key: env.FEED_CHECKPOINT_PUBLIC_KEY_PREVIOUS, current: false, purpose: 'checkpoint' })
   }
   return json({ keys })
 }
@@ -676,7 +686,13 @@ async function stats(env) {
   ).first()
   const tool_version = extractToolVersion(latest && latest.payload)
   if (tool_version) row.tool_version = tool_version
-  return json(row)
+  const counts = await env.DB.prepare(
+    `SELECT (SELECT COUNT(*) FROM campaign_events) AS campaigns,
+            (SELECT COUNT(*) FROM maintainer_events) AS maintainers,
+            (SELECT COUNT(*) FROM ioc_events) AS ioc_events,
+            (SELECT COUNT(*) FROM feed_checkpoints WHERE complete = 1) AS checkpoints`
+  ).first()
+  return json({ ...row, ...(counts || {}) })
 }
 
 /** The tool_version a stored payload JSON carries, when it has one. */
@@ -834,7 +850,7 @@ async function fetchRepoFiles(name) {
     })
     if (!res.ok) return []
     const html = await res.text()
-    const names = [...html.matchAll(/\/cgit\/aur\.git\/tree\/([^'"?]+)\?h=/g)].map((m) => decodeURIComponent(m[1]))
+    const names = [...html.matchAll(/\/cgit\/aur\.git\/tree\/([^'"?]+)\?h=/g)].map((m) => safeDecode(m[1])).filter(Boolean)
     return [...new Set(names)]
   } catch {
     return []
@@ -921,7 +937,7 @@ async function source(env, url, name) {
 }
 
 /** Dispatch an API request, or return null when the path is not ours. */
-export async function handleApi(request, env, url) {
+async function handleApiUnsafe(request, env, url) {
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS })
   }
@@ -937,6 +953,7 @@ export async function handleApi(request, env, url) {
   if (path === '/api/feed.atom') return syndication(env, url, 'atom')
   if (path === '/api/feed.json') return syndication(env, url, 'json')
   if (path === '/api/keys') return publicKeys(env)
+  if (path === '/api/checkpoints') return checkpoints(env, url)
   if (path === '/api/campaigns') return campaigns(env, url)
   if (path === '/api/iocs') return iocs(env, url)
   if (path === '/api/feed') return feed(env, url)
@@ -948,38 +965,71 @@ export async function handleApi(request, env, url) {
     return latestN(env, url, clampInt(match[1], 1, 1, MAX_LIMIT))
   }
   if ((match = path.match(/^\/api\/date\/([0-9-]+)\/([^/]+)$/))) {
-    return byDate(env, url, match[1], decodeURIComponent(match[2]))
+    const timeframe = match[2] ? safeDecode(match[2]) : null
+    if (match[2] && timeframe === null) return json({ error: 'bad_path' }, 400)
+    return byDate(env, url, match[1], timeframe)
   }
   if ((match = path.match(/^\/api\/date\/([0-9-]+)$/))) {
     return byDate(env, url, match[1], null)
   }
   if ((match = path.match(/^\/api\/package\/(.+)\/history$/))) {
-    return packageHistoryResponse(env, decodeURIComponent(match[1]))
+    const name = safeDecode(match[1])
+    if (name === null) return json({ error: 'bad_path' }, 400)
+    return packageHistoryResponse(env, name)
   }
   if ((match = path.match(/^\/api\/package\/(.+)$/))) {
-    return bySearch(env, url, decodeURIComponent(match[1]))
+    const term = safeDecode(match[1])
+    if (term === null) return json({ error: 'bad_path' }, 400)
+    return bySearch(env, url, term)
+  }
+  if ((match = path.match(/^\/api\/checkpoints\/([^/]+)\/proof$/))) {
+    const id = safeDecode(match[1])
+    if (id === null) return json({ error: 'bad_path' }, 400)
+    return checkpointProof(env, id, url)
+  }
+  if ((match = path.match(/^\/api\/checkpoints\/([^/]+)$/))) {
+    const id = safeDecode(match[1])
+    if (id === null) return json({ error: 'bad_path' }, 400)
+    return checkpointDetail(env, id)
   }
   if ((match = path.match(/^\/api\/campaign\/(.+)$/))) {
-    return campaignDetail(env, decodeURIComponent(match[1]))
+    const id = safeDecode(match[1])
+    if (id === null) return json({ error: 'bad_path' }, 400)
+    return campaignDetail(env, id)
   }
   if ((match = path.match(/^\/api\/maintainer\/(.+)$/))) {
-    return maintainerDetail(env, decodeURIComponent(match[1]), url)
+    const name = safeDecode(match[1])
+    if (name === null) return json({ error: 'bad_path' }, 400)
+    return maintainerDetail(env, name, url)
   }
   if ((match = path.match(/^\/api\/rule\/(.+)$/))) {
     return bySearch(env, url, decodeURIComponent(match[1]))
   }
   if ((match = path.match(/^\/api\/source\/(.+)$/))) {
-    return source(env, url, decodeURIComponent(match[1]))
+    const name = safeDecode(match[1])
+    if (name === null) return json({ error: 'bad_path' }, 400)
+    return source(env, url, name)
   }
   if ((match = path.match(/^\/api\/diff\/(.+)$/))) {
-    return diff(env, url, decodeURIComponent(match[1]))
+    const name = safeDecode(match[1])
+    if (name === null) return json({ error: 'bad_path' }, 400)
+    return diff(env, url, name)
   }
   if (path === '/api/maintainers') return maintainers(env, url)
   if (path.startsWith('/api/messages/')) {
-    const slug = decodeURIComponent(path.slice('/api/messages/'.length))
+    const slug = safeDecode(path.slice('/api/messages/'.length))
+    if (slug === null) return json({ error: 'bad_path' }, 400)
     if (!slug) return json({ error: 'not_found' }, 404)
     return message(env, slug)
   }
 
   return json({ error: 'not_found', endpoints: ENDPOINTS }, 404)
+}
+
+export async function handleApi(request, env, url) {
+  try {
+    return await handleApiUnsafe(request, env, url)
+  } catch {
+    return json({ error: 'internal' }, 500)
+  }
 }

@@ -23,6 +23,8 @@ jobs:
       - run: npm ci
       - run: python scripts/build_rule_catalog.py --check
       - run: npm run verify:csp
+      - run: npm run verify:schema
+      - run: npm run verify:syntax
       - run: npm run build
       - run: npm test
 
@@ -64,6 +66,13 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: d1 migrations apply trustsight-feed --remote
+      - name: Backfill the event indexes
+        if: steps.cf.outputs.have == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          D1_DATABASE_ID: 541b4a69-29ae-422a-ad38-6076c5ae0b54
+        run: node scripts/backfill-events.mjs --require-complete
       - name: Deploy the Worker
         if: steps.cf.outputs.have == 'true'
         uses: cloudflare/wrangler-action@v3

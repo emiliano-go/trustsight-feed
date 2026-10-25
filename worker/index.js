@@ -1,5 +1,7 @@
 import { handleApi } from './api.js'
 import { ingestDocument, MAX_BODY_BYTES } from './ingest.js'
+import { runCheckpoint } from './checkpoints.js'
+import { EXPECTED_SCHEMA } from './schema.js'
 
 function rateLimited() {
   return new Response(JSON.stringify({ error: 'rate_limited' }), {
@@ -8,6 +10,8 @@ function rateLimited() {
       'content-type': 'application/json; charset=utf-8',
       'retry-after': '60',
       'access-control-allow-origin': '*',
+      'x-content-type-options': 'nosniff',
+      'referrer-policy': 'no-referrer',
     },
   })
 }
@@ -31,6 +35,8 @@ const CACHE_TTLS = [
   [/^\/api\/maintainer\//, 60],
   [/^\/api\/iocs$/, 60],
   [/^\/api\/keys$/, 3600],
+  [/^\/api\/checkpoints$/, 60],
+  [/^\/api\/checkpoints\//, 60],
   [/^\/api\/latest(?:\/\d+)?$/, 30],
   [/^\/api\/date\//, 60],
   [/^\/api\/package\/[^/]+\/history$/, 60],
@@ -58,7 +64,12 @@ function apiCache() {
 /** Search routes are the only ones that can scan a fuzzy window. */
 function isSearchRequest(url) {
   if (url.pathname.startsWith('/api/package/') || url.pathname.startsWith('/api/rule/')) return true
-  return url.pathname === '/api/feed' && Boolean((url.searchParams.get('q') || '').trim())
+  if (url.pathname.startsWith('/api/maintainer/')) return true
+  if (url.pathname.startsWith('/api/campaign/')) return true
+  if (url.pathname === '/api/iocs') return true
+  if (url.pathname.startsWith('/api/checkpoints/')) return true
+  return ['/api/feed', '/api/feed.atom', '/api/feed.json'].includes(url.pathname)
+    && Boolean((url.searchParams.get('q') || '').trim())
 }
 
 async function cachedApi(request, env, ctx, url) {
@@ -91,13 +102,39 @@ async function health(env) {
   try {
     const schema = await env.DB.prepare('SELECT value FROM meta WHERE key = ?').bind('schema').first()
     const last = await env.DB.prepare('SELECT MAX(time) AS t FROM notifications').first()
+    const checkpoint = await env.DB.prepare(
+      `SELECT id, generated_at, through_rowid FROM feed_checkpoints
+        WHERE complete = 1 ORDER BY generated_at DESC, id DESC LIMIT 1`
+    ).first()
+    const metaRows = await env.DB.prepare(
+      `SELECT key, value FROM meta WHERE key IN
+        ('last_ingest_ok_at', 'events_backfill_at', 'events_backfill_through_rowid')`
+    ).all()
+    const meta = Object.fromEntries((metaRows.results || []).map((row) => [row.key, row.value]))
+    const current = schema ? String(schema.value) : null
+    const ready = current === EXPECTED_SCHEMA
+    const age = checkpoint ? Math.max(0, Math.floor(Date.now() / 1000) - checkpoint.generated_at) : null
     return new Response(JSON.stringify({
-      status: 'ok',
+      status: ready ? 'ok' : 'degraded',
       time: new Date().toISOString(),
       db: 'ok',
-      schema: schema ? schema.value : null,
+      schema: current,
+      expected_schema: EXPECTED_SCHEMA,
+      ready,
       last: last ? last.t : null,
-    }), { status: 200, headers })
+      last_ingest: meta.last_ingest_ok_at || null,
+      backfill: {
+        at: meta.events_backfill_at || null,
+        through_rowid: meta.events_backfill_through_rowid || null,
+      },
+      checkpoint: checkpoint ? {
+        id: checkpoint.id,
+        generated_at: checkpoint.generated_at,
+        through_rowid: checkpoint.through_rowid,
+        age_seconds: age,
+        fresh: age !== null && age <= 48 * 3600,
+      } : null,
+    }), { status: ready ? 200 : 503, headers })
   } catch (err) {
     return new Response(JSON.stringify({
       status: 'degraded',
@@ -108,14 +145,18 @@ async function health(env) {
   }
 }
 
-/** Read a request body without trusting its declared length (A4). */
+/** Read a request body without trusting its declared length (A4).
+ *
+ * The bytes are kept for the Ed25519 check and the body hash; the decoded text
+ * is only for JSON parsing and storage.  A signature must cover what the
+ * sender signed, not a re-encoding of it.
+ */
 export async function readBodyCapped(request, limit = MAX_BODY_BYTES) {
   const declared = Number(request.headers.get('content-length') || 0)
-  if (declared > limit) return { tooLarge: true, text: '' }
-  if (!request.body) return { tooLarge: false, text: '' }
+  if (declared > limit) return { tooLarge: true, text: '', bytes: new Uint8Array() }
+  if (!request.body) return { tooLarge: false, text: '', bytes: new Uint8Array() }
   const reader = request.body.getReader()
-  const decoder = new TextDecoder()
-  let text = ''
+  const chunks = []
   let size = 0
   while (true) {
     const { done, value } = await reader.read()
@@ -123,12 +164,17 @@ export async function readBodyCapped(request, limit = MAX_BODY_BYTES) {
     size += value.byteLength
     if (size > limit) {
       await reader.cancel()
-      return { tooLarge: true, text: '' }
+      return { tooLarge: true, text: '', bytes: new Uint8Array() }
     }
-    text += decoder.decode(value, { stream: true })
+    chunks.push(value)
   }
-  text += decoder.decode()
-  return { tooLarge: false, text }
+  const bytes = new Uint8Array(size)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return { tooLarge: false, text: new TextDecoder().decode(bytes), bytes }
 }
 
 /** POST /api/ingest: verify the Ed25519 signature, then store the document. */
@@ -141,8 +187,7 @@ async function ingest(request, env) {
   if (payload.tooLarge) {
     return new Response(JSON.stringify({ error: 'too_large' }), { status: 413, headers: json })
   }
-  const raw = payload.text
-  const result = await ingestDocument(env, raw, request.headers)
+  const result = await ingestDocument(env, payload.bytes, request.headers)
   const status = result.status || (result.ok ? 200 : 401)
   const body = result.ok ? { stored: result.stored, id: result.id } : { error: result.error }
   return new Response(JSON.stringify(body), { status, headers: json })
@@ -193,5 +238,13 @@ export default {
     // Static frontend; `not_found_handling: single-page-application` turns
     // the detail routes (/<date>/<time>/) into the app shell.
     return env.ASSETS.fetch(request)
+  },
+
+  async scheduled(_event, env, ctx) {
+    // A failed checkpoint must not kill the scheduled invocation; /health and
+    // the logs carry the failure, and the next run extends the same state.
+    ctx.waitUntil(runCheckpoint(env).catch((err) => {
+      console.error('checkpoint failed', String(err && err.message ? err.message : err))
+    }))
   },
 }

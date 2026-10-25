@@ -14,7 +14,11 @@
     "verify:rules": "python scripts/build_rule_catalog.py --check",
     "verify:csp": "node scripts/verify-csp.mjs",
     "deploy": "npm run build && wrangler deploy",
-    "db:apply": "wrangler d1 migrations apply trustsight-feed"
+    "db:apply": "wrangler d1 migrations apply trustsight-feed",
+    "backfill:events": "node scripts/backfill-events.mjs",
+    "verify:schema": "node scripts/verify-schema.mjs",
+    "verify:checkpoint": "node scripts/verify-checkpoint.mjs",
+    "verify:syntax": "node scripts/verify-syntax.mjs"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.8.0",

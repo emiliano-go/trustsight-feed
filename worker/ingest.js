@@ -42,7 +42,13 @@ async function importPublicKey(spkiB64) {
  * `{ ok: false, status, error }`: 401 for a missing/stale/unknown/bad
  * signature, 400 for a missing header shape.
  */
+function rawBytes(value) {
+  if (value instanceof Uint8Array) return value
+  return new TextEncoder().encode(String(value ?? ''))
+}
+
 export async function verifyIngest(env, headers, rawBody) {
+  const bytes = rawBytes(rawBody)
   const id = headers.get('webhook-id') || ''
   const time = Number(headers.get('webhook-timestamp'))
   const keyId = headers.get('webhook-key-id') || ''
@@ -68,7 +74,10 @@ export async function verifyIngest(env, headers, rawBody) {
   } catch {
     return { ok: false, status: 401, error: 'bad_signature' }
   }
-  const data = new TextEncoder().encode(`${id}.${time}.${rawBody}`)
+  const prefix = new TextEncoder().encode(`${id}.${time}.`)
+  const data = new Uint8Array(prefix.length + bytes.length)
+  data.set(prefix, 0)
+  data.set(bytes, prefix.length)
   let valid = false
   try {
     valid = await crypto.subtle.verify('Ed25519', key, sig, data)
@@ -86,19 +95,21 @@ export async function verifyIngest(env, headers, rawBody) {
  * Returns `{ ok, status, stored, id, error }`.
  */
 export async function ingestDocument(env, rawBody, headers) {
-  const verdict = await verifyIngest(env, headers, rawBody)
+  const bytes = rawBytes(rawBody)
+  const text = rawBody instanceof Uint8Array ? new TextDecoder().decode(bytes) : String(rawBody ?? '')
+  const verdict = await verifyIngest(env, headers, bytes)
   if (!verdict.ok) return verdict
   const title = headers.get('Title') || ''
   let row
   try {
     row = parseNotification({
       id: verdict.id, time: verdict.time, event: 'message', topic: '',
-      title, message: rawBody,
+      title, message: text,
     })
   } catch {
     return { ok: false, status: 400, error: 'malformed' }
   }
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(rawBody))
+  const digest = await crypto.subtle.digest('SHA-256', bytes)
   const bodySha256 = [...new Uint8Array(digest)]
     .map((byte) => byte.toString(16).padStart(2, '0')).join('')
   const stored = await storeRow(env, row, {
@@ -108,5 +119,16 @@ export async function ingestDocument(env, rawBody, headers) {
     signature: verdict.signature,
     bodySha256,
   })
+  // A successful verified request is the liveness signal for ingest.  The
+  // write is bounded to one row and contains no document content.
+  try {
+    const now = String(Math.floor(Date.now() / 1000))
+    await env.DB.prepare(
+      `INSERT INTO meta (key, value) VALUES ('last_ingest_ok_at', ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+    ).bind(now).run()
+  } catch {
+    /* observability must never fail an accepted notification */
+  }
   return { ok: true, status: 200, stored, id: verdict.id }
 }

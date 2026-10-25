@@ -92,14 +92,13 @@ describe('event APIs', () => {
     expect(detail.timeline[0].slug).toBe('2026-05-02/120000')
   })
 
-  it('falls back to stored payloads for a legacy campaign id', async () => {
+  it('requires the backfill: an unindexed campaign is not served from a scan', async () => {
     const legacy = campaignEvents({ campaign_cluster: [{ rule_id: 'G003', members: ['adopted', 'other'] }] })[0].campaign_id
     const doc = { ...PAYLOAD, campaign_cluster: [{ rule_id: 'G003', members: ['adopted', 'other'] }] }
     await ingest({ message: JSON.stringify(doc) })
     await env.DB.exec('DELETE FROM campaign_events')
-    const detail = await (await SELF.fetch(`https://example.com/api/campaign/${encodeURIComponent(legacy)}`)).json()
-    expect(detail.id).toBe(legacy)
-    expect(detail.members.length).toBe(2)
+    const res = await SELF.fetch(`https://example.com/api/campaign/${encodeURIComponent(legacy)}`)
+    expect(res.status).toBe(404)
   })
 
   it('serves a maintainer page', async () => {
@@ -120,6 +119,7 @@ describe('event APIs', () => {
     const stix = await (await SELF.fetch('https://example.com/api/iocs?format=stix')).json()
     expect(stix.type).toBe('bundle')
     expect(stix.objects[0].pattern).toContain('domain-name')
+    expect(stix.objects[0].id).toMatch(/^indicator--[0-9a-f-]{36}$/)
   })
 
   it('serves Atom and JSON Feed projections', async () => {
@@ -137,19 +137,31 @@ describe('event APIs', () => {
       ...PAYLOAD,
       alerts: [{ package: 'x<script>', rule_id: 'H001' }],
       campaign_cluster: [],
-      ioc_matches: [{ package: 'adopted', indicator: '=HYPERLINK("x")' }],
+      ioc_matches: [{ package: 'adopted', indicator: '  =HYPERLINK("x")' }],
     }
     await ingest({ message: JSON.stringify(doc) })
     const atom = await (await SELF.fetch('https://example.com/api/feed.atom')).text()
     expect(atom).not.toContain('<script>')
     expect(atom).toContain('&lt;script&gt;')
     const csv = await (await SELF.fetch('https://example.com/api/iocs?format=csv')).text()
-    expect(csv).toContain("'=HYPERLINK")
+    expect(csv).toContain("'  =HYPERLINK")
   })
 
   it('rejects path-like campaign ids', async () => {
     const res = await SELF.fetch('https://example.com/api/campaign/..%2Fsecret')
     expect(res.status).toBe(400)
+  })
+
+  it('rejects malformed paths and unknown filters', async () => {
+    expect((await SELF.fetch('https://example.com/api/campaign/%ZZ')).status).toBe(400)
+    expect((await SELF.fetch('https://example.com/api/feed?event=nope')).status).toBe(400)
+    expect((await SELF.fetch('https://example.com/api/iocs?format=xml')).status).toBe(400)
+  })
+
+  it('sets hardening headers on API responses', async () => {
+    const res = await SELF.fetch('https://example.com/api/feed')
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(res.headers.get('referrer-policy')).toBe('no-referrer')
   })
 
   it('keeps the ingest signature on the message', async () => {

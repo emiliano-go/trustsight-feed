@@ -4,6 +4,8 @@
 
 import { buildEventIndex, isTrustSightNotification, parseNotification } from './lib.js'
 
+const MAX_BATCH_STATEMENTS = 100
+
 async function insertRow(env, row, slug, verification = null) {
   let payload = {}
   try { payload = JSON.parse(row.payload || '{}') } catch { /* keep {} */ }
@@ -51,7 +53,17 @@ async function insertRow(env, row, slug, verification = null) {
        VALUES (?, ?, ?, ?)`
     ).bind(event.indicator, event.package, row.time, slug))
   }
-  await env.DB.batch(statements)
+  if (statements.length <= MAX_BATCH_STATEMENTS) {
+    await env.DB.batch(statements)
+    return
+  }
+  // A hostile document can name many members.  Keep the notification as the
+  // source of truth and write the derived index in bounded chunks; a failed
+  // event chunk leaves the notification readable through the API fallbacks.
+  await env.DB.batch(statements.slice(0, 1))
+  for (let i = 1; i < statements.length; i += MAX_BATCH_STATEMENTS) {
+    await env.DB.batch(statements.slice(i, i + MAX_BATCH_STATEMENTS))
+  }
 }
 
 /**
@@ -64,20 +76,31 @@ export async function storeRow(env, row, verification = null) {
   // The feed is public; only store documents the watcher marks as its own.
   if (!isTrustSightNotification(row)) return false
 
-  // One read covers both checks: the natural id and the same-second slug.
+  // One read covers the id, the same-second slug and a replayed body.  The
+  // unique body hash also closes the race in the database.
   const { results } = await env.DB.prepare(
-    'SELECT id, slug FROM notifications WHERE id = ? OR slug = ? LIMIT 2'
-  ).bind(row.id, row.slug).all()
+    'SELECT id, slug, body_sha256 FROM notifications WHERE id = ? OR slug = ? OR (body_sha256 IS NOT NULL AND body_sha256 = ?) LIMIT 3'
+  ).bind(row.id, row.slug, verification ? verification.bodySha256 : null).all()
   const hits = results || []
   if (hits.some((hit) => hit.id === row.id)) return false
+  if (verification && hits.some(
+    (hit) => hit.body_sha256 && hit.body_sha256 === verification.bodySha256)) {
+    // A captured signed body replayed under a new webhook id is not a new
+    // notification.  The unique index is the final guard against the race.
+    return false
+  }
   const slugTaken = hits.some((hit) => hit.slug === row.slug)
   const slug = slugTaken ? `${row.slug}-${row.id}` : row.slug
 
   try {
     await insertRow(env, row, slug, verification)
   } catch (err) {
+    const message = String(err && err.message)
+    if (/UNIQUE constraint failed: notifications\.body_sha256/.test(message)) {
+      return false
+    }
     // A concurrent same-second writer took the slug between read and insert.
-    if (!/UNIQUE constraint failed: notifications\.slug/.test(String(err && err.message))) throw err
+    if (!/UNIQUE constraint failed: notifications\.slug/.test(message)) throw err
     await insertRow(env, row, `${row.slug}-${row.id}`, verification)
   }
   return true

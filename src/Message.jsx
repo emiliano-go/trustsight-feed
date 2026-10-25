@@ -1464,9 +1464,9 @@ export function Message({ slug }) {
             <MaintainersSection packages={allPackages} />
             <Refusals refusals={payload.refusals || []} />
             <IocSection matches={ioc} />
+            <Campaigns payload={payload} />
             <AlertList alerts={alerts} overPackages={overPackages} iocPackages={iocPackages} />
             <PackageSections packages={packages} iocPackages={iocPackages} />
-            <Campaigns payload={payload} />
 
             {!alerts.length && !packages.length && !ioc.length && !alertingClusters(payload).length && !(payload.impersonation || []).length && !(payload.refusals || []).length ? (
               <p className="feed-empty">This document carries no alerts, packages, indicators or campaigns.</p>

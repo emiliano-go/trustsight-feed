@@ -421,8 +421,33 @@ export const openapiSpec = {
     '/api/keys': {
       get: {
         tags: ['Meta'], summary: 'Notification signing keys',
-        description: 'The public Ed25519 keys that sign ingest requests. A stored notification can be verified against its `webhook_id`, `signed_at` and `message_raw`.',
-        responses: { 200: { description: 'Public keys.', content: { 'application/json': { schema: { type: 'object', properties: { keys: { type: 'array', items: { type: 'object', properties: { id: { type: 'string' }, public_key: { type: 'string' }, current: { type: 'boolean' } } } } } } } } } },
+        description: 'The public Ed25519 keys for ingest and archive checkpoints. `purpose` separates them; the private keys are never exposed.',
+        responses: { 200: { description: 'Public keys.', content: { 'application/json': { schema: { type: 'object', properties: { keys: { type: 'array', items: { type: 'object', properties: { id: { type: 'string' }, public_key: { type: 'string' }, current: { type: 'boolean' }, purpose: { type: 'string', enum: ['ingest', 'checkpoint'] } } } } } } } } } },
+      },
+    },
+    '/api/checkpoints': {
+      get: {
+        tags: ['Meta'], summary: 'Signed archive checkpoints',
+        description: 'Newest-first complete checkpoints. Each chains to the previous root and carries an Ed25519 signature.',
+        parameters: [LIMIT],
+        responses: { 200: { description: 'Checkpoints.', content: { 'application/json': { schema: { type: 'object', additionalProperties: true } } } }, 429: RATE_LIMITED },
+      },
+    },
+    '/api/checkpoints/{id}': {
+      get: {
+        tags: ['Meta'], summary: 'One checkpoint',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'Checkpoint row.', content: { 'application/json': { schema: { type: 'object', additionalProperties: true } } } }, 400: BAD_REQUEST, 404: NOT_FOUND, 429: RATE_LIMITED },
+      },
+    },
+    '/api/checkpoints/{id}/proof': {
+      get: {
+        tags: ['Meta'], summary: 'Inclusion proof for one notification',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'slug', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { 200: { description: 'Leaf hash and audit path.', content: { 'application/json': { schema: { type: 'object', additionalProperties: true } } } }, 400: BAD_REQUEST, 404: NOT_FOUND, 429: RATE_LIMITED },
       },
     },
     '/api/stats': {
