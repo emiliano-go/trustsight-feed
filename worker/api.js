@@ -392,7 +392,8 @@ async function campaigns(env, url) {
             COUNT(DISTINCT package) AS members, COUNT(DISTINCT slug) AS notifications,
             MAX(legacy) AS legacy,
             (SELECT COUNT(*) FROM rule_events re
-              WHERE re.campaign_id = campaign_events.campaign_id) AS triggers
+              WHERE re.campaign_id = campaign_events.campaign_id
+                AND re.rule_id GLOB '[A-Za-z][0-9][0-9][0-9]') AS triggers
        FROM campaign_events
       GROUP BY campaign_id, rule_id
       ORDER BY last DESC, campaign_id ASC
@@ -420,12 +421,14 @@ async function campaignDetail(env, id) {
     `SELECT rule_id, COUNT(*) AS count, COUNT(DISTINCT package) AS packages,
             MIN(time) AS first, MAX(time) AS last
        FROM rule_events WHERE campaign_id = ?
+         AND rule_id GLOB '[A-Za-z][0-9][0-9][0-9]'
       GROUP BY rule_id ORDER BY count DESC, rule_id ASC`
   ).bind(campaignId).all()
   const recentTriggers = await env.DB.prepare(
     `SELECT package, rule_id, severity, weight, source, campaign_id, time, slug,
             file, line, reason
        FROM rule_events WHERE campaign_id = ?
+         AND rule_id GLOB '[A-Za-z][0-9][0-9][0-9]'
       ORDER BY time DESC, id DESC LIMIT 100`
   ).bind(campaignId).all()
   const events = new Map()
@@ -472,6 +475,7 @@ async function campaignDetail(env, id) {
 const RULE_ID_RE = /^[A-Za-z]\d{3}$/
 const SEVERITIES = new Set(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO', ''])
 const TRIGGER_SOURCES = new Set(['finding', 'refusal', 'alert', 'campaign'])
+const RULE_ID_SQL = "e.rule_id GLOB '[A-Za-z][0-9][0-9][0-9]'"
 
 function ruleIds(raw) {
   const values = String(raw || '').split(',').map((value) => value.trim().toUpperCase()).filter(Boolean)
@@ -481,7 +485,7 @@ function ruleIds(raw) {
 
 /** Shared filters for the rule-trigger extraction endpoints. */
 function triggerFilters(url, presetRule) {
-  const where = []
+  const where = [RULE_ID_SQL]
   const params = []
   const rules = ruleIds(presetRule || url.searchParams.get('rule') || '')
   if (rules === null) return { error: 'bad_rule' }
@@ -647,6 +651,7 @@ async function rules(env, url) {
             COUNT(DISTINCT e.package) AS packages, MIN(e.time) AS first,
             MAX(e.time) AS last
        FROM rule_events e
+      WHERE e.rule_id GLOB '[A-Za-z][0-9][0-9][0-9]'
       GROUP BY e.rule_id ORDER BY count DESC, e.rule_id ASC LIMIT ?`
   ).bind(limit).all()
   return json({ count: (results || []).length, items: results || [] })

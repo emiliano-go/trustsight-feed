@@ -73,7 +73,8 @@ describe('event index', () => {
         { package: 'hot', rule_id: 'R010' },
       ],
       over_threshold: [{
-        package: 'hot', findings: [{ rule_id: 'R010', severity: 'HIGH', weight: 40, file: 'PKGBUILD', line: 7, reason: 'curl | bash' }],
+        package: 'hot', rules: ['R010', 'NOVELTY'],
+        findings: [{ rule_id: 'R010', severity: 'HIGH', weight: 40, file: 'PKGBUILD', line: 7, reason: 'curl | bash' }],
       }],
       campaign_cluster: [{
         rule_id: 'G003', campaign_id: 'g003:m', members: ['hot', 'other'],
@@ -86,6 +87,7 @@ describe('event index', () => {
     ]))
     expect(rows.filter((row) => row.package === 'hot' && row.rule_id === 'R010')).toHaveLength(1)
     expect(rows.find((row) => row.rule_id === 'H026').campaign_id).toBe('g003:m')
+    expect(rows.some((row) => row.rule_id === 'NOVELTY')).toBe(false)
   })
 
   it('gives a legacy campaign a deterministic id', () => {

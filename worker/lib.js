@@ -270,12 +270,16 @@ export function ruleEvents(payload) {
   const byPackageRule = new Map()
   const byPackage = new Map()
   const add = (row) => {
-    const key = [row.package, row.rule_id, row.source, row.file, row.line ?? '', row.reason]
+    // `over_threshold.rules` also carries corpus signals (NOVELTY, COVERAGE,
+    // SOURCE_BUCKET). They are not rules, so they do not belong in the index.
+    const ruleId = String(row.rule_id || '').trim().slice(0, 64)
+    if (!/^[A-Za-z]\d{3}$/.test(ruleId)) return null
+    const key = [row.package, ruleId, row.source, row.file, row.line ?? '', row.reason]
       .map((value) => String(value ?? '')).join('\u0000')
     if (rows.has(key)) return rows.get(key)
     const entry = {
       package: String(row.package || '').slice(0, 255),
-      rule_id: String(row.rule_id || '').slice(0, 64),
+      rule_id: ruleId,
       severity: String(row.severity || '').slice(0, 32),
       weight: Number(row.weight) || 0,
       file: String(row.file || '').slice(0, 255),
