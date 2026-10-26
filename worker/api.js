@@ -282,7 +282,7 @@ async function getBySlug(env, slug) {
 async function feed(env, url) {
   const event = eventFilter(url, 'trustsight.alerts')
   if (event === null) return json({ error: 'bad_event' }, 400)
-  return listResponse(env, url, {
+  const response = await listResponse(env, url, {
     query: { source: 'feed' },
     q: url.searchParams.get('q'),
     event,
@@ -292,6 +292,12 @@ async function feed(env, url) {
     campaign: url.searchParams.get('campaign') || undefined,
     maintainer: url.searchParams.get('maintainer') || undefined,
   })
+  // The live list is the one response a reader expects to move.  A cached
+  // 30-second copy made a newly ingested alert invisible under one filter
+  // while a different filter's URL returned it; the feed path is cheap enough
+  // to read fresh, and the client also aborts superseded requests.
+  response.headers.set('cache-control', 'no-store')
+  return response
 }
 
 async function latestOne(env) {

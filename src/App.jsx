@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'preact/hooks'
 import { AccessibilityMenu, ThemeSwitch, Wordmark } from './Controls.jsx'
 import { RuleChip } from './RuleChip.jsx'
 import { eventBadgeClass, eventLabel, formatTime, relative } from './util.js'
@@ -64,8 +64,14 @@ export function App() {
   const [stats, setStats] = useState(null)
   const [now, setNow] = useState(() => Date.now())
   const [refreshTick, setRefreshTick] = useState(0)
+  const loadSeq = useRef(0)
+  const loadAbort = useRef(null)
 
   async function load({ append = false, q, ev, before, beforeRow } = {}) {
+    const seq = ++loadSeq.current
+    loadAbort.current?.abort()
+    const controller = new AbortController()
+    loadAbort.current = controller
     setLoading(true)
     setError('')
     const params = new URLSearchParams()
@@ -77,15 +83,23 @@ export function App() {
     params.set('limit', '30')
     if (before) { params.set('before', before); params.set('beforeRow', beforeRow) }
     try {
-      const res = await fetch(`/api/feed?${params.toString()}`)
+      const res = await fetch(`/api/feed?${params.toString()}`, {
+        cache: 'no-store',
+        signal: controller.signal,
+      })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
+      // Only the newest request may paint: a slow older filter response used
+      // to overwrite the list the reader had just selected.
+      if (seq !== loadSeq.current) return
       setItems((prev) => (append ? [...prev, ...data.items] : data.items))
       setNext(data.next)
     } catch (err) {
+      if (err && err.name === 'AbortError') return
+      if (seq !== loadSeq.current) return
       setError(String(err && err.message ? err.message : err))
     } finally {
-      setLoading(false)
+      if (seq === loadSeq.current) setLoading(false)
     }
   }
 

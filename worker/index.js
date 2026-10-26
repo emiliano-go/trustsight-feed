@@ -28,7 +28,6 @@ function redirect(location) {
 // first request after a TTL pays for the query; the rest are cache hits.
 const CACHE_TTLS = [
   [/^\/api\/stats$/, 60],
-  [/^\/api\/feed$/, 30],
   [/^\/api\/feed\.(?:atom|json)$/, 60],
   [/^\/api\/campaigns$/, 60],
   [/^\/api\/campaign\//, 60],

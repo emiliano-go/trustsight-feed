@@ -434,6 +434,12 @@ describe('api endpoints', () => {
     expect(stats.last_alive).toBe(beat.time)
   })
 
+  it('does not cache the live feed list', async () => {
+    const res = await SELF.fetch('https://example.com/api/feed?event=trustsight.alerts&limit=30')
+    expect(res.status).toBe(200)
+    expect(res.headers.get('cache-control')).toBe('no-store')
+  })
+
   it('serves a cached read without touching D1 again', async () => {
     const url = 'https://example.com/api/stats?cachetest=1'
     const key = new Request(url)
