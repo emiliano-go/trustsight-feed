@@ -59,6 +59,11 @@ const CAMPAIGN_COLUMNS = ['campaign_id', 'rule_id', 'package', 'time', 'slug',
 const MAINTAINER_COLUMNS = ['maintainer_key', 'maintainer', 'package',
   'previous_maintainer', 'rule_id', 'time', 'slug']
 const IOC_COLUMNS = ['indicator', 'package', 'time', 'slug']
+const RULE_COLUMNS = ['package', 'rule_id', 'severity', 'weight', 'file', 'line',
+  'reason', 'source', 'campaign_id', 'time', 'slug']
+// Bump when a new derived table is added: the old rowid marker would skip
+// notifications that predate the table.
+const INDEX_VERSION = '2'
 
 async function flush(events) {
   if (dryRun) return
@@ -76,6 +81,7 @@ async function flush(events) {
   push('campaign_events', CAMPAIGN_COLUMNS, events.campaigns)
   push('maintainer_events', MAINTAINER_COLUMNS, events.maintainers)
   push('ioc_events', IOC_COLUMNS, events.iocs)
+  push('rule_events', RULE_COLUMNS, events.rules)
   for (const statement of chunks) await query(statement.sql, statement.params)
 }
 
@@ -83,7 +89,10 @@ const pageSize = 200
 let lastRowid = 0
 if (!all) {
   const marker = await query("SELECT value FROM meta WHERE key = 'events_backfill_through_rowid'")
-  lastRowid = Number(marker.results?.[0]?.value || 0)
+  const version = await query("SELECT value FROM meta WHERE key = 'events_index_version'")
+  lastRowid = String(version.results?.[0]?.value || '') === INDEX_VERSION
+    ? Number(marker.results?.[0]?.value || 0)
+    : 0
 }
 let processed = 0
 const snapshot = await query('SELECT MAX(rowid) AS max_rowid FROM notifications')
@@ -96,7 +105,7 @@ while (processed < limit) {
   )
   const rows = page.results || []
   if (!rows.length) break
-  const events = { campaigns: [], maintainers: [], iocs: [] }
+  const events = { campaigns: [], maintainers: [], iocs: [], rules: [] }
   for (const row of rows) {
     let payload = {}
     try { payload = JSON.parse(row.payload || '{}') } catch { continue }
@@ -105,6 +114,7 @@ while (processed < limit) {
     for (const event of index.campaigns) events.campaigns.push({ ...event, ...stamp })
     for (const event of index.maintainers) events.maintainers.push({ ...event, ...stamp })
     for (const event of index.iocs) events.iocs.push({ ...event, ...stamp })
+    for (const event of index.rules) events.rules.push({ ...event, ...stamp })
   }
   await flush(events)
   lastRowid = Number(rows[rows.length - 1].rowid)
@@ -130,6 +140,11 @@ await query(
   `INSERT INTO meta (key, value) VALUES ('events_backfill_at', ?)
    ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
   [String(Math.floor(Date.now() / 1000))],
+)
+await query(
+  `INSERT INTO meta (key, value) VALUES ('events_index_version', ?)
+   ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+  [INDEX_VERSION],
 )
 
 if (requireComplete && lastRowid < maxRowid) {

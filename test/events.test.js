@@ -1,6 +1,6 @@
 import { env, SELF } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { buildEventIndex, campaignEvents, maintainerEvents } from '../worker/lib.js'
+import { buildEventIndex, campaignEvents, maintainerEvents, ruleEvents } from '../worker/lib.js'
 import { parseNotification } from '../worker/lib.js'
 import { storeRow } from '../worker/store.js'
 
@@ -43,6 +43,7 @@ async function reset() {
   await env.DB.exec('DELETE FROM campaign_events')
   await env.DB.exec('DELETE FROM maintainer_events')
   await env.DB.exec('DELETE FROM ioc_events')
+  await env.DB.exec('DELETE FROM rule_events')
 }
 
 async function ingest(overrides = {}, verification = null) {
@@ -63,6 +64,28 @@ describe('event index', () => {
       expect.objectContaining({ maintainer_key: 'name:newm', package: 'adopted' }),
     ]))
     expect(index.iocs).toEqual([{ indicator: 'domain:evil.example', package: 'adopted' }])
+  })
+
+  it('normalizes rule triggers without duplicating an alert and its finding', () => {
+    const rows = ruleEvents({
+      alerts: [
+        { package: 'hot', rule_id: 'H026' },
+        { package: 'hot', rule_id: 'R010' },
+      ],
+      over_threshold: [{
+        package: 'hot', findings: [{ rule_id: 'R010', severity: 'HIGH', weight: 40, file: 'PKGBUILD', line: 7, reason: 'curl | bash' }],
+      }],
+      campaign_cluster: [{
+        rule_id: 'G003', campaign_id: 'g003:m', members: ['hot', 'other'],
+      }],
+    })
+    expect(rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ package: 'hot', rule_id: 'R010', source: 'finding', file: 'PKGBUILD', line: 7 }),
+      expect.objectContaining({ package: 'hot', rule_id: 'H026', source: 'alert', campaign_id: 'g003:m' }),
+      expect.objectContaining({ package: 'other', rule_id: 'G003', source: 'campaign', campaign_id: 'g003:m' }),
+    ]))
+    expect(rows.filter((row) => row.package === 'hot' && row.rule_id === 'R010')).toHaveLength(1)
+    expect(rows.find((row) => row.rule_id === 'H026').campaign_id).toBe('g003:m')
   })
 
   it('gives a legacy campaign a deterministic id', () => {
@@ -90,6 +113,25 @@ describe('event APIs', () => {
     expect(detail.members.map((m) => m.package)).toEqual(['adopted', 'other'])
     expect(detail.members[0].maintainer).toBe('newm')
     expect(detail.timeline[0].slug).toBe('2026-05-02/120000')
+    expect(detail.triggered_rules.map((row) => row.rule_id)).toEqual(['G003', 'H026'])
+    expect(list.items[0].triggers).toBe(2)
+  })
+
+  it('serves rule triggers as JSON, CSV and NDJSON', async () => {
+    await ingest()
+    const json = await (await SELF.fetch('https://example.com/api/triggers?rule=H026&include=evidence,summary')).json()
+    expect(json.count).toBe(1)
+    expect(json.items[0]).toMatchObject({ package: 'adopted', rule_id: 'H026', source: 'alert' })
+    expect(json.summary.rules[0]).toMatchObject({ rule_id: 'H026', count: 1 })
+    const csv = await SELF.fetch('https://example.com/api/triggers?format=csv')
+    expect(csv.headers.get('content-type')).toContain('text/csv')
+    expect(await csv.text()).toContain('"adopted","H026"')
+    const ndjson = await (await SELF.fetch('https://example.com/api/triggers?format=ndjson')).text()
+    expect(ndjson.trim().split('\n').map((line) => JSON.parse(line).rule_id)).toContain('H026')
+    const rules = await (await SELF.fetch('https://example.com/api/rules')).json()
+    expect(rules.items.map((row) => row.rule_id)).toContain('H026')
+    const alias = await (await SELF.fetch('https://example.com/api/rule/H026/triggers')).json()
+    expect(alias.items[0].rule_id).toBe('H026')
   })
 
   it('requires the backfill: an unindexed campaign is not served from a scan', async () => {
@@ -120,6 +162,32 @@ describe('event APIs', () => {
     expect(stix.type).toBe('bundle')
     expect(stix.objects[0].pattern).toContain('domain-name')
     expect(stix.objects[0].id).toMatch(/^indicator--[0-9a-f-]{36}$/)
+  })
+
+  it('filters the feed by quick facets and rule tokens', async () => {
+    await ingest()
+    const over = {
+      ...PAYLOAD,
+      ioc_matches: [],
+      campaign_cluster: [],
+      over_threshold: [{ package: 'hot-pkg', score: 45 }],
+    }
+    await ingest({ id: 'events-over', time: 1777723400, message: JSON.stringify(over) })
+    const refusal = {
+      ...PAYLOAD,
+      ioc_matches: [],
+      campaign_cluster: [],
+      refusals: [{ package: 'unread-pkg' }],
+    }
+    await ingest({ id: 'events-refusal', time: 1777723500, message: JSON.stringify(refusal) })
+
+    const get = async (query) => (await (await SELF.fetch(`https://example.com/api/feed?event=all&${query}`)).json()).items
+
+    expect((await get('rule=G003')).map((item) => item.slug)).toEqual(['2026-05-02/120000'])
+    expect((await get('over=1')).map((item) => item.slug)).toEqual(['2026-05-02/120320'])
+    expect((await get('ioc=1')).map((item) => item.slug)).toEqual(['2026-05-02/120000'])
+    expect((await get('campaigns=1')).map((item) => item.slug)).toEqual(['2026-05-02/120000'])
+    expect((await get('refusals=1')).map((item) => item.slug)).toEqual(['2026-05-02/120500'])
   })
 
   it('serves Atom and JSON Feed projections', async () => {

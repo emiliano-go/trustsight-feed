@@ -30,6 +30,8 @@ const CACHE_TTLS = [
   [/^\/api\/stats$/, 60],
   [/^\/api\/feed\.(?:atom|json)$/, 60],
   [/^\/api\/campaigns$/, 60],
+  [/^\/api\/triggers$/, 60],
+  [/^\/api\/rules$/, 60],
   [/^\/api\/campaign\//, 60],
   [/^\/api\/maintainer\//, 60],
   [/^\/api\/iocs$/, 60],
@@ -66,6 +68,7 @@ function isSearchRequest(url) {
   if (url.pathname.startsWith('/api/maintainer/')) return true
   if (url.pathname.startsWith('/api/campaign/')) return true
   if (url.pathname === '/api/iocs') return true
+  if (url.searchParams.get('rule')) return true
   if (url.pathname.startsWith('/api/checkpoints/')) return true
   return ['/api/feed', '/api/feed.atom', '/api/feed.json'].includes(url.pathname)
     && Boolean((url.searchParams.get('q') || '').trim())
@@ -92,7 +95,7 @@ async function cachedApi(request, env, ctx, url) {
 
 // Root spellings of the API resources. Without this, /feed and /latest fall
 // through to the SPA and silently render the home page.
-const ROOT_ALIASES = ['/feed', '/feed.atom', '/feed.json', '/latest', '/date', '/package', '/rule', '/stats', '/messages']
+const ROOT_ALIASES = ['/feed', '/feed.atom', '/feed.json', '/latest', '/date', '/package', '/rule', '/rules', '/triggers', '/stats', '/messages']
 
 // A cheap liveness and readiness check. Not rate limited, so a monitor is
 // never throttled, and no-store so it is always current.

@@ -1,7 +1,7 @@
 // Read API over the D1 store. Public data, so responses are CORS-open for
 // anyone who wants to consume the feed from another tool.
 
-import { ftsQuery, fuzzyScore, maintainerKey, packageHistory, summarize } from './lib.js'
+import { campaignCommon, ftsQuery, fuzzyScore, maintainerKey, packageHistory, summarize } from './lib.js'
 import { atomFeed, jsonFeed } from './feeds.js'
 import { merkleProof } from './checkpoints.js'
 import { openapiSpec } from './openapi.js'
@@ -15,7 +15,7 @@ const ENDPOINTS = [
   'GET /api/index.json',
   'GET /api/docs (redirects to /api)',
   'GET /api/openapi.json',
-  'GET /api/feed?q=&event=&day=&from=&to=&campaign=&maintainer=&limit=&before=&beforeRow=',
+  'GET /api/feed?q=&event=&day=&from=&to=&campaign=&maintainer=&rule=&over=1&ioc=1&campaigns=1&refusals=1&limit=&before=&beforeRow=',
   'GET /api/feed.atom',
   'GET /api/feed.json',
   'GET /api/latest',
@@ -25,6 +25,9 @@ const ENDPOINTS = [
   'GET /api/package/{name}',
   'GET /api/package/{name}/history',
   'GET /api/rule/{id}',
+  'GET /api/rule/{id}/triggers?format=json|csv|ndjson',
+  'GET /api/rules',
+  'GET /api/triggers?rule=&campaign=&package=&maintainer=&severity=&source=&day=&since=&until=&include=evidence,summary&format=json|csv|ndjson',
   'GET /api/messages/{slug}',
   'GET /api/source/{package}?file=PKGBUILD',
   'GET /api/diff/{package}',
@@ -169,7 +172,8 @@ async function fuzzyWindow(env) {
 async function listQuery(env, options = {}) {
   const {
     q, event = 'all', day, from, to, beforeTime, beforeRow,
-    campaign, maintainer, limit = DEFAULT_LIMIT,
+    campaign, maintainer, rule, over, ioc, campaigns, refusals,
+    limit = DEFAULT_LIMIT,
   } = options
   const term = typeof q === 'string' ? q.slice(0, MAX_QUERY_CHARS) : q
   const fts = ftsQuery(term)
@@ -189,6 +193,18 @@ async function listQuery(env, options = {}) {
   if (maintainer) {
     where.push('EXISTS (SELECT 1 FROM maintainer_events me WHERE me.slug = n.slug AND me.maintainer_key = ?)')
     params.push(maintainerKey(maintainer))
+  }
+  if (rule) {
+    where.push("(' ' || n.search_text || ' ') LIKE ?")
+    params.push(`% ${String(rule).toUpperCase()} %`)
+  }
+  if (over) where.push('n.n_over_threshold > 0')
+  if (ioc) where.push('n.n_ioc > 0')
+  if (campaigns) {
+    where.push("json_array_length(json_extract(n.payload, '$.campaign_cluster')) > 0")
+  }
+  if (refusals) {
+    where.push("json_array_length(json_extract(n.payload, '$.refusals')) > 0")
   }
   if (fromTime !== null) { where.push('n.time >= ?'); params.push(fromTime) }
   if (toTime !== null) { where.push('n.time <= ?'); params.push(toTime) }
@@ -291,6 +307,11 @@ async function feed(env, url) {
     to: url.searchParams.get('to') || undefined,
     campaign: url.searchParams.get('campaign') || undefined,
     maintainer: url.searchParams.get('maintainer') || undefined,
+    rule: url.searchParams.get('rule') || undefined,
+    over: url.searchParams.get('over') === '1',
+    ioc: url.searchParams.get('ioc') === '1',
+    campaigns: url.searchParams.get('campaigns') === '1',
+    refusals: url.searchParams.get('refusals') === '1',
   })
   // The live list is the one response a reader expects to move.  A cached
   // 30-second copy made a newly ingested alert invisible under one filter
@@ -369,13 +390,18 @@ async function campaigns(env, url) {
   const { results } = await env.DB.prepare(
     `SELECT campaign_id, rule_id, MIN(time) AS first, MAX(time) AS last,
             COUNT(DISTINCT package) AS members, COUNT(DISTINCT slug) AS notifications,
-            MAX(legacy) AS legacy
+            MAX(legacy) AS legacy,
+            (SELECT COUNT(*) FROM rule_events re
+              WHERE re.campaign_id = campaign_events.campaign_id) AS triggers
        FROM campaign_events
       GROUP BY campaign_id, rule_id
       ORDER BY last DESC, campaign_id ASC
       LIMIT ?`
   ).bind(limit).all()
-  return json({ count: (results || []).length, items: results || [] })
+  return json({
+    count: (results || []).length,
+    items: (results || []).map((row) => ({ ...row, common: campaignCommon(row) })),
+  })
 }
 
 async function campaignDetail(env, id) {
@@ -390,6 +416,18 @@ async function campaignDetail(env, id) {
   ).bind(campaignId).all()
   const rows = results || []
   if (!rows.length) return json({ error: 'not_found' }, 404)
+  const triggerRows = await env.DB.prepare(
+    `SELECT rule_id, COUNT(*) AS count, COUNT(DISTINCT package) AS packages,
+            MIN(time) AS first, MAX(time) AS last
+       FROM rule_events WHERE campaign_id = ?
+      GROUP BY rule_id ORDER BY count DESC, rule_id ASC`
+  ).bind(campaignId).all()
+  const recentTriggers = await env.DB.prepare(
+    `SELECT package, rule_id, severity, weight, source, campaign_id, time, slug,
+            file, line, reason
+       FROM rule_events WHERE campaign_id = ?
+      ORDER BY time DESC, id DESC LIMIT 100`
+  ).bind(campaignId).all()
   const events = new Map()
   const members = new Map()
   for (const row of rows) {
@@ -426,7 +464,192 @@ async function campaignDetail(env, id) {
     members: [...members.values()].sort((a, b) => a.package.localeCompare(b.package)),
     timeline: [...events.values()].sort((a, b) => b.time - a.time),
     notifications: [...new Set(rows.map((row) => row.slug))].sort().reverse(),
+    triggered_rules: triggerRows.results || [],
+    triggers: recentTriggers.results || [],
   })
+}
+
+const RULE_ID_RE = /^[A-Za-z]\d{3}$/
+const SEVERITIES = new Set(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO', ''])
+const TRIGGER_SOURCES = new Set(['finding', 'refusal', 'alert', 'campaign'])
+
+function ruleIds(raw) {
+  const values = String(raw || '').split(',').map((value) => value.trim().toUpperCase()).filter(Boolean)
+  if (!values.length) return []
+  return values.every((value) => RULE_ID_RE.test(value)) ? [...new Set(values)] : null
+}
+
+/** Shared filters for the rule-trigger extraction endpoints. */
+function triggerFilters(url, presetRule) {
+  const where = []
+  const params = []
+  const rules = ruleIds(presetRule || url.searchParams.get('rule') || '')
+  if (rules === null) return { error: 'bad_rule' }
+  if (rules.length) {
+    where.push(`e.rule_id IN (${rules.map(() => '?').join(',')})`)
+    params.push(...rules)
+  }
+  const campaign = url.searchParams.get('campaign')
+  if (campaign) {
+    const id = publicId(campaign)
+    if (!id) return { error: 'bad_campaign' }
+    where.push('e.campaign_id = ?')
+    params.push(id)
+  }
+  const packageName = url.searchParams.get('package')
+  if (packageName) {
+    if (!PACKAGE_RE.test(packageName)) return { error: 'bad_package' }
+    where.push('e.package = ?')
+    params.push(packageName)
+  }
+  const maintainer = url.searchParams.get('maintainer')
+  if (maintainer) {
+    where.push(`EXISTS (SELECT 1 FROM maintainer_events me
+                        WHERE me.slug = e.slug AND me.package = e.package
+                          AND me.maintainer_key = ?)`)
+    params.push(maintainerKey(maintainer))
+  }
+  const severity = String(url.searchParams.get('severity') || '').toUpperCase()
+  if (severity) {
+    if (!SEVERITIES.has(severity)) return { error: 'bad_severity' }
+    where.push('e.severity = ?')
+    params.push(severity)
+  }
+  const source = String(url.searchParams.get('source') || '').toLowerCase()
+  if (source) {
+    if (!TRIGGER_SOURCES.has(source)) return { error: 'bad_source' }
+    where.push('e.source = ?')
+    params.push(source)
+  }
+  const day = url.searchParams.get('day')
+  if (day) {
+    if (!dayStart(day)) return { error: 'bad_day' }
+    where.push('EXISTS (SELECT 1 FROM notifications n WHERE n.slug = e.slug AND n.day = ?)')
+    params.push(day)
+  }
+  const since = asInt(url.searchParams.get('since'))
+  const until = asInt(url.searchParams.get('until'))
+  if (since !== null) { where.push('e.time >= ?'); params.push(since) }
+  if (until !== null) { where.push('e.time <= ?'); params.push(until) }
+  return { where, params }
+}
+
+const TRIGGER_COLUMNS = ['package', 'rule_id', 'severity', 'weight', 'source',
+  'campaign_id', 'time', 'slug']
+const TRIGGER_EVIDENCE = ['file', 'line', 'reason']
+
+function triggerRow(row, evidence) {
+  const item = {}
+  for (const key of TRIGGER_COLUMNS) item[key] = row[key]
+  if (evidence) for (const key of TRIGGER_EVIDENCE) item[key] = row[key]
+  item.id = row._id
+  return item
+}
+
+async function triggerSummary(env, filters) {
+  const where = filters.where.length ? `WHERE ${filters.where.join(' AND ')}` : ''
+  const [rules, packages, campaigns] = await Promise.all([
+    env.DB.prepare(
+      `SELECT e.rule_id, COUNT(*) AS count, COUNT(DISTINCT e.package) AS packages,
+              MIN(e.time) AS first, MAX(e.time) AS last
+         FROM rule_events e ${where}
+        GROUP BY e.rule_id ORDER BY count DESC, e.rule_id ASC LIMIT 100`
+    ).bind(...filters.params).all(),
+    env.DB.prepare(
+      `SELECT e.package, COUNT(*) AS count, COUNT(DISTINCT e.rule_id) AS rules,
+              MIN(e.time) AS first, MAX(e.time) AS last
+         FROM rule_events e ${where}
+        GROUP BY e.package ORDER BY count DESC, e.package ASC LIMIT 100`
+    ).bind(...filters.params).all(),
+    env.DB.prepare(
+      `SELECT e.campaign_id, COUNT(*) AS count, COUNT(DISTINCT e.package) AS packages,
+              MIN(e.time) AS first, MAX(e.time) AS last
+         FROM rule_events e ${where ? `${where} AND` : 'WHERE'} e.campaign_id != ''
+        GROUP BY e.campaign_id ORDER BY count DESC, e.campaign_id ASC LIMIT 100`
+    ).bind(...filters.params).all(),
+  ])
+  return {
+    rules: rules.results || [],
+    packages: packages.results || [],
+    campaigns: campaigns.results || [],
+  }
+}
+
+function triggerExtractResponse(env, rows, { url, filters, next }) {
+  const format = String(url.searchParams.get('format') || 'json').toLowerCase()
+  if (!['json', 'csv', 'ndjson'].includes(format)) return json({ error: 'bad_format' }, 400)
+  const include = new Set(String(url.searchParams.get('include') || '').split(',').map((v) => v.trim()))
+  const evidence = include.has('evidence')
+  if (format === 'csv') {
+    const columns = [...TRIGGER_COLUMNS, ...(evidence ? TRIGGER_EVIDENCE : [])]
+    const lines = [columns.join(',')]
+    for (const row of rows) lines.push(columns.map((key) => csvCell(row[key])).join(','))
+    return new Response(`${lines.join('\n')}\n`, {
+      headers: {
+        'content-type': 'text/csv; charset=utf-8',
+        'content-disposition': 'attachment; filename="trustsight-triggers.csv"',
+        'cache-control': 'public, max-age=60',
+        ...CORS,
+      },
+    })
+  }
+  if (format === 'ndjson') {
+    return new Response(rows.map((row) => JSON.stringify(triggerRow(row, evidence))).join('\n') + (rows.length ? '\n' : ''), {
+      headers: { 'content-type': 'application/x-ndjson; charset=utf-8', 'cache-control': 'public, max-age=60', ...CORS },
+    })
+  }
+  const summary = include.has('summary') ? triggerSummary(env, filters) : Promise.resolve(undefined)
+  return summary.then((aggregates) => json({
+    count: rows.length,
+    query: { source: 'triggers', ...filters.query },
+    items: rows.map((row) => triggerRow(row, evidence)),
+    summary: aggregates,
+    next,
+  }))
+}
+
+async function triggers(env, url, presetRule = '') {
+  const filters = triggerFilters(url, presetRule)
+  if (filters.error) return json({ error: filters.error }, 400)
+  const limit = clampInt(url.searchParams.get('limit'), 200, 1, 1000)
+  const before = asInt(url.searchParams.get('before'))
+  const where = [...filters.where]
+  const params = [...filters.params]
+  if (before !== null) { where.push('e.id < ?'); params.push(before) }
+  const evidence = String(url.searchParams.get('include') || '').split(',').map((v) => v.trim()).includes('evidence')
+  const columns = [...TRIGGER_COLUMNS.map((key) => `e.${key}`), 'e.id AS _id',
+    ...(evidence ? TRIGGER_EVIDENCE.map((key) => `e.${key}`) : [])]
+  const { results } = await env.DB.prepare(
+    `SELECT ${columns.join(', ')} FROM rule_events e
+      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+      ORDER BY e.time DESC, e.id DESC LIMIT ?`
+  ).bind(...params, limit).all()
+  const rows = results || []
+  const next = rows.length === limit ? { before: rows[rows.length - 1]._id } : null
+  filters.query = {
+    rule: ruleIds(presetRule || url.searchParams.get('rule') || '') || [],
+    campaign: url.searchParams.get('campaign') || '',
+    package: url.searchParams.get('package') || '',
+    maintainer: url.searchParams.get('maintainer') || '',
+    severity: url.searchParams.get('severity') || '',
+    source: url.searchParams.get('source') || '',
+    day: url.searchParams.get('day') || '',
+    since: url.searchParams.get('since') || '',
+    until: url.searchParams.get('until') || '',
+  }
+  return triggerExtractResponse(env, rows, { url, filters, next })
+}
+
+async function rules(env, url) {
+  const limit = clampInt(url.searchParams.get('limit'), 100, 1, 500)
+  const { results } = await env.DB.prepare(
+    `SELECT e.rule_id, MAX(e.severity) AS severity, COUNT(*) AS count,
+            COUNT(DISTINCT e.package) AS packages, MIN(e.time) AS first,
+            MAX(e.time) AS last
+       FROM rule_events e
+      GROUP BY e.rule_id ORDER BY count DESC, e.rule_id ASC LIMIT ?`
+  ).bind(limit).all()
+  return json({ count: (results || []).length, items: results || [] })
 }
 
 async function maintainerDetail(env, name, url) {
@@ -586,6 +809,11 @@ async function syndication(env, url, format) {
     to: url.searchParams.get('to') || undefined,
     campaign: url.searchParams.get('campaign') || undefined,
     maintainer: url.searchParams.get('maintainer') || undefined,
+    rule: url.searchParams.get('rule') || undefined,
+    over: url.searchParams.get('over') === '1',
+    ioc: url.searchParams.get('ioc') === '1',
+    campaigns: url.searchParams.get('campaigns') === '1',
+    refusals: url.searchParams.get('refusals') === '1',
     limit: clampInt(url.searchParams.get('limit'), 50, 1, 100),
   })
   const baseUrl = new URL(url).origin
@@ -974,6 +1202,8 @@ async function handleApiUnsafe(request, env, url) {
   if (path === '/api/keys') return publicKeys(env)
   if (path === '/api/checkpoints') return checkpoints(env, url)
   if (path === '/api/campaigns') return campaigns(env, url)
+  if (path === '/api/triggers') return triggers(env, url)
+  if (path === '/api/rules') return rules(env, url)
   if (path === '/api/iocs') return iocs(env, url)
   if (path === '/api/feed') return feed(env, url)
   if (path === '/api/stats') return stats(env)
@@ -1020,6 +1250,11 @@ async function handleApiUnsafe(request, env, url) {
     const name = safeDecode(match[1])
     if (name === null) return json({ error: 'bad_path' }, 400)
     return maintainerDetail(env, name, url)
+  }
+  if ((match = path.match(/^\/api\/rule\/([^/]+)\/triggers$/))) {
+    const id = safeDecode(match[1])
+    if (id === null) return json({ error: 'bad_path' }, 400)
+    return triggers(env, url, id)
   }
   if ((match = path.match(/^\/api\/rule\/(.+)$/))) {
     return bySearch(env, url, decodeURIComponent(match[1]))

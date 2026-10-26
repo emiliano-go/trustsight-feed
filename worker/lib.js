@@ -264,6 +264,86 @@ export function iocEvents(payload) {
     }))
 }
 
+/** Every rule firing one notification records, normalized for extraction. */
+export function ruleEvents(payload) {
+  const rows = new Map()
+  const byPackageRule = new Map()
+  const byPackage = new Map()
+  const add = (row) => {
+    const key = [row.package, row.rule_id, row.source, row.file, row.line ?? '', row.reason]
+      .map((value) => String(value ?? '')).join('\u0000')
+    if (rows.has(key)) return rows.get(key)
+    const entry = {
+      package: String(row.package || '').slice(0, 255),
+      rule_id: String(row.rule_id || '').slice(0, 64),
+      severity: String(row.severity || '').slice(0, 32),
+      weight: Number(row.weight) || 0,
+      file: String(row.file || '').slice(0, 255),
+      line: Number.isFinite(Number(row.line)) ? Number(row.line) : null,
+      reason: String(row.reason || '').slice(0, 4096),
+      source: String(row.source || '').slice(0, 32),
+      campaign_id: String(row.campaign_id || '').slice(0, 255),
+    }
+    rows.set(key, entry)
+    const pair = `${entry.package}\u0000${entry.rule_id}`
+    if (!byPackageRule.has(pair)) byPackageRule.set(pair, [])
+    byPackageRule.get(pair).push(entry)
+    if (!byPackage.has(entry.package)) byPackage.set(entry.package, [])
+    byPackage.get(entry.package).push(entry)
+    return entry
+  }
+  const has = (packageName, rule) => byPackageRule.has(`${packageName}\u0000${rule}`)
+
+  for (const over of (payload && payload.over_threshold) || []) {
+    const findings = Array.isArray(over.findings) ? over.findings : []
+    for (const finding of findings) {
+      add({
+        package: over.package, rule_id: finding.rule_id,
+        severity: finding.severity, weight: finding.weight,
+        file: finding.file, line: finding.line, reason: finding.reason,
+        source: 'finding',
+      })
+    }
+    for (const rule of over.rules || []) {
+      if (!has(over.package, rule)) {
+        add({ package: over.package, rule_id: rule, source: 'alert' })
+      }
+    }
+  }
+  for (const refusal of (payload && payload.refusals) || []) {
+    for (const finding of refusal.findings || []) {
+      add({
+        package: refusal.package, rule_id: finding.rule_id,
+        severity: finding.severity, weight: finding.weight,
+        file: finding.file, line: finding.line, reason: finding.reason,
+        source: 'refusal',
+      })
+    }
+  }
+  for (const alert of (payload && payload.alerts) || []) {
+    if (!has(alert.package, alert.rule_id)) {
+      add({ package: alert.package, rule_id: alert.rule_id, source: 'alert' })
+    }
+  }
+  for (const cluster of alertingClusters(payload)) {
+    const published = typeof cluster.campaign_id === 'string' ? cluster.campaign_id.trim() : ''
+    const campaignId = published || legacyCampaignKey(
+      String(cluster.rule_id || ''), [...new Set((cluster.members || []).map(String))])
+    for (const member of cluster.members || []) {
+      const existing = byPackage.get(member) || []
+      if (existing.length) {
+        for (const row of existing) row.campaign_id = campaignId
+      } else {
+        add({
+          package: member, rule_id: cluster.rule_id, source: 'campaign',
+          campaign_id: campaignId,
+        })
+      }
+    }
+  }
+  return [...rows.values()]
+}
+
 /** The complete event index for one notification. */
 export function buildEventIndex(payload) {
   // A notification is bounded, but a hostile document can still name many
@@ -274,6 +354,7 @@ export function buildEventIndex(payload) {
     campaigns: campaignEvents(payload || {}).slice(0, MAX_EVENTS),
     maintainers: maintainerEvents(payload || {}).slice(0, MAX_EVENTS),
     iocs: iocEvents(payload || {}).slice(0, MAX_EVENTS),
+    rules: ruleEvents(payload || {}).slice(0, MAX_EVENTS),
   }
 }
 

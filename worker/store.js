@@ -53,6 +53,16 @@ async function insertRow(env, row, slug, verification = null) {
        VALUES (?, ?, ?, ?)`
     ).bind(event.indicator, event.package, row.time, slug))
   }
+  for (const event of events.rules) {
+    statements.push(env.DB.prepare(
+      `INSERT OR IGNORE INTO rule_events
+         (package, rule_id, severity, weight, file, line, reason, source,
+          campaign_id, time, slug)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(event.package, event.rule_id, event.severity, event.weight,
+      event.file, event.line, event.reason, event.source, event.campaign_id,
+      row.time, slug))
+  }
   if (statements.length <= MAX_BATCH_STATEMENTS) {
     await env.DB.batch(statements)
     return

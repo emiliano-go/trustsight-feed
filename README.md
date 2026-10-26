@@ -95,13 +95,21 @@ A read-only JSON API over the same store, with an OpenAPI 3.1 description:
   `/api/docs` and `/api/reference` redirect there; `/api/index.json` is a
   plain endpoint list.
 - `/api/openapi.json` the OpenAPI document.
-- `/api/feed` search, with `q`, `event`, `day`, `from`, `to`, `limit` and a
+- `/api/feed` search, with `q`, `event`, `day`, `from`, `to`, `campaign`,
+  `maintainer`, `rule`, `over`, `ioc`, `campaigns`, `refusals`, `limit` and a
   keyset cursor.
 - `/api/latest` and `/api/latest/{n}` the most recent notifications.
 - `/api/date/{YYYY-MM-DD}` and `/api/date/{YYYY-MM-DD}/{timeframe}` a UTC day
   or a window in it (`HH`, `HH-HH`, or `HHMM-HHMM`).
 - `/api/package/{name}` and `/api/rule/{id}` everything mentioning a package or
   fired by a rule.
+- `/api/triggers` every normalized rule firing (`rule`, `campaign`, `package`,
+  `maintainer`, `severity`, `source`, `day`, `since`, `until`), as JSON, CSV or
+  NDJSON. `include=evidence` adds file/line/reason; `include=summary` adds
+  per-rule, per-package and per-campaign counts. `/api/rule/{id}/triggers` is
+  the same extraction pinned to one rule, and `/api/rules` lists firing counts.
+- `/api/campaign/{id}` also returns `triggered_rules` and the newest 100
+  `triggers`, so a campaign drill-down is one request.
 - `/api/package/{name}/history` every stored alert that names a package, with
   its version transitions, scores, rules, findings, maintainer-change signals
   and the upstream URLs those analyses record. The page at `/pkg/{name}` renders

@@ -51,11 +51,17 @@ function RuleBody({ id }) {
  * The chip is a span, not a link, so the docs link can live inside without
  * nesting anchors.
  */
-export function RuleChip({ id }) {
+export function RuleChip({ id, onFilter }) {
   const rule = ruleInfo(id)
 
   function activate(event) {
-    if (!isCoarse()) return
+    if (!isCoarse()) {
+      if (!onFilter) return
+      event.preventDefault()
+      event.stopPropagation()
+      onFilter(id)
+      return
+    }
     event.preventDefault()
     event.stopPropagation()
     openRuleExplanation(id)
@@ -67,7 +73,9 @@ export function RuleChip({ id }) {
       tabIndex="0"
       role="button"
       onClick={activate}
-      aria-label={`Rule ${id}${rule ? `: ${rule.name}` : ''}. Open the explanation.`}
+      aria-label={onFilter
+        ? `Filter the feed by rule ${id}${rule ? `: ${rule.name}` : ''}.`
+        : `Rule ${id}${rule ? `: ${rule.name}` : ''}. Open the explanation.`}
     >
       {id}
       <span className="rule-pop" role="tooltip">
