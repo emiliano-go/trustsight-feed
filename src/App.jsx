@@ -153,9 +153,9 @@ export function App() {
             <b>{stats ? stats.total + (stats.alive || 0) : '…'}</b>Total scans
           </div>
           <div><b>{stats ? stats.total : '…'}</b>Alerts</div>
-          {stats && Number.isFinite(stats.last) ? (
-            <div title={`last alert: ${formatTime(stats.last_alert)}; last alive: ${formatTime(stats.last_alive)}`}>
-              <b>{relative(Math.max(stats.last_alert || 0, stats.last_alive || 0), now)}</b>Last refreshed
+          {stats && Number.isFinite(stats.last_alive) ? (
+            <div title={`last alive: ${formatTime(stats.last_alive)}; last alert: ${formatTime(stats.last_alert)}`}>
+              <b>{relative(stats.last_alive, now)}</b>Last refreshed
             </div>
           ) : null}
           {stats ? <div className="stat--warn"><b>{stats.over_threshold}</b>Packages over threshold</div> : null}
