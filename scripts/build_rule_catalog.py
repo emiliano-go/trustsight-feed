@@ -205,6 +205,12 @@ def _section_bullets_and_prose(lines: list[str], start: int, end: int) -> tuple[
 
 META_LINE = re.compile(r"^\*\*([A-Z]+)\*\*.*(?:weight|category)")
 FIRE_RATE = re.compile(r"^(?:Fire rate|Measured)[:\s]")
+HTML_COMMENT = re.compile(r"<!--.*?-->", re.S)
+
+
+def _without_comments(text: str) -> str:
+    """Docs use HTML comments as markers, not prose; they must not reach the feed."""
+    return " ".join(HTML_COMMENT.sub("", text or "").split())
 
 
 def _looks_like_meta(text: str) -> bool:
@@ -230,8 +236,8 @@ def _parse_page(path: Path) -> list[dict]:
         end = heads[n + 1] if n + 1 < len(heads) else len(lines)
         bullets, prose = _section_bullets_and_prose(lines, index + 1, end)
         severity = (bullets.get("severity") or "").split(" ")[0].upper()
-        explicit = bullets.get("description") or ""
-        condition = bullets.get("condition") or ""
+        explicit = _without_comments(bullets.get("description") or "")
+        condition = _without_comments(bullets.get("condition") or "")
         # Some pages (crossfire, sabotage) open with `**SEVERITY** ... category`
         # instead of a Severity bullet. That line is metadata, not the
         # explanation; take its severity and use the paragraph after it.
@@ -242,8 +248,10 @@ def _parse_page(path: Path) -> list[dict]:
                     m2 = META_LINE.match(block)
                     severity = m2.group(1) if m2 else severity
                 continue
-            paragraph = block
-            break
+            clean = _without_comments(block)
+            if clean:
+                paragraph = clean
+                break
         entries.append({
             "id": rule_id,
             "name": name,
