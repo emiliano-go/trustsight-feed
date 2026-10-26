@@ -2,10 +2,34 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://watcher.trustsight.org/</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-10-26</lastmod>
   </url>
   <url>
     <loc>https://watcher.trustsight.org/api/</loc>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-10-26/012041/</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-10-26/010512/</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-10-26/004941/</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-10-26/003413/</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-10-26/001846/</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-10-26/000305/</loc>
+    <lastmod>2026-10-26</lastmod>
   </url>
   <url>
     <loc>https://watcher.trustsight.org/2026-10-25/233157/</loc>
