@@ -471,6 +471,14 @@
     "description": "The G001 shape with the novelty join instead of the gained-host join: only a host the corpus has not met before counts, so one honest newcomer per window is the AUR being the AUR and five is a distribution infrastructure. Trusted-forge and official hosts stand down, as do split outputs of one pkgbase and one maintainer's long-prefix name family. Weight 0 and never campaign-priming: a first contact is a statement about newness, never about intent, so G010 names the coordination and never scores, gates, notifies alone, or escalates a member (the Contact Ledger's plural-contact rule: strangers in company are a signal, strangers alone are a census).",
     "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g010"
   },
+  "g011": {
+    "id": "G011",
+    "name": "Maintainer Package Creation Burst",
+    "severity": "MEDIUM",
+    "categoryTitle": "Correlation",
+    "description": "The burst is read from the recorded `cycle_events` window and each package's latest analysis, not from one cycle's processed set: the observed placeholder burst was spread over several cycles, so a current-cycle-only join would miss most of it. H021 keeps the membership to packages that are actually new to the AUR; a package this watcher has only just seen is not a creation burst.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g011"
+  },
   "g012": {
     "id": "G012",
     "name": "Shared Payload Signal",
@@ -1324,7 +1332,7 @@
     "name": "Placeholder Package",
     "severity": "INFO",
     "categoryTitle": "Naming and Dependencies",
-    "description": "A placeholder reserves a name in the AUR while installing nothing - it builds, runs, and ships an empty package. Individually it is inert, so the finding is not a payload claim: it states that the recipe claims a name it does not fill, which is worth a human's eye because a burst of them is a name-squatting campaign ([#41](https://github.com/emiliano-go/trustsight/issues/41)). The two-of-three threshold keeps a legitimate project pinned at a `0.0.0` release or an unusual-but-real package function from reading as a reservation. Weight 0 until the benign corpus calibrates it; read from the recipe text, so it fires identically whether the package is first seen, edited, or checked with `trustsight lint`.",
+    "description": "A placeholder reserves a name in the AUR while installing nothing - it builds, runs, and ships an empty package. Individually it is inert, so the finding is not a payload claim: it states that the recipe claims a name it does not fill, which is worth a human's eye because a burst of them is a name-squatting campaign ([G011](correlation.md#g011)). The two-of-three threshold keeps a legitimate project pinned at a `0.0.0` release or an unusual-but-real package function from reading as a reservation. Weight 0 until the benign corpus calibrates it; read from the recipe text, so it fires identically whether the package is first seen, edited, or checked with `trustsight lint`.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/naming-and-dependency/#h104"
   },
   "m001": {
