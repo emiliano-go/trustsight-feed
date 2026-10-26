@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks'
 import { AccessibilityMenu, ThemeSwitch, Wordmark } from './Controls.jsx'
 import { RuleChip, RuleHighlight, RuleSection, ruleInfo, sortRuleIds } from './RuleChip.jsx'
-import { AUR_PACKAGE, AUR_PKGBUILD, eventBadgeClass, eventLabel, formatTime, locationLabel, relative } from './util.js'
+import { AUR_PACKAGE, AUR_PKGBUILD, chunk, eventBadgeClass, eventLabel, formatTime, locationLabel, relative } from './util.js'
 import { alertingClusters, campaignCommon, campaignEvents } from '../worker/lib.js'
 import { renderMarkdown, renderInlineCode } from './markdown.jsx'
 
@@ -275,9 +275,15 @@ function MaintainersSection({ packages }) {
   useEffect(() => {
     let live = true
     if (!packages.length) return undefined
-    fetch(`/api/maintainers?packages=${encodeURIComponent(key)}`)
-      .then((r) => (r.ok ? r.json() : {}))
-      .then((body) => { if (live) setMaintainers(body.maintainers || {}) })
+    const batches = chunk(packages, 100)
+    Promise.all(batches.map((batch) => (
+      fetch(`/api/maintainers?packages=${encodeURIComponent(batch.join(','))}`)
+        .then((r) => (r.ok ? r.json() : {}))
+        .catch(() => ({}))
+    )))
+      .then((results) => {
+        if (live) setMaintainers(Object.assign({}, ...results.map((body) => body.maintainers || {})))
+      })
       .catch(() => {})
     return () => { live = false }
   }, [key])
@@ -595,6 +601,12 @@ function AlertPackage({ entry, iocPackages }) {
         <a className="pkg__action" href={AUR_PKGBUILD(entry.package)} target="_blank" rel="noreferrer">See PKGBUILD ↗</a>
       </header>
       <MaintainerChange entry={entry} />
+      {entry.dependency ? (
+        <p className="pkg__meta">
+          depends on <a className="md-code" href={packageHref(entry.dependency)} data-route>{entry.dependency}</a>,
+          which was adopted or orphaned this cycle
+        </p>
+      ) : null}
       <AnalysedDiff entry={entry} />
     </article>
   )
@@ -1398,6 +1410,21 @@ export function Message({ slug }) {
     ...(payload.impersonation || []).flatMap((c) => c.members || []),
     ...(payload.refusals || []).map((r) => r.package),
   ].filter(Boolean))]
+  // H046 names a dependency the package did not change; it is exposure, not an
+  // update.  Keep those dependents out of the maintainer roll-up (and out of
+  // its RPC fan-out) unless the same package also changed or is in a cluster.
+  const dependencyOnly = new Set(
+    alerts.filter((a) => a.rule_id === 'H046').map((a) => a.package),
+  )
+  const changedPackages = new Set([
+    ...overPackages,
+    ...iocPackages,
+    ...alerts.filter((a) => a.rule_id !== 'H046').map((a) => a.package),
+    ...alertingClusters(payload).flatMap((c) => c.members || []),
+    ...(payload.impersonation || []).flatMap((c) => c.members || []),
+  ])
+  for (const name of changedPackages) dependencyOnly.delete(name)
+  const maintainerPackages = allPackages.filter((name) => !dependencyOnly.has(name))
   const pretty = data ? JSON.stringify(payload, null, 2) : ''
 
   async function copyJson() {
@@ -1477,7 +1504,7 @@ export function Message({ slug }) {
             ) : null}
 
             {data.event === 'trustsight.alerts' ? <CalibrationNote /> : null}
-            <MaintainersSection packages={allPackages} />
+            <MaintainersSection packages={maintainerPackages} />
             <Refusals refusals={payload.refusals || []} />
             <IocSection matches={ioc} />
             <Campaigns payload={payload} />

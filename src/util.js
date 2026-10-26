@@ -2,6 +2,17 @@
 
 const pad = (n) => String(n).padStart(2, '0')
 
+/**
+ * Split a list into bounded batches.  The watcher's maintainer endpoint
+ * accepts at most 100 names per request; a large alert must issue one request
+ * per batch rather than leaving every name after the first 100 unknown.
+ */
+export function chunk(items, size) {
+  const out = []
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size))
+  return out
+}
+
 /** `YYYY-MM-DD HH:MM UTC` from a unix-seconds timestamp. */
 export function formatUtc(time) {
   if (!time) return ''

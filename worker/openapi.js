@@ -66,6 +66,7 @@ const NOTIFICATION = {
                   maintainer: { type: 'string', description: 'Current maintainer of the package, when the watcher recorded it.' },
                   old: { type: 'string', description: 'Previous maintainer, when the rule recorded a transition.' },
                   new: { type: 'string', description: 'New maintainer, when the rule recorded a transition.' },
+                  dependency: { type: 'string', description: 'The adopted or orphaned dependency that exposed this dependent (H046).' },
                   pkgbuild_sha256: { type: 'string', description: 'SHA-256 of the analysed PKGBUILD.' },
                   previous_pkgbuild_sha256: { type: 'string', description: 'SHA-256 of the previous PKGBUILD.' },
                   diff: { type: 'string', description: 'Bounded unified diff of the analysed change.' },

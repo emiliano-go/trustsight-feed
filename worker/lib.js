@@ -79,6 +79,8 @@ export function buildSearchText({ event, title, day, payload }) {
     push(a.package); push(a.rule_id)
     // Ownership alerts name the handover, so both accounts are searchable.
     push(a.maintainer); push(a.old); push(a.new)
+    // H046 names the adopted dependency that exposed this dependent.
+    push(a.dependency)
   }
   for (const o of (payload && payload.over_threshold) || []) {
     push(o.package); push(o.version)
