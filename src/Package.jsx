@@ -95,6 +95,7 @@ export function Package({ name }) {
         <div className="detail__meta">
           <a href={AUR_PACKAGE(name)} target="_blank" rel="noreferrer">AUR package ↗</a>
           <a href={AUR_PKGBUILD(name)} target="_blank" rel="noreferrer">PKGBUILD ↗</a>
+          <a href={`/deps/${encodeURIComponent(name)}`} data-route>Check dependencies</a>
           <button type="button" className="pkg__action" onClick={() => navigator.clipboard?.writeText(window.location.href)}>Copy permalink</button>
           {history && history.first ? <span title={formatTime(history.first)}>first seen {relative(history.first)}</span> : null}
           {history && history.last ? <span title={formatTime(history.last)}>last seen {relative(history.last)}</span> : null}

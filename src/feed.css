@@ -1378,3 +1378,14 @@ a.chip--ioc:hover {
 .refusal__source[open] > summary {
   margin-bottom: 0.5rem;
 }
+
+/* ---------- dependency check ---------- */
+
+.deps-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 22px 0 28px;
+}
+.deps-form .search { flex: 1 1 300px; }
+.deps-form .filter { height: 44px; }

@@ -76,6 +76,11 @@ survive the match.
 ## URLs
 
 - `/` the feed, newest first, with search and event filters.
+- `/deps` and `/deps/{package}` the dependency check: it reads the package's
+  current PKGBUILD dependency arrays and cross-references them with H044/H045/
+  H026 ownership signals and H046 dependency-impact alerts from the last 30
+  days. The landing page lists recent H046 packages; a missing dependency name
+  is never guessed.
 - `/<YYYY-MM-DD>/<HHMMSS>/` one notification, split into explained sections:
   new alerts, packages over threshold (each with its rule breakdown), IOC
   matches, and campaigns. Each flagged package has a Findings/Source switch:
