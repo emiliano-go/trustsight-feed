@@ -20,6 +20,7 @@ describe('lastNotification', () => {
   it('uses whichever notification arrived last', () => {
     expect(lastNotification({ last_alert: 100, last_alive: 200 })).toBe(200)
     expect(lastNotification({ last_alert: 300, last_alive: 200 })).toBe(300)
+    expect(lastNotification({ last: 400, last_alert: 300, last_alive: 200 })).toBe(400)
   })
 
   it('accepts one side and ignores absent timestamps', () => {

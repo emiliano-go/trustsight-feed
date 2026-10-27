@@ -61,7 +61,7 @@ export function relative(time, now = Date.now()) {
 /** The newest notification timestamp: an alert and a heartbeat both count. */
 export function lastNotification(stats) {
   if (!stats) return null
-  const times = [stats.last_alert, stats.last_alive]
+  const times = [stats.last, stats.last_alert, stats.last_alive]
     .map((value) => (value === null || value === undefined || value === '' ? NaN : Number(value)))
     .filter(Number.isFinite)
   return times.length ? Math.max(...times) : null

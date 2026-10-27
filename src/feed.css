@@ -30,7 +30,6 @@
 }
 
 .masthead--feed .masthead-note {
-  max-width: 44em;
   margin-top: 22px;
   padding-left: 16px;
   border-left: 2px solid var(--rule);
@@ -655,7 +654,6 @@ a.chip--ioc:hover {
 
 .detail__explain {
   margin: 0 0 18px;
-  max-width: 62ch;
   color: var(--fg-muted);
   font-size: 0.8824rem;
   line-height: 1.6;
@@ -713,7 +711,7 @@ a.chip--ioc:hover {
   color: var(--accent);
 }
 .rule-section__name { flex: 1; font-size: inherit; font-weight: inherit; color: inherit; }
-.rule-section__desc { margin: 0 0 8px; max-width: 62ch; color: var(--fg-muted); font-size: 0.8824rem; line-height: 1.6; }
+.rule-section__desc { margin: 0 0 8px; color: var(--fg-muted); font-size: 0.8824rem; line-height: 1.6; }
 .rule-section__link { font-family: var(--font-mono); font-size: 0.7647rem; }
 
 .rule-section__tap {
@@ -847,7 +845,7 @@ a.chip--ioc:hover {
   border-radius: 6px;
 }
 .partial__head { margin: 0 0 6px; font-size: 0.9412rem; }
-.partial__body { margin: 0; max-width: 62ch; color: var(--fg-muted); font-size: 0.8824rem; line-height: 1.6; }
+.partial__body { margin: 0; color: var(--fg-muted); font-size: 0.8824rem; line-height: 1.6; }
 .partial__details { margin: 10px 0 0; }
 .partial__details summary {
   cursor: pointer;
@@ -1234,7 +1232,7 @@ a.chip--ioc:hover {
 }
 .api-path { font-family: var(--font-mono); font-size: 0.8529rem; color: var(--fg); word-break: break-all; }
 .api-endpoint__title { margin: 10px 0 0; font-size: 1rem; font-weight: 700; }
-.api-endpoint__desc { margin: 8px 0 0; max-width: 70ch; color: var(--fg-muted); font-size: 0.8824rem; line-height: 1.6; overflow-wrap: anywhere; }
+.api-endpoint__desc { margin: 8px 0 0; color: var(--fg-muted); font-size: 0.8824rem; line-height: 1.6; overflow-wrap: anywhere; }
 
 .api-params { width: 100%; border-collapse: collapse; font-size: 0.8235rem; }
 .api-params th, .api-params td { padding: 10px 16px 10px 0; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
