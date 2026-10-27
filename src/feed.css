@@ -651,7 +651,7 @@ a.chip--ioc:hover {
 }
 .pkg__name:hover { color: var(--accent); }
 .pkg__version { font-family: var(--font-mono); font-size: 0.7647rem; color: var(--fg-muted); }
-.pkg__meta { margin: 8px 0 0; color: var(--fg-muted); font-size: 0.8235rem; }
+.pkg__meta { margin: 8px 0 0; color: var(--fg-muted); font-size: 0.8235rem; overflow-wrap: anywhere; }
 
 .detail__explain {
   margin: 0 0 18px;
@@ -659,6 +659,7 @@ a.chip--ioc:hover {
   color: var(--fg-muted);
   font-size: 0.8824rem;
   line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
 /* ---------- rule explanation sections ---------- */
@@ -763,15 +764,16 @@ a.chip--ioc:hover {
   font-family: var(--font-mono);
   font-size: 0.7647rem;
   color: var(--fg);
-  white-space: pre;
-  overflow-x: auto;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-width: 100%;
 }
 .finding__loc--none {
   background: transparent;
   color: var(--fg-muted);
   font-style: italic;
 }
-.finding__reason { display: block; margin: 10px 0 0; color: var(--fg); font-size: 0.8824rem; line-height: 1.55; text-wrap: pretty; }
+.finding__reason { display: block; margin: 10px 0 0; color: var(--fg); font-size: 0.8824rem; line-height: 1.55; text-wrap: pretty; overflow-wrap: anywhere; }
 
 /* The matched source line, shown as the diff line it came from. */
 .finding__diff {
@@ -1232,7 +1234,7 @@ a.chip--ioc:hover {
 }
 .api-path { font-family: var(--font-mono); font-size: 0.8529rem; color: var(--fg); word-break: break-all; }
 .api-endpoint__title { margin: 10px 0 0; font-size: 1rem; font-weight: 700; }
-.api-endpoint__desc { margin: 8px 0 0; max-width: 70ch; color: var(--fg-muted); font-size: 0.8824rem; line-height: 1.6; }
+.api-endpoint__desc { margin: 8px 0 0; max-width: 70ch; color: var(--fg-muted); font-size: 0.8824rem; line-height: 1.6; overflow-wrap: anywhere; }
 
 .api-params { width: 100%; border-collapse: collapse; font-size: 0.8235rem; }
 .api-params th, .api-params td { padding: 10px 16px 10px 0; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
@@ -1358,9 +1360,20 @@ a.chip--ioc:hover {
   .source__hits { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 0; }
   .pkg__action, .member__pkgbuild { align-self: flex-start; }
   .finding__loc { max-width: 100%; }
+  .pkg__viewrow { justify-content: flex-start; }
+  .view-switch button { min-width: 0; }
+  .history-row { flex-basis: 100%; }
+  .diff__file-head { flex-wrap: wrap; }
+  .api-params tbody th, .api-params td { white-space: normal; overflow-wrap: anywhere; }
 
   /* The modal takes the screen without ever exceeding it. */
   .modal__panel { max-height: 88vh; }
+}
+
+@media (max-width: 480px) {
+  .masthead-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; }
+  .masthead-stats > div { min-width: 0; }
+  .masthead-stats b { font-size: 1.4118rem; overflow-wrap: anywhere; }
 }
 
 

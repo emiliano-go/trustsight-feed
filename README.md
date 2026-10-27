@@ -83,11 +83,12 @@ survive the match.
   is never guessed.
 - `/<YYYY-MM-DD>/<HHMMSS>/` one notification, split into explained sections:
   new alerts, packages over threshold (each with its rule breakdown), IOC
-  matches, and campaigns. Each flagged package has a Findings/Source switch:
-  Source shows the analysed file from the AUR repository with the flagged lines
-  highlighted and the rule named on each one. The full JSON is hidden behind a
-  Show JSON button. A same-second collision appends the ntfy id to keep the slug
-  unique.
+  matches, and campaigns. Each package has Findings, Source and Diff tabs:
+  Source shows the current file from the AUR repository with the flagged lines
+  highlighted and the rule named on each one, and Diff shows the change the
+  watcher analysed when the document carries it. The full JSON is hidden behind
+  a Show JSON button. A same-second collision appends the ntfy id to keep the
+  slug unique.
 
 On a phone, a rule explanation opens as a modal (a bottom sheet) rather than a
 hover box, and every control is sized for touch.
@@ -148,11 +149,11 @@ A read-only JSON API over the same store, with an OpenAPI 3.1 description:
 - `/api/diff/{package}` the latest AUR commit as a unified diff, so the page can
   show what changed, including the removed lines.
 
-Source and diff are fetched from the AUR at most once per day per file and then
-served from the `source_cache` table, so a page view never reaches the AUR. The
-exact revision the watcher analysed is not stored; the current repository file
-is served, and the newest diff, which is usually the change that triggered the
-alert.
+Source is fetched from the AUR at most once per day per file and then served
+from the `source_cache` table, so a page view never reaches the AUR. The diff
+is usually taken from the stored notification, which is the revision the
+watcher analysed; `/api/diff` is the fallback for a document that does not
+carry one, and serves the latest AUR commit.
 - `/health` (and `/healthz`) liveness and readiness: `ok` with the schema
   version and the time of the most recent notification, or `503` when the
   database is unreachable. Not rate limited.

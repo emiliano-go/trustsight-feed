@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { AccessibilityMenu, ThemeSwitch, Wordmark } from './Controls.jsx'
 import { RuleChip } from './RuleChip.jsx'
-import { eventBadgeClass, eventLabel, formatTime, relative } from './util.js'
+import { eventBadgeClass, eventLabel, flattenProse, formatTime, lastNotification, relative } from './util.js'
 
 const DOCS = 'https://docs.trustsight.org'
 const SECURITY = `${DOCS}/security/`
@@ -106,7 +106,7 @@ export function FeedItem({ item, onRule }) {
         {isCampaign ? <span className="badge">campaign</span> : null}
       </div>
       <h3 className="feed-item__title">
-        <a href={href} data-route>{item.headline || item.title || 'Untitled notification'}</a>
+        <a href={href} data-route>{flattenProse(item.headline || item.title || 'Untitled notification')}</a>
       </h3>
       <div className="feed-item__tags">
         {item.packages.map((name) => (
@@ -288,6 +288,7 @@ export function App() {
   const emptyMessage = active
     ? 'No alerts match these filters.'
     : 'No alerts yet. New ones appear here as the watcher raises them.'
+  const lastSeen = lastNotification(stats)
 
   return (
     <div className="page" id="top">
@@ -317,9 +318,9 @@ export function App() {
             <b>{stats ? stats.total + (stats.alive || 0) : '…'}</b>Total scans
           </div>
           <div><b>{stats ? stats.total : '…'}</b>Alerts</div>
-          {stats && Number.isFinite(stats.last_alive) ? (
-            <div title={`last alive: ${formatTime(stats.last_alive)}; last alert: ${formatTime(stats.last_alert)}`}>
-              <b>{relative(stats.last_alive, now)}</b>Last refreshed
+          {lastSeen !== null ? (
+            <div title={`last alert: ${formatTime(stats.last_alert)}; last alive: ${formatTime(stats.last_alive)}`}>
+              <b>{relative(lastSeen, now)}</b>Last notification
             </div>
           ) : null}
           {stats ? <div className="stat--warn"><b>{stats.over_threshold}</b>Packages over threshold</div> : null}

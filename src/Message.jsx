@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks'
 import { AccessibilityMenu, ThemeSwitch, Wordmark } from './Controls.jsx'
 import { RuleChip, RuleHighlight, RuleSection, ruleInfo, sortRuleIds } from './RuleChip.jsx'
-import { AUR_PACKAGE, AUR_PKGBUILD, chunk, eventBadgeClass, eventLabel, formatTime, locationLabel, relative } from './util.js'
+import { AUR_PACKAGE, AUR_PKGBUILD, chunk, eventBadgeClass, eventLabel, flattenProse, formatTime, locationLabel, relative } from './util.js'
 import { alertingClusters, campaignCommon, campaignEvents } from '../worker/lib.js'
 import { renderMarkdown, renderInlineCode } from './markdown.jsx'
 
@@ -114,8 +114,8 @@ function diffFiles(diffText) {
   const files = []
   const seen = new Set()
   for (const line of String(diffText || '').split('\n')) {
-    const m = line.match(/^diff --git a\/.+ b\/(.+)$/)
-    if (m && !seen.has(m[1])) { seen.add(m[1]); files.push(m[1]) }
+    const m = line.match(/^diff --git a\/.+ b\/(.+)$/) || line.match(/^\+\+\+ b\/(.+)$/)
+    if (m && m[1] !== '/dev/null' && !seen.has(m[1])) { seen.add(m[1]); files.push(m[1]) }
   }
   return files
 }
@@ -329,7 +329,7 @@ function MaintainersSection({ packages }) {
  * what the reader should do - without the rule-name jargon the payload
  * carries for the catalog pages.
  */
-function Refusals({ refusals }) {
+function Refusals({ refusals, diffs }) {
   if (!refusals.length) return null
   return (
     <section className="detail__section">
@@ -379,7 +379,11 @@ function Refusals({ refusals }) {
               </>
             ) : null}
             {findings.length ? (
-              <FindingsOrSource packageName={refusal.package} findings={findings} />
+              <ChangeViews
+                packageName={refusal.package}
+                findings={findings}
+                diff={(diffs && diffs.get(refusal.package)) || undefined}
+              />
             ) : null}
             {!unresolved.length && !findings.length ? (
               <>
@@ -389,7 +393,7 @@ function Refusals({ refusals }) {
                   gap in the check, not a sign of a problem — but a problem in
                   the unread part would not have been seen either.
                 </p>
-                {refusal.reason ? <p className="pkg__meta">Technical detail: {refusal.reason}</p> : null}
+                {refusal.reason ? <p className="pkg__meta">Technical detail: {flattenProse(refusal.reason)}</p> : null}
               </>
             ) : null}
           </article>
@@ -523,31 +527,6 @@ function MaintainerChange({ entry }) {
   )
 }
 
-/** The exact PKGBUILD change the watcher analysed, when the payload carries it. */
-export function AnalysedDiff({ entry }) {
-  if (!entry) return null
-  const digest = entry.pkgbuild_sha256 || entry.diff_sha256 || ''
-  if (entry.diff) {
-    return (
-      <details className="history-item__findings">
-        <summary>Analysed change (exact revision)</summary>
-        <pre className="finding__diff">{entry.diff}</pre>
-        {digest ? <p className="pkg__meta">PKGBUILD sha256: <code className="md-code">{digest}</code></p> : null}
-      </details>
-    )
-  }
-  if (entry.diff_truncated || digest) {
-    return (
-      <p className="pkg__meta">
-        Analysed revision recorded
-        {digest ? <> (<code className="md-code">{digest}</code>)</> : null}
-        ; the diff was too large to include, so the feed cannot show it.
-      </p>
-    )
-  }
-  return null
-}
-
 /** The arithmetic behind an over-threshold package, without hiding the inputs. */
 function ScoreBreakdown({ pkg }) {
   const findings = Array.isArray(pkg.findings) ? pkg.findings : []
@@ -567,7 +546,7 @@ function ScoreBreakdown({ pkg }) {
               <RuleChip id={finding.rule_id} />
               <span className="finding__loc">weight {Number(finding.weight) || 0}</span>
             </div>
-            {finding.reason ? <p className="finding__reason">{renderInlineCode(finding.reason)}</p> : null}
+            {finding.reason ? <p className="finding__reason">{renderInlineCode(flattenProse(finding.reason))}</p> : null}
           </li>
         ))}
       </ul>
@@ -607,7 +586,14 @@ function AlertPackage({ entry, iocPackages }) {
           which was adopted or orphaned this cycle
         </p>
       ) : null}
-      <AnalysedDiff entry={entry} />
+      <ChangeViews
+        packageName={entry.package}
+        findings={[]}
+        diff={entry.diff}
+        diffSha={entry.pkgbuild_sha256 || entry.diff_sha256}
+        diffTruncated={entry.diff_truncated}
+        defaultView="diff"
+      />
     </article>
   )
 }
@@ -687,8 +673,8 @@ function AlertList({ alerts, overPackages, iocPackages, campaigns = [] }) {
 function splitReason(reason) {
   if (!reason) return { text: '', diff: '' }
   const m = reason.match(/(?:^|:\s)([+-]\s*\S[^\n]*)$/)
-  if (!m) return { text: reason.trim(), diff: '' }
-  return { text: reason.slice(0, m.index).replace(/:\s*$/, '').trim(), diff: m[1].trim() }
+  if (!m) return { text: flattenProse(reason), diff: '' }
+  return { text: flattenProse(reason.slice(0, m.index).replace(/:\s*$/, '')), diff: m[1].trim() }
 }
 
 function diffLineClass(diff) {
@@ -781,7 +767,7 @@ function PartialAnalysisCard({ findings }) {
         <ul className="partial__raw">
           {findings.map((f, i) => (
             <li key={`${f.rule_id}-${i}`}>
-              <RuleChip id={f.rule_id} /> <span className="partial__rawreason">{f.reason}</span>
+              <RuleChip id={f.rule_id} /> <span className="partial__rawreason">{flattenProse(f.reason)}</span>
             </li>
           ))}
         </ul>
@@ -812,7 +798,7 @@ export function Findings({ findings }) {
             <div className="finding__head">
               <RuleChip id={f.rule_id} />
               {loc
-                ? <pre className="finding__loc">{loc}</pre>
+                ? <span className="finding__loc">{loc}</span>
                 : <span className="finding__loc finding__loc--none" title="This signal names a fact about the change, not a line">no line</span>}
             </div>
             {reasonText ? <p className="finding__reason">{renderInlineCode(reasonText)}</p> : null}
@@ -1090,45 +1076,80 @@ function ViewToggle({ view, onChange }) {
  * (index, ---, +++) are dropped; rename, new-file and mode lines become a note
  * on the file.
  */
-function parseDiff(text) {
+export function parseDiff(text) {
   const files = []
   let file = null
   let oldNo = 0
   let newNo = 0
+  let oldLeft = 0
+  let newLeft = 0
+  const begin = (name = '', oldName = '') => {
+    file = { name, oldName, add: 0, del: 0, note: '', rows: [] }
+    files.push(file)
+  }
   for (const line of text.split('\n')) {
+    if (oldLeft > 0 || newLeft > 0) {
+      if (line.startsWith('\\')) continue
+      if (line.startsWith('+')) {
+        file.rows.push({ type: 'add', new: newNo++, text: line.slice(1) })
+        file.add++
+        newLeft--
+        continue
+      }
+      if (line.startsWith('-')) {
+        file.rows.push({ type: 'del', old: oldNo++, text: line.slice(1) })
+        file.del++
+        oldLeft--
+        continue
+      }
+      if (line.startsWith(' ')) {
+        file.rows.push({ type: 'ctx', old: oldNo++, new: newNo++, text: line.slice(1) })
+        oldLeft--
+        newLeft--
+        continue
+      }
+      oldLeft = 0
+      newLeft = 0
+    }
     const head = line.match(/^diff --git a\/.+ b\/(.+)$/)
     if (head) {
-      file = { name: head[1], add: 0, del: 0, note: '', rows: [] }
-      files.push(file)
+      begin(head[1], head[1])
+      continue
+    }
+    // Stored notification diffs may be a plain unified diff with no
+    // `diff --git` line; the `---`/`+++` pair still names the file.
+    const oldHead = line.match(/^--- (?:a\/)?(.+)$/)
+    if (oldHead) {
+      if (!(file && file.name && !file.rows.length)) begin('', oldHead[1])
+      continue
+    }
+    const newHead = line.match(/^\+\+\+ (?:b\/)?(.+)$/)
+    if (newHead) {
+      if (file && !file.name) {
+        file.name = newHead[1] === '/dev/null' ? (file.oldName || 'file') : newHead[1]
+      }
       continue
     }
     if (!file) continue
-    const hunk = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@\s*(.*)$/)
+    const hunk = line.match(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@\s*(.*)$/)
     if (hunk) {
       oldNo = Number(hunk[1])
-      newNo = Number(hunk[2])
-      file.rows.push({ type: 'hunk', text: hunk[3] || '' })
+      newNo = Number(hunk[3])
+      oldLeft = hunk[2] === undefined ? 1 : Number(hunk[2])
+      newLeft = hunk[4] === undefined ? 1 : Number(hunk[4])
+      file.rows.push({ type: 'hunk', text: hunk[5] || '' })
       continue
     }
-    if (/^(index |--- |\+\+\+ )/.test(line)) continue
+    if (/^index /.test(line)) continue
     const note = line.match(/^(new file|deleted file|rename (?:from|to)|similarity|old mode|new mode)\b(.*)$/)
     if (note) {
       file.note = file.note || (note[1] === 'new file' ? 'new file' : note[1] === 'deleted file' ? 'deleted' : 'renamed')
       continue
     }
-    if (line.startsWith('\\')) continue
-    if (!file.rows.length) continue
-    if (line.startsWith('+')) {
-      file.rows.push({ type: 'add', new: newNo++, text: line.slice(1) })
-      file.add++
-    } else if (line.startsWith('-')) {
-      file.rows.push({ type: 'del', old: oldNo++, text: line.slice(1) })
-      file.del++
-    } else if (line !== '' || oldNo) {
-      file.rows.push({ type: 'ctx', old: oldNo++, new: newNo++, text: line.slice(1) })
-    }
   }
-  return files.filter((f) => f.rows.length)
+  return files
+    .filter((f) => f.rows.length)
+    .map((f) => (f.name ? f : { ...f, name: f.oldName || 'file' }))
 }
 
 /**
@@ -1137,10 +1158,15 @@ function parseDiff(text) {
  * disappeared from the recipe is visible even when the current file no longer
  * contains it.
  */
-function DiffView({ packageName }) {
-  const [state, setState] = useState({ loading: true })
+function DiffView({ packageName, diff, diffSha, diffTruncated }) {
+  const stored = diff !== undefined || Boolean(diffTruncated) || Boolean(diffSha)
+  const [state, setState] = useState(() => stored ? { diff: String(diff || '') } : { loading: true })
 
   useEffect(() => {
+    if (stored) {
+      setState({ diff: String(diff || '') })
+      return undefined
+    }
     let live = true
     setState({ loading: true })
     fetch(`/api/diff/${encodeURIComponent(packageName)}`)
@@ -1152,7 +1178,7 @@ function DiffView({ packageName }) {
       .then((body) => { if (live) setState({ diff: String(body.diff || '') }) })
       .catch((err) => { if (live) setState({ error: String(err && err.message ? err.message : err) }) })
     return () => { live = false }
-  }, [packageName])
+  }, [packageName, diff, stored])
 
   const files = parseDiff(state.diff || '')
   const added = files.reduce((n, f) => n + f.add, 0)
@@ -1160,9 +1186,18 @@ function DiffView({ packageName }) {
 
   return (
     <div className="diff">
+      {stored ? (
+        <p className="pkg__meta diff__source">
+          The change the watcher analysed
+          {diffSha ? <> &middot; <code className="md-code">{String(diffSha).slice(0, 12)}</code></> : null}
+          {diffTruncated ? '. The diff was too large to include.' : null}
+        </p>
+      ) : null}
       {state.loading ? <p className="pkg__meta">Loading diff…</p> : null}
       {state.error ? <p className="feed-error">Could not load the diff: {state.error}</p> : null}
-      {state.diff !== undefined && !files.length ? <p className="pkg__meta">No diff for the latest commit.</p> : null}
+      {state.diff !== undefined && !files.length && !diffTruncated ? (
+        <p className="pkg__meta">{stored ? 'The analysed change recorded no diff.' : 'No diff for the latest commit.'}</p>
+      ) : null}
       {files.length ? (
         <>
           <p className="diff__summary">
@@ -1203,9 +1238,11 @@ function DiffView({ packageName }) {
   )
 }
 
-/** The findings list, with a switch to the highlighted source or the diff. */
-function FindingsOrSource({ packageName, findings }) {
-  const [view, setView] = useState('findings')
+/** One package's change: Findings, Source and Diff, in one tabbed view. */
+export function ChangeViews({
+  packageName, findings = [], diff, diffSha, diffTruncated, defaultView,
+}) {
+  const [view, setView] = useState(defaultView || (findings.length ? 'findings' : 'diff'))
   const files = [...new Set(findings.map((f) => f.file).filter(Boolean))]
   // PKGBUILD first: it is the artifact a reader wants by default.
   files.sort((a, b) => (a === 'PKGBUILD' ? -1 : b === 'PKGBUILD' ? 1 : a.localeCompare(b)))
@@ -1217,8 +1254,10 @@ function FindingsOrSource({ packageName, findings }) {
       {view === 'source'
         ? <SourceView packageName={packageName} files={files.length ? files : ['PKGBUILD']} findings={findings} />
         : view === 'diff'
-          ? <DiffView packageName={packageName} />
-          : <Findings findings={findings} />}
+          ? <DiffView packageName={packageName} diff={diff} diffSha={diffSha} diffTruncated={diffTruncated} />
+          : findings.length
+            ? <Findings findings={findings} />
+            : <p className="pkg__meta">This entry carries no line-located finding. Open the Diff tab to read the change.</p>}
     </>
   )
 }
@@ -1263,12 +1302,24 @@ function PackageSections({ packages, iocPackages }) {
             {findings.some(isPartialFinding) ? <PartialBanner /> : null}
             <ContextBlock packageName={pkg.package} findings={findings} />
             {findings.length ? (
-              <FindingsOrSource packageName={pkg.package} findings={findings} />
+              <ChangeViews
+                packageName={pkg.package}
+                findings={findings}
+                diff={pkg.diff}
+                diffSha={pkg.pkgbuild_sha256 || pkg.diff_sha256}
+                diffTruncated={pkg.diff_truncated}
+              />
             ) : (
-              <p className="pkg__meta">No located findings in this entry.</p>
+              <ChangeViews
+                packageName={pkg.package}
+                findings={[]}
+                diff={pkg.diff}
+                diffSha={pkg.pkgbuild_sha256 || pkg.diff_sha256}
+                diffTruncated={pkg.diff_truncated}
+                defaultView="diff"
+              />
             )}
             <ScoreBreakdown pkg={pkg} />
-            <AnalysedDiff entry={pkg} />
             {rules.length ? (
               <div className="rule-sections">
                 {sortRuleIds(rules).map((id) => <RuleSection key={id} id={id} />)}
@@ -1400,6 +1451,12 @@ export function Message({ slug }) {
   const alerts = payload.alerts || []
   const packages = payload.over_threshold || []
   const overPackages = new Set(packages.map((p) => p.package))
+  // The document may carry the analysed diff on a bare alert or an over-threshold
+  // package; keep whichever record has one so every tab can show the same revision.
+  const diffs = new Map()
+  for (const entry of [...alerts, ...packages]) {
+    if (entry && entry.package && entry.diff !== undefined) diffs.set(entry.package, entry.diff)
+  }
   const ioc = payload.ioc_matches || []
   const iocPackages = new Set(ioc.map((m) => m.package))
   const allPackages = [...new Set([
@@ -1481,7 +1538,7 @@ export function Message({ slug }) {
 
         {data ? (
           <>
-            <h1>{data.headline || data.title || '(untitled notification)'}</h1>
+            <h1>{flattenProse(data.headline || data.title || '(untitled notification)')}</h1>
             <div className="detail__meta">
               <span title="Your local time with its offset, then UTC">{formatTime(data.time)}</span>
               <span>{relative(data.time)}</span>
@@ -1505,7 +1562,7 @@ export function Message({ slug }) {
 
             {data.event === 'trustsight.alerts' ? <CalibrationNote /> : null}
             <MaintainersSection packages={maintainerPackages} />
-            <Refusals refusals={payload.refusals || []} />
+            <Refusals refusals={payload.refusals || []} diffs={diffs} />
             <IocSection matches={ioc} />
             <Campaigns payload={payload} />
             <AlertList alerts={alerts} overPackages={overPackages} iocPackages={iocPackages} campaigns={alertingClusters(payload)} />

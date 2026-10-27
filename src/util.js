@@ -58,6 +58,23 @@ export function relative(time, now = Date.now()) {
   return `${Math.floor(delta / 86400)}d ago`
 }
 
+/** The newest notification timestamp: an alert and a heartbeat both count. */
+export function lastNotification(stats) {
+  if (!stats) return null
+  const times = [stats.last_alert, stats.last_alive]
+    .map((value) => (value === null || value === undefined || value === '' ? NaN : Number(value)))
+    .filter(Number.isFinite)
+  return times.length ? Math.max(...times) : null
+}
+
+/** Collapse hard line breaks in prose so the viewport decides where it wraps. */
+export function flattenProse(text) {
+  return String(text ?? '')
+    .replace(/\s*\r?\n\s*/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
 /** Human label for a TrustSight document event. */
 export function eventLabel(event) {
   if (event === 'trustsight.alerts') return 'alerts'

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'preact/hooks'
 import { AccessibilityMenu, ThemeSwitch, Wordmark } from './Controls.jsx'
-import { AnalysedDiff, Findings, LimitsNote, diffValues, parsePkgbuild, sourceUrlsFromDiff } from './Message.jsx'
+import { ChangeViews, LimitsNote, diffValues, parsePkgbuild, sourceUrlsFromDiff } from './Message.jsx'
 import { RuleChip } from './RuleChip.jsx'
-import { AUR_PACKAGE, AUR_PKGBUILD, eventBadgeClass, eventLabel, formatTime, relative } from './util.js'
+import { AUR_PACKAGE, AUR_PKGBUILD, eventBadgeClass, eventLabel, flattenProse, formatTime, relative } from './util.js'
 
 const FP_DOCS = 'https://docs.trustsight.org/guides/tuning-false-positives/'
 const FP_ISSUE = 'https://github.com/emiliano-go/trustsight/issues/new?template=false_positive.yml'
@@ -181,7 +181,7 @@ export function Package({ name }) {
                   {history.maintainers.map((m, i) => (
                     <li className="history-row" key={`${m.time}-${m.rule_id}-${i}`}>
                       <RuleChip id={m.rule_id} />
-                      <span className="history-row__main">{m.reason || 'maintainer-change rule fired'}</span>
+                      <span className="history-row__main">{flattenProse(m.reason || 'maintainer-change rule fired')}</span>
                       <a className="history-row__time" href={`/${m.slug}/`} data-route>{relative(m.time)}</a>
                     </li>
                   ))}
@@ -249,7 +249,7 @@ export function Package({ name }) {
                     <a className="pkg__action" href={`/${item.slug}/`} data-route>Open alert ↗</a>
                   </header>
                   <h3 className="history-item__title">
-                    <a href={`/${item.slug}/`} data-route>{item.headline}</a>
+                    <a href={`/${item.slug}/`} data-route>{flattenProse(item.headline)}</a>
                   </h3>
                   {item.ioc.length ? (
                     <p className="pkg__meta">Indicators: {item.ioc.map((indicator) => <code className="md-code" key={indicator}>{indicator}</code>)}</p>
@@ -273,13 +273,13 @@ export function Package({ name }) {
                       {item.rules.map((id) => <RuleChip key={`${item.slug}-${id}`} id={id} />)}
                     </div>
                   ) : null}
-                  {item.findings.length ? (
-                    <details className="history-item__findings">
-                      <summary>{item.findings.length} finding{item.findings.length === 1 ? '' : 's'}</summary>
-                      <Findings findings={item.findings} />
-                    </details>
-                  ) : null}
-                  <AnalysedDiff entry={item} />
+                  <ChangeViews
+                    packageName={name}
+                    findings={item.findings || []}
+                    diff={item.diff || undefined}
+                    diffSha={item.pkgbuild_sha256 || item.diff_sha256}
+                    diffTruncated={item.diff_truncated}
+                  />
                 </article>
               ))}
             </section>
