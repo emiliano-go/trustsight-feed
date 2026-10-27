@@ -93,7 +93,12 @@ export async function storeRow(env, row, verification = null) {
   ).bind(row.id, row.slug, verification ? verification.bodySha256 : null).all()
   const hits = results || []
   if (hits.some((hit) => hit.id === row.id)) return false
-  if (verification && hits.some(
+  // Heartbeats are deliberately identical across quiet cycles: the payload
+  // carries only cycle counts.  De-duplicating them by body hash would drop a
+  // real liveness signal, so the replay guard applies to content documents
+  // only; a heartbeat is still unique by its webhook id and timestamp.
+  const heartbeat = row.event === 'trustsight.heartbeat'
+  if (!heartbeat && verification && hits.some(
     (hit) => hit.body_sha256 && hit.body_sha256 === verification.bodySha256)) {
     // A captured signed body replayed under a new webhook id is not a new
     // notification.  The unique index is the final guard against the race.
@@ -102,8 +107,11 @@ export async function storeRow(env, row, verification = null) {
   const slugTaken = hits.some((hit) => hit.slug === row.slug)
   const slug = slugTaken ? `${row.slug}-${row.id}` : row.slug
 
+  const stored = heartbeat && verification
+    ? { ...verification, bodySha256: null }
+    : verification
   try {
-    await insertRow(env, row, slug, verification)
+    await insertRow(env, row, slug, stored)
   } catch (err) {
     const message = String(err && err.message)
     if (/UNIQUE constraint failed: notifications\.body_sha256/.test(message)) {
@@ -111,7 +119,7 @@ export async function storeRow(env, row, verification = null) {
     }
     // A concurrent same-second writer took the slug between read and insert.
     if (!/UNIQUE constraint failed: notifications\.slug/.test(message)) throw err
-    await insertRow(env, row, `${row.slug}-${row.id}`, verification)
+    await insertRow(env, row, `${row.slug}-${row.id}`, stored)
   }
   return true
 }

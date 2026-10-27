@@ -764,6 +764,20 @@ describe('signed direct ingest', () => {
     expect(n.n).toBe(1)
   })
 
+  it('keeps identical heartbeat bodies as separate liveness signals', async () => {
+    const { privateKey, env: e } = await withKeys()
+    const ts = Math.floor(Date.now() / 1000)
+    const doc = '{"event":"trustsight.heartbeat","tool":"trustsight","title":"TrustSight: alive"}'
+    const first = await ingestDocument(e, doc, headersFor('beat-a', ts, await sign(privateKey, 'beat-a', ts, doc)))
+    const second = await ingestDocument(e, doc, headersFor('beat-b', ts, await sign(privateKey, 'beat-b', ts, doc)))
+    expect(first.stored).toBe(true)
+    expect(second.stored).toBe(true)
+    const n = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM notifications WHERE event = 'trustsight.heartbeat'"
+    ).first()
+    expect(n.n).toBe(2)
+  })
+
   it('verifies the signature over raw bytes, not a re-encoding', async () => {
     const { privateKey, env: e } = await withKeys()
     const ts = Math.floor(Date.now() / 1000)
