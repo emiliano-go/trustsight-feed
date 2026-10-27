@@ -844,7 +844,7 @@
     "name": "Attack-Chain Composition",
     "severity": "INFO",
     "categoryTitle": "Composition",
-    "description": "Stages: takeover (H026, H044, H074), mass adoption (H045, H073), install hook (H023, H017), foreign fetch (R001, H035, H066, H034), payload (H068, H069), obfuscation (H036, H065), anti-analysis (H067), write-then-execute (H072), staging (H038), recon (H040), persistence (H039, H062, H076), exfil (H041, H071), hidden drop (H042), integrity removed (H091) and sabotage (S001-S008). Later rules also map onto these stages, including R041, R054, R144, the H080-H083/H089-H091 additions and the X001-X034 crossfire rules; the authoritative rule-to-stage map is `_STAGE_OF` in `analysis/composition.py`.",
+    "description": "Stages: takeover (H026, H044, H074, H086, H088, H105), mass adoption (H045, H073), install hook (H023, H017, H100), foreign fetch (R001, H035, H066, H034, H075), registry (W002, H106), payload (H068, H069), obfuscation (H036, H065), anti-analysis (H067), write-then-execute (H072, H081, C032), staging (H038), recon (H040), persistence (H039, H062, H076, H093, H095, H108), exfil (H041, H071, H107), hidden drop (H042), integrity removed (H087, H091) and sabotage (S001-S008). Later rules also map onto these stages, including R041, R054, R144, the H080-H083/H089-H091 additions and the X001-X034 crossfire rules; the authoritative rule-to-stage map is `_STAGE_OF` in `analysis/composition.py`.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/composition/#h043"
   },
   "h044": {
@@ -1334,6 +1334,38 @@
     "categoryTitle": "Naming and Dependencies",
     "description": "A placeholder reserves a name in the AUR while installing nothing - it builds, runs, and ships an empty package. Individually it is inert, so the finding is not a payload claim: it states that the recipe claims a name it does not fill, which is worth a human's eye because a burst of them is a name-squatting campaign ([G011](correlation.md#g011)). The two-of-three threshold keeps a legitimate project pinned at a `0.0.0` release or an unusual-but-real package function from reading as a reservation. Weight 0 until the benign corpus calibrates it; read from the recipe text, so it fires identically whether the package is first seen, edited, or checked with `trustsight lint`.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/naming-and-dependency/#h104"
+  },
+  "h105": {
+    "id": "H105",
+    "name": "Adopted Source Executed",
+    "severity": "HIGH",
+    "categoryTitle": "Maintainer and Metadata",
+    "description": "H088 catches the registry variant: an adopted recipe that now resolves code from `npm`, `bun`, `pip` or another registry. This rule catches the declared source variant used by the 2018 acroread and 2025 CHAOS RAT attacks: the recipe points at an attacker-controlled repository or file and then runs it during the build.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#h105"
+  },
+  "h106": {
+    "id": "H106",
+    "name": "Registry Or Index Override",
+    "severity": "MEDIUM",
+    "categoryTitle": "Naming and Dependencies",
+    "description": "A registry override is suspicious on its own because the default registry is the ecosystem's trust anchor. It is a delivery chain when the same function or install hook also resolves a package: the recipe chooses attacker-controlled resolution before the build runs. A read-only query such as `npm config get registry` is not an override.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/naming-and-dependency/#h106"
+  },
+  "h107": {
+    "id": "H107",
+    "name": "Credential Store Access With Egress",
+    "severity": "HIGH",
+    "categoryTitle": "Fetch and Execution",
+    "description": "Reading a configuration file is ordinary packaging; sending data is ordinary in isolation. The conjunction is a credential-stealer step written directly into the recipe rather than hidden in an external binary. The path list covers SSH keys, cloud credentials, GitHub/npm/Docker configuration, browser profile stores, `/etc/shadow`, GPG material and `/proc/*/environ`.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h107"
+  },
+  "h108": {
+    "id": "H108",
+    "name": "Service Or Cron Enable Command",
+    "severity": "HIGH",
+    "categoryTitle": "Install and Persistence",
+    "description": "`R054` catches a persistence file written outside the package root; this rule catches the command that enables it. Shipping a unit and documenting how the user may enable it is ordinary packaging. Enabling it during install changes the running system without the user asking, and survives package removal in the usual service-management sense.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#h108"
   },
   "m001": {
     "id": "M001",
