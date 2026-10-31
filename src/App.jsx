@@ -15,6 +15,8 @@ const NTFY = 'https://ntfy.sh/trustsight-aur-1d8a3fd2'
 const SITE = 'https://trustsight.org'
 const DEFAULT_EVENT = 'trustsight.alerts'
 
+const formatCount = (value) => Number(value || 0).toLocaleString('en-US')
+
 const FILTERS = [
   [DEFAULT_EVENT, 'Alerts'],
   ['trustsight.heartbeat', 'Heartbeats'],
@@ -303,6 +305,10 @@ export function App() {
           </div>
         </div>
         <h1>AUR watcher feed</h1>
+        <p className="masthead-lead">
+          Every notification the watcher raises, with its full evidence document and the rules
+          that fired.
+        </p>
         <p className="masthead-note">
           TrustSight reports evidence, not verdicts. It never runs a PKGBUILD or changes your
           system, and a clean result only means no published rule matched. It is not a reason to
@@ -314,17 +320,17 @@ export function App() {
           Read <a href={FP_DOCS} target="_blank" rel="noreferrer">the distinction</a>.
         </p>
         <div className="masthead-stats">
-          <div title={stats ? `${stats.total} alerts + ${stats.alive || 0} alive` : undefined}>
-            <b>{stats ? stats.total + (stats.alive || 0) : '…'}</b>Total scans
+          <div title={stats ? `${formatCount(stats.total)} alerts + ${formatCount(stats.alive)} alive` : undefined}>
+            <b>{stats ? formatCount(stats.total + (stats.alive || 0)) : '…'}</b>Total scans
           </div>
-          <div><b>{stats ? stats.total : '…'}</b>Alerts</div>
+          <div><b>{stats ? formatCount(stats.total) : '…'}</b>Alerts</div>
           {lastSeen !== null ? (
             <div title={`last alert: ${formatTime(stats.last_alert)}; last alive: ${formatTime(stats.last_alive)}`}>
               <b>{relative(lastSeen, now)}</b>Last notification
             </div>
           ) : null}
-          {stats ? <div className="stat--warn"><b>{stats.over_threshold}</b>Packages over threshold</div> : null}
-          {stats ? <div className="stat--ioc"><b>{stats.ioc}</b>IOC matches</div> : null}
+          {stats ? <div className="stat--warn"><b>{formatCount(stats.over_threshold)}</b>Packages over threshold</div> : null}
+          {stats ? <div className="stat--ioc"><b>{formatCount(stats.ioc)}</b>IOC matches</div> : null}
           {stats && stats.tool_version ? (
             <div className="stat--version" title="TrustSight version that produced these analyses">
               <b>{stats.tool_version}</b>Analyzer
@@ -355,7 +361,7 @@ export function App() {
                 id="feed-search"
                 type="search"
                 value={filters.q}
-                placeholder="Search by package, rule, version or day"
+                placeholder="Search alerts"
                 onInput={(e) => setFilter('q', e.target.value)}
               />
             </label>

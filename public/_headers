@@ -5,7 +5,7 @@
   Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
   Strict-Transport-Security: max-age=86400
   Cache-Control: public, max-age=0, must-revalidate
-  Content-Security-Policy: default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; img-src 'self'; style-src 'self'; font-src 'self'; script-src 'self' 'sha256-ebZMmtuKhtSpXwWUp+8hrwy+BEkdt5pnAltaoXDrj/4='; connect-src 'self'
+  Content-Security-Policy: default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; img-src 'self'; style-src 'self'; font-src 'self'; script-src 'self' 'sha256-R4IpDGkXfBu+p2tdB3BuBB746g/LwBofj28TtppAtfk='; connect-src 'self'
 
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
