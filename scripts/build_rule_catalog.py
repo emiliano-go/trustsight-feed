@@ -67,6 +67,17 @@ SYNTHETIC = {
             "of the source list, not of each URL in it."
         ),
     },
+    "TAG_CONVERGENCE": {
+        "id": "TAG_CONVERGENCE",
+        "name": "Tag Convergence",
+        "severity": "INFO",
+        "categoryTitle": "Opsonization",
+        "description": (
+            "Several distinct weight-0 tag kinds landed on one diff. "
+            "Convergence is a pointer to look once, never a score: the "
+            "tags coat evidence so later detection is cheaper."
+        ),
+    },
     "COVERAGE": {
         "id": "COVERAGE",
         "name": "Coverage Gap",
