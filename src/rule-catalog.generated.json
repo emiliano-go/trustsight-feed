@@ -1927,6 +1927,14 @@
     "description": "A weight-0 corroboration signal: the AUR says this account packaged the project, but no commit in history names them. The message is only one place an identity appears, so the author and committer names and addresses count too; a maintainer who imported the package often signs the commit and writes no message at all. Name matching is fuzzy (display name vs email vs git config), so this corroborates T006 and G008 but never scores alone. On its own tier it is nearly a confession; as a solo scorer it would eventually burn someone with an unusual committer setup.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#t007"
   },
+  "tag_convergence": {
+    "id": "TAG_CONVERGENCE",
+    "name": "Tag Convergence",
+    "severity": "INFO",
+    "categoryTitle": "Opsonization",
+    "description": "Several distinct weight-0 tag kinds landed on one diff. Convergence is a pointer to look once, never a score: the tags coat evidence so later detection is cheaper.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/"
+  },
   "u001": {
     "id": "U001",
     "name": "Manifest Added Or Removed",
