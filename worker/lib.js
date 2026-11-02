@@ -720,8 +720,8 @@ function editDistance(a, b) {
  * Returns the summed distance, so 0 is an exact token match.
  */
 export function fuzzyScore(input, text) {
-  const tokens = String(input || '').toLowerCase().match(/[a-z0-9_]+/g) || []
-  const words = String(text || '').toLowerCase().match(/[a-z0-9_]+/g) || []
+  const tokens = (String(input || '').toLowerCase().match(/[a-z0-9_]+/g) || []).slice(0, 8)
+  const words = (String(text || '').toLowerCase().match(/[a-z0-9_]+/g) || []).slice(0, 4000)
   if (!tokens.length || !words.length) return null
   let total = 0
   for (const token of tokens) {

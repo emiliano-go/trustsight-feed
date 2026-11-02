@@ -4,6 +4,8 @@ import { ChangeViews, LimitsNote, diffValues, parsePkgbuild, sourceUrlsFromDiff 
 import { RuleChip } from './RuleChip.jsx'
 import { AUR_PACKAGE, AUR_PKGBUILD, eventBadgeClass, eventLabel, flattenProse, formatTime, relative } from './util.js'
 
+const safeHref = (value) => (/^https?:\/\//i.test(String(value || '')) ? value : null)
+
 const FP_DOCS = 'https://docs.trustsight.org/guides/tuning-false-positives/'
 const FP_ISSUE = 'https://github.com/emiliano-go/trustsight/issues/new?template=false_positive.yml'
 
@@ -141,11 +143,11 @@ export function Package({ name }) {
                 <article className="context__card">
                   <span className="context__title">Upstream</span>
                   {live.url
-                    ? <a className="context__value" href={live.url} target="_blank" rel="noreferrer">{live.url}</a>
+                    ? <a className="context__value" href={safeHref(live.url) || undefined} target="_blank" rel="noreferrer">{live.url}</a>
                     : <span className="context__value">unknown</span>}
                   {live.sources.length ? (
                     <ul className="context__list">
-                      {live.sources.slice(0, 6).map((u) => <li key={u}><a href={u} target="_blank" rel="noreferrer">{u}</a></li>)}
+                      {live.sources.slice(0, 6).map((u) => <li key={u}><a href={safeHref(u) || undefined} target="_blank" rel="noreferrer">{u}</a></li>)}
                     </ul>
                   ) : null}
                 </article>

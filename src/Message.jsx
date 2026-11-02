@@ -5,6 +5,8 @@ import { AUR_PACKAGE, AUR_PKGBUILD, chunk, eventBadgeClass, eventLabel, flattenP
 import { alertingClusters, campaignCommon, campaignEvents } from '../worker/lib.js'
 import { renderMarkdown, renderInlineCode } from './markdown.jsx'
 
+const safeHref = (value) => (/^https?:\/\//i.test(String(value || '')) ? value : null)
+
 const SECURITY = 'https://docs.trustsight.org/security/'
 const FP_DOCS = 'https://docs.trustsight.org/guides/tuning-false-positives/'
 const FP_ISSUE = 'https://github.com/emiliano-go/trustsight/issues/new?template=false_positive.yml'
@@ -243,11 +245,11 @@ function ContextBlock({ packageName, findings }) {
           ) : (
             <>
               {info.url
-                ? <a className="context__value" href={info.url} target="_blank" rel="noreferrer">{info.url}</a>
+                ? <a className="context__value" href={safeHref(info.url) || undefined} target="_blank" rel="noreferrer">{info.url}</a>
                 : <span className="context__value">unknown</span>}
               {info.sources.length ? (
                 <ul className="context__list">
-                  {info.sources.slice(0, 4).map((u) => <li key={u}><a href={u} target="_blank" rel="noreferrer">{u}</a></li>)}
+                  {info.sources.slice(0, 4).map((u) => <li key={u}><a href={safeHref(u) || undefined} target="_blank" rel="noreferrer">{u}</a></li>)}
                 </ul>
               ) : null}
             </>
