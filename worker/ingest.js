@@ -99,7 +99,9 @@ export async function ingestDocument(env, rawBody, headers) {
   const text = rawBody instanceof Uint8Array ? new TextDecoder().decode(bytes) : String(rawBody ?? '')
   const verdict = await verifyIngest(env, headers, bytes)
   if (!verdict.ok) return verdict
-  const title = headers.get('Title') || ''
+  // The title is derived from the signed body; the unsigned header is not
+  // trusted.  An intercepted POST could otherwise rewrite the headline.
+  const title = ''
   let row
   try {
     row = parseNotification({

@@ -237,7 +237,7 @@ async function listQuery(env, options = {}) {
         ).bind(...params, window).all()
         const matched = (candidates.results || [])
           .filter((row) => fuzzyScore(term, row.search_text) !== null)
-          .slice(0, limit)
+          .slice(0, Math.min(limit, 90))
         if (matched.length) {
           const ids = matched.map((row) => row._rowid)
           const rows = await env.DB.prepare(
@@ -480,6 +480,7 @@ const RULE_ID_SQL = "e.rule_id GLOB '[A-Za-z][0-9][0-9][0-9]'"
 function ruleIds(raw) {
   const values = String(raw || '').split(',').map((value) => value.trim().toUpperCase()).filter(Boolean)
   if (!values.length) return []
+  if (values.length > 50) return null
   return values.every((value) => RULE_ID_RE.test(value)) ? [...new Set(values)] : null
 }
 
@@ -1026,9 +1027,10 @@ async function maintainers(env, url) {
   if (missing.length) {
     const fetched = await fetchMaintainers(missing)
     for (const name of missing) result[name] = fetched[name] || ''
-    // One multi-row upsert instead of one write per package.
-    if (missing.length) {
-      const values = missing.map((name) => [name, result[name], now])
+    // D1 caps a statement at 100 bound parameters (3 per package here).
+    for (let start = 0; start < missing.length; start += 30) {
+      const chunk = missing.slice(start, start + 30)
+      const values = chunk.map((name) => [name, result[name], now])
       await env.DB.prepare(
         `INSERT INTO maintainer_cache (package, maintainer, fetched_at)
          VALUES ${values.map(() => '(?, ?, ?)').join(', ')}

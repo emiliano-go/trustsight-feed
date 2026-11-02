@@ -6,3 +6,16 @@ dist/
 .DS_Store
 __pycache__/
 vendor/
+
+# Local deployment and Node adapter are intentionally kept out of the repo.
+deploy/
+server/
+
+# Never commit local secrets or state.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.db
+data/

@@ -5,18 +5,25 @@ on:
     branches: [main, master]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   checks:
     runs-on: ubuntu-latest
     env:
       TRUSTSIGHT_SRC: ${{ github.workspace }}/vendor/trustsight/src
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: emiliano-go/trustsight
           path: vendor/trustsight
-      - uses: actions/setup-node@v4
+          ref: 7c2061321631d6ca86cea8759a5ceec99e5e12b6
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
           cache: npm
@@ -40,12 +47,16 @@ jobs:
     env:
       TRUSTSIGHT_SRC: ${{ github.workspace }}/vendor/trustsight/src
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: emiliano-go/trustsight
           path: vendor/trustsight
-      - uses: actions/setup-node@v4
+          ref: 7c2061321631d6ca86cea8759a5ceec99e5e12b6
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
           cache: npm
@@ -61,7 +72,7 @@ jobs:
         run: echo "::warning::CLOUDFLARE_API_TOKEN is not set; skipping deploy. Add it (and CLOUDFLARE_ACCOUNT_ID) to enable automatic deploys."
       - name: Apply D1 migrations
         if: steps.cf.outputs.have == 'true'
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -75,7 +86,7 @@ jobs:
         run: node scripts/backfill-events.mjs --require-complete
       - name: Deploy the Worker
         if: steps.cf.outputs.have == 'true'
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

@@ -199,7 +199,14 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url)
 
-    if (url.pathname === '/health' || url.pathname === '/healthz') return health(env)
+    if (url.pathname === '/health' || url.pathname === '/healthz') {
+      if (env.API_LIMITER) {
+        const key = request.headers.get('CF-Connecting-IP') || 'anonymous'
+        const { success } = await env.API_LIMITER.limit({ key: `health:${key}` })
+        if (!success) return rateLimited()
+      }
+      return health(env)
+    }
 
     // The bare /api path is the HTML reference page, served by the SPA; its
     // trailing-slash spelling goes to the same place.
