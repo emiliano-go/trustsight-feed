@@ -1900,7 +1900,7 @@
     "name": "Vouch Surface Removed",
     "severity": "MEDIUM",
     "categoryTitle": "Temporal Context",
-    "description": "The missing-self shape: the recipe used to prove something about its signer and now proves less. Whole-array removal is H024; a rotation is T003/H078; checksum loss is H091/H001/C004. This rule owns only the partial-key gap, so the same change is never scored twice by two different names. The locked benign corpus adjudicates it; the measured rate is recorded in the changelog.",
+    "description": "The missing-self shape: the recipe used to prove something about its signer and now proves less. Whole-array removal is H024; T003/H078 still describe a real rotation, but T004 reports it too rather than giving a decoy a free pass. Checksum loss is H091/H001/C004. This rule owns only the partial-key gap, so the same change is never scored twice by two different names. The locked benign corpus adjudicates it; the measured rate is recorded in the changelog.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#t004"
   },
   "t005": {
@@ -1908,7 +1908,7 @@
     "name": "Scheme Downgrade",
     "severity": "MEDIUM",
     "categoryTitle": "Temporal Context",
-    "description": "H019 owns the exact `https://x` -> `http://x` swap. This covers the quieter version of the same move, where a new filename or version hides the scheme fall. The host must be routable, the origin must have been TLS, and a host change is not this shape. The locked benign corpus adjudicates it; the measured rate is recorded in the changelog.",
+    "description": "H019 owns the exact `https://x` -> `http://x` swap. This covers the quieter version of the same move, where a new filename, version or fragment hides the scheme fall. The host must be routable, the origin must have been TLS, and a host change is not this shape. The locked benign corpus adjudicates it; the measured rate is recorded in the changelog.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#t005"
   },
   "t006": {
