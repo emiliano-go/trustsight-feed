@@ -1927,13 +1927,45 @@
     "description": "A weight-0 corroboration signal: the AUR says this account packaged the project, but no commit in history names them. The message is only one place an identity appears, so the author and committer names and addresses count too; a maintainer who imported the package often signs the commit and writes no message at all. Name matching is fuzzy (display name vs email vs git config), so this corroborates T006 and G008 but never scores alone. On its own tier it is nearly a confession; as a solo scorer it would eventually burn someone with an unusual committer setup.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#t007"
   },
-  "tag_convergence": {
-    "id": "TAG_CONVERGENCE",
-    "name": "Tag Convergence",
+  "t008": {
+    "id": "T008",
+    "name": "Delayed Payload Adoption",
     "severity": "INFO",
-    "categoryTitle": "Opsonization",
-    "description": "Several distinct weight-0 tag kinds landed on one diff. Convergence is a pointer to look once, never a score: the tags coat evidence so later detection is cheaper.",
-    "docsUrl": "https://docs.trustsight.org/reference/rules/"
+    "categoryTitle": "Temporal Context",
+    "description": "Delayed execution separates the takeover from the payload, so same-cycle adoption heuristics no longer see the two events together. T008 joins the stored transition to the later payload without reading recipe content. It is full-AUR history/cycle context, report-only and anergic pending benign replay; missing or malformed history produces no finding.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#t008"
+  },
+  "t009": {
+    "id": "T009",
+    "name": "High-Value Dormant Takeover",
+    "severity": "INFO",
+    "categoryTitle": "Temporal Context",
+    "description": "Dormancy alone is common and popularity alone is not compromise. Their join with an ownership transition prioritises review of a high-blast-radius target. This is full-AUR history/cycle context, not a content judgement; it remains INFO and anergic pending benign replay.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#t009"
+  },
+  "t010": {
+    "id": "T010",
+    "name": "Dependency Redirection",
+    "severity": "INFO",
+    "categoryTitle": "Naming and Dependencies",
+    "description": "A newly controlled target becomes dangerous when other packages start resolving to it. T010 reports that redirection across the cycle rather than judging the dependency declaration's text. It is INFO, weight 0 and anergic pending benign replay; established targets and missing history are silent.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/naming-and-dependency/#t010"
+  },
+  "t011": {
+    "id": "T011",
+    "name": "Package Reappearance",
+    "severity": "INFO",
+    "categoryTitle": "Temporal Context",
+    "description": "Reappearance can be an ordinary resurrection or a name returning under new control. The rule states the historical fact without choosing between those explanations. It does not inspect recipe content and remains INFO, weight 0 and anergic pending benign replay.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#t011"
+  },
+  "t012": {
+    "id": "T012",
+    "name": "Trust Erosion Sequence",
+    "severity": "INFO",
+    "categoryTitle": "Temporal Context",
+    "description": "The sequence preserves the order that isolated findings lose: verification or provenance eroded first, then a payload arrived. It is corroborating full-AUR history/cycle context, not independent proof of compromise. Missing precursor history or a missing current terminal rule is silent; the rule is INFO, weight 0 and anergic pending benign replay.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#t012"
   },
   "u001": {
     "id": "U001",
