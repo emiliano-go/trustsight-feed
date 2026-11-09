@@ -1967,6 +1967,14 @@
     "description": "The sequence preserves the order that isolated findings lose: verification or provenance eroded first, then a payload arrived. It is corroborating full-AUR history/cycle context, not independent proof of compromise. Missing precursor history or a missing current terminal rule is silent; the rule is INFO, weight 0 and anergic pending benign replay.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/temporal/#t012"
   },
+  "tag_convergence": {
+    "id": "TAG_CONVERGENCE",
+    "name": "Tag Convergence",
+    "severity": "INFO",
+    "categoryTitle": "Opsonization",
+    "description": "Several distinct weight-0 tag kinds landed on one diff. Convergence is a pointer to look once, never a score: the tags coat evidence so later detection is cheaper.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/"
+  },
   "u001": {
     "id": "U001",
     "name": "Manifest Added Or Removed",
