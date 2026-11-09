@@ -1,6 +1,7 @@
 import { handleApi } from './api.js'
 import { ingestDocument, MAX_BODY_BYTES } from './ingest.js'
 import { runCheckpoint } from './checkpoints.js'
+import { rollupScans } from './retention.js'
 import { EXPECTED_SCHEMA } from './schema.js'
 
 function rateLimited() {
@@ -254,6 +255,9 @@ export default {
     // the logs carry the failure, and the next run extends the same state.
     ctx.waitUntil(runCheckpoint(env).catch((err) => {
       console.error('checkpoint failed', String(err && err.message ? err.message : err))
+    }))
+    ctx.waitUntil(rollupScans(env).catch((err) => {
+      console.error('scan rollup failed', String(err && err.message ? err.message : err))
     }))
   },
 }

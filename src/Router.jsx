@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks'
 import { ApiDocs } from './ApiDocs.jsx'
 import { App } from './App.jsx'
+import { Analytics } from './Analytics.jsx'
 import { Message } from './Message.jsx'
 import { Package } from './Package.jsx'
 import { Campaign } from './Campaign.jsx'
@@ -17,6 +18,7 @@ const DEPS_RE = /^deps(?:\/(.+))?$/
 function parseRoute(pathname) {
   const clean = pathname.replace(/^\/+|\/+$/g, '')
   if (clean === 'api') return { view: 'api', slug: '' }
+  if (clean === 'analytics') return { view: 'analytics', slug: '' }
   if (DETAIL_RE.test(clean)) return { view: 'message', slug: clean }
   const pkg = clean.match(PACKAGE_RE)
   if (pkg) return { view: 'package', slug: decodeURIComponent(pkg[1]) }
@@ -60,7 +62,7 @@ export function Router() {
 
   return (
     <>
-      {route.view === 'api' ? <ApiDocs /> : route.view === 'message' ? <Message slug={route.slug} /> : route.view === 'package' ? <Package name={route.slug} /> : route.view === 'campaign' ? <Campaign id={route.slug} /> : route.view === 'maintainer' ? <Maintainer name={route.slug} /> : route.view === 'dependencies' ? <Dependencies name={route.slug} /> : <App />}
+      {route.view === 'api' ? <ApiDocs /> : route.view === 'analytics' ? <Analytics /> : route.view === 'message' ? <Message slug={route.slug} /> : route.view === 'package' ? <Package name={route.slug} /> : route.view === 'campaign' ? <Campaign id={route.slug} /> : route.view === 'maintainer' ? <Maintainer name={route.slug} /> : route.view === 'dependencies' ? <Dependencies name={route.slug} /> : <App />}
       <RuleModal />
     </>
   )

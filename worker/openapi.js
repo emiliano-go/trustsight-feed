@@ -541,8 +541,8 @@ export const openapiSpec = {
     },
     '/api/stats': {
       get: {
-        tags: ['Meta'],        summary: 'Aggregate counts',
-        description: 'Totals over alert documents plus the alive/heartbeat count. `last` is the most recent stored notification of any kind; `last_alert` and `last_alive` name the two event clocks separately.',
+        tags: ['Meta'],        summary: 'Aggregate notification counts',
+        description: 'Totals over stored notification documents: alert documents, heartbeats, and the alert/heartbeat clocks. This is not a package-analysis count. `last` is the most recent stored notification of any kind; `last_alert` and `last_alive` name the two event clocks separately.',
         responses: {
           200: {
             description: 'Aggregates.',
@@ -569,6 +569,74 @@ export const openapiSpec = {
           },
           429: RATE_LIMITED,
         },
+      },
+    },
+    '/api/analytics/summary': {
+      get: {
+        tags: ['Analytics'], summary: 'Alert-derived dashboard summary',
+        description: 'Counts and reported cycle workload over the selected window. This is notification-derived until the scan stream is available.',
+        parameters: [{ name: 'window', in: 'query', schema: { type: 'string', enum: ['24h', '7d', '30d'], default: '7d' } }],
+        responses: { 200: { description: 'Summary.', content: { 'application/json': { schema: { type: 'object', additionalProperties: true } } } }, 429: RATE_LIMITED },
+      },
+    },
+    '/api/analytics/timeseries': {
+      get: {
+        tags: ['Analytics'], summary: 'Alert-derived time series',
+        parameters: [
+          { name: 'bucket', in: 'query', schema: { type: 'string', enum: ['hour', 'day'], default: 'day' } },
+          { name: 'window', in: 'query', schema: { type: 'string', enum: ['24h', '7d', '30d'], default: '7d' } },
+        ],
+        responses: { 200: { description: 'Buckets.', content: { 'application/json': { schema: { type: 'object', additionalProperties: true } } } }, 429: RATE_LIMITED },
+      },
+    },
+    '/api/analytics/breakdown': {
+      get: {
+        tags: ['Analytics'], summary: 'Alert-derived breakdown',
+        parameters: [
+          { name: 'dimension', in: 'query', schema: { type: 'string', enum: ['rule', 'severity', 'event'], default: 'rule' } },
+          { name: 'window', in: 'query', schema: { type: 'string', enum: ['24h', '7d', '30d'], default: '7d' } },
+        ],
+        responses: { 200: { description: 'Breakdown rows.', content: { 'application/json': { schema: { type: 'object', additionalProperties: true } } } }, 429: RATE_LIMITED },
+      },
+    },
+    '/api/scans': {
+      get: {
+        tags: ['Analytics'], summary: 'Recent all-scan records',
+        description: 'Raw per-package scan records for the last 30 days. Older days are squashed into the scan-stats rollups.',
+        parameters: [
+          { name: 'package', in: 'query', schema: { type: 'string' } },
+          { name: 'status', in: 'query', schema: { type: 'string' } },
+          { name: 'risk', in: 'query', schema: { type: 'string' } },
+          { name: 'rule', in: 'query', schema: { type: 'string' } },
+          { name: 'cycle', in: 'query', schema: { type: 'string' } },
+          LIMIT,
+        ],
+        responses: { 200: { description: 'Scan records.', content: { 'application/json': { schema: { type: 'object', additionalProperties: true } } } }, 429: RATE_LIMITED },
+      },
+    },
+    '/api/scans/{cycle_id}': {
+      get: {
+        tags: ['Analytics'], summary: 'One scan cycle',
+        parameters: [{ name: 'cycle_id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'Cycle and records.', content: { 'application/json': { schema: { type: 'object', additionalProperties: true } } } }, 404: NOT_FOUND, 429: RATE_LIMITED },
+      },
+    },
+    '/api/scan-stats': {
+      get: {
+        tags: ['Analytics'], summary: 'All-scan aggregates',
+        description: 'Workload, risk, rule and score aggregates. Reads permanent cycle summaries plus recent raw rows and older daily rollups.',
+        parameters: [{ name: 'window', in: 'query', schema: { type: 'string', enum: ['24h', '7d', '30d'], default: '7d' } }],
+        responses: { 200: { description: 'Aggregates.', content: { 'application/json': { schema: { type: 'object', additionalProperties: true } } } }, 429: RATE_LIMITED },
+      },
+    },
+    '/api/scan-stats/timeseries': {
+      get: {
+        tags: ['Analytics'], summary: 'All-scan time series',
+        parameters: [
+          { name: 'bucket', in: 'query', schema: { type: 'string', enum: ['hour', 'day'], default: 'day' } },
+          { name: 'window', in: 'query', schema: { type: 'string', enum: ['24h', '7d', '30d'], default: '7d' } },
+        ],
+        responses: { 200: { description: 'Buckets.', content: { 'application/json': { schema: { type: 'object', additionalProperties: true } } } }, 429: RATE_LIMITED },
       },
     },
     '/api/openapi.json': {

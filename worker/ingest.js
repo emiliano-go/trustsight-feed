@@ -5,7 +5,8 @@
 // document.  A replayed request is idempotent on the row id, not re-stored.
 
 import { parseNotification } from './lib.js'
-import { storeRow } from './store.js'
+import { storeRow, storeScanDocument } from './store.js'
+import { isScanDocument } from './scans.js'
 
 export const MAX_BODY_BYTES = 1_000_000
 export const REPLAY_WINDOW_SECONDS = 300
@@ -121,8 +122,12 @@ export async function ingestDocument(env, rawBody, headers) {
     signature: verdict.signature,
     bodySha256,
   })
-  // A successful verified request is the liveness signal for ingest.  The
-  // write is bounded to one row and contains no document content.
+  await noteIngest(env)
+  return { ok: true, status: 200, stored, id: verdict.id }
+}
+
+/** A successful verified request is the liveness signal for ingest. */
+async function noteIngest(env) {
   try {
     const now = String(Math.floor(Date.now() / 1000))
     await env.DB.prepare(
@@ -132,5 +137,4 @@ export async function ingestDocument(env, rawBody, headers) {
   } catch {
     /* observability must never fail an accepted notification */
   }
-  return { ok: true, status: 200, stored, id: verdict.id }
 }
