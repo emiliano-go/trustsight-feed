@@ -168,6 +168,24 @@ The root spellings `/feed`, `/latest`, `/date/*`, `/package/*`, `/rule/*`,
 `/stats` and `/messages/*` redirect (308) to their `/api` equivalent, so a
 shortened URL never falls through to the app shell.
 
+## Analytics
+
+`/analytics` is the watcher dashboard. It starts with alert- and
+heartbeat-derived figures (`/api/analytics/*`) and switches the workload
+denominator to the signed `trustsight.scans` stream when that stream is
+available (`/api/scan-stats`, `/api/scans`).
+
+Scan documents are feed-only: they never enter `notifications`, FTS or
+`feed_stats`. Raw `scan_events` are retained for 30 days for drill-down; the
+daily Worker cron squashes complete old days into `scan_daily_*` rollups and
+deletes the raw rows. Historical backfill uses the TrustSight command
+`trustsight full-aur export-scans`, then:
+
+```bash
+npm run import:scans -- scans.ndjson
+npm run rollup:scans -- --retention=30
+```
+
 ## Layout
 
 ```

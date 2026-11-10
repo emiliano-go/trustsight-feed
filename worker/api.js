@@ -41,6 +41,13 @@ const ENDPOINTS = [
   'GET /api/checkpoints/{id}',
   'GET /api/checkpoints/{id}/proof?slug=',
   'GET /api/stats',
+  'GET /api/scans?from=&to=&package=&status=&risk=&rule=&cycle=&limit=&before=',
+  'GET /api/scans/{cycle_id}',
+  'GET /api/scan-stats?window=24h|7d|30d',
+  'GET /api/scan-stats/timeseries?bucket=hour|day&from=&to=',
+  'GET /api/analytics/summary?window=24h|7d|30d',
+  'GET /api/analytics/timeseries?bucket=hour|day&from=&to=',
+  'GET /api/analytics/breakdown?dimension=rule|severity|event&window=',
 ]
 
 // Timeframes: `HH` (one hour), `HH-HH` (whole hours), `HHMM-HHMM` (a range).
@@ -904,6 +911,250 @@ function publicKeys(env) {
   return json({ keys })
 }
 
+
+const SCAN_RAW_RETENTION_DAYS = 30
+const SCAN_WINDOWS = { '24h': 1, '7d': 7, '30d': 30 }
+
+function scanWindow(url) {
+  const now = Math.floor(Date.now() / 1000)
+  const name = String(url.searchParams.get('window') || '7d')
+  const days = SCAN_WINDOWS[name] || 7
+  const from = asInt(url.searchParams.get('from'))
+  const to = asInt(url.searchParams.get('to'))
+  return {
+    from: from === null ? now - days * SECONDS_PER_DAY : from,
+    to: to === null ? now : to,
+    name: SCAN_WINDOWS[name] ? name : '7d',
+  }
+}
+
+function scanRawBoundary() {
+  return Math.floor(Date.now() / 1000) - SCAN_RAW_RETENTION_DAYS * SECONDS_PER_DAY
+}
+
+function isoSecond(value) {
+  return new Date(value * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z')
+}
+
+async function scanStats(env, url) {
+  const { from, to, name } = scanWindow(url)
+  const totals = await env.DB.prepare(
+    `SELECT COUNT(*) AS cycles,
+            COALESCE(SUM(attempted), 0) AS attempted,
+            COALESCE(SUM(succeeded), 0) AS succeeded,
+            COALESCE(SUM(fetch_failed), 0) AS fetch_failed,
+            COALESCE(SUM(not_vetted), 0) AS not_vetted,
+            COALESCE(SUM(vanished), 0) AS vanished,
+            COALESCE(SUM(reserved), 0) AS reserved,
+            COALESCE(SUM(with_diff), 0) AS with_diff,
+            COALESCE(SUM(alerts), 0) AS alerts
+       FROM scan_cycles WHERE started_at >= ? AND started_at <= ?`
+  ).bind(isoSecond(from), isoSecond(to)).first() || {}
+  const boundary = scanRawBoundary()
+  const rawFrom = Math.max(from, boundary)
+  const dailyTo = Math.min(to, boundary - 1)
+  const risk = await env.DB.prepare(
+    `SELECT risk, SUM(count) AS count FROM (
+       SELECT risk, COUNT(*) AS count FROM scan_events
+        WHERE time >= ? AND time <= ? GROUP BY risk
+       UNION ALL
+       SELECT risk, SUM(count) AS count FROM scan_daily_risks
+        WHERE day >= ? AND day <= ? GROUP BY risk
+     ) GROUP BY risk ORDER BY count DESC`
+  ).bind(rawFrom, to, isoSecond(from).slice(0, 10), isoSecond(dailyTo).slice(0, 10)).all()
+  const rules = await env.DB.prepare(
+    `SELECT rule_id, MAX(severity) AS severity, SUM(count) AS count FROM (
+       SELECT rule_id, severity, COUNT(*) AS count FROM scan_rule_events
+        WHERE time >= ? AND time <= ? GROUP BY rule_id, severity
+       UNION ALL
+       SELECT rule_id, severity, SUM(count) AS count FROM scan_daily_rules
+        WHERE day >= ? AND day <= ? GROUP BY rule_id, severity
+     ) GROUP BY rule_id ORDER BY count DESC LIMIT 25`
+  ).bind(rawFrom, to, isoSecond(from).slice(0, 10), isoSecond(dailyTo).slice(0, 10)).all()
+  const scores = await env.DB.prepare(
+    `SELECT bucket, SUM(count) AS count FROM (
+       SELECT (score / 10) * 10 AS bucket, COUNT(*) AS count FROM scan_events
+        WHERE time >= ? AND time <= ? AND score IS NOT NULL GROUP BY bucket
+       UNION ALL
+       SELECT bucket, SUM(count) AS count FROM scan_daily_scores
+        WHERE day >= ? AND day <= ? GROUP BY bucket
+     ) GROUP BY bucket ORDER BY bucket`
+  ).bind(rawFrom, to, isoSecond(from).slice(0, 10), isoSecond(dailyTo).slice(0, 10)).all()
+  return json({
+    window: name, from, to,
+    raw_since: boundary,
+    totals: {
+      ...totals,
+      failure: Number(totals.fetch_failed || 0) + Number(totals.not_vetted || 0)
+        + Number(totals.vanished || 0) + Number(totals.reserved || 0),
+    },
+    risk: risk.results || [],
+    rules: rules.results || [],
+    scores: scores.results || [],
+  })
+}
+
+async function scanTimeseries(env, url) {
+  const { from, to } = scanWindow(url)
+  const bucket = String(url.searchParams.get('bucket') || 'day') === 'hour' ? 'hour' : 'day'
+  const key = bucket === 'hour' ? 'substr(started_at, 1, 13)' : 'substr(started_at, 1, 10)'
+  const rows = await env.DB.prepare(
+    `SELECT ${key} AS bucket,
+            COUNT(*) AS cycles,
+            COALESCE(SUM(attempted), 0) AS attempted,
+            COALESCE(SUM(succeeded), 0) AS succeeded,
+            COALESCE(SUM(fetch_failed), 0) AS fetch_failed,
+            COALESCE(SUM(with_diff), 0) AS with_diff,
+            COALESCE(SUM(alerts), 0) AS alerts
+       FROM scan_cycles WHERE started_at >= ? AND started_at <= ?
+      GROUP BY bucket ORDER BY bucket`
+  ).bind(isoSecond(from), isoSecond(to)).all()
+  return json({ window: bucket, from, to, rows: rows.results || [] })
+}
+
+async function scans(env, url) {
+  const { from, to } = scanWindow(url)
+  const boundary = scanRawBoundary()
+  const where = ['time >= ?', 'time <= ?']
+  const params = [Math.max(from, boundary), to]
+  for (const [name, column] of [['package', 'package'], ['status', 'status'], ['risk', 'risk'], ['cycle', 'cycle_id']]) {
+    const value = String(url.searchParams.get(name) || '').trim()
+    if (value) { where.push(`${column} = ?`); params.push(value.slice(0, 255)) }
+  }
+  const rule = String(url.searchParams.get('rule') || '').trim()
+  if (rule) {
+    where.push('EXISTS (SELECT 1 FROM scan_rule_events re WHERE re.cycle_id = scan_events.cycle_id AND re.package = scan_events.package AND re.rule_id = ?)')
+    params.push(rule.toUpperCase())
+  }
+  const before = asInt(url.searchParams.get('before'))
+  if (before !== null) { where.push('time < ?'); params.push(before) }
+  const limit = clampInt(url.searchParams.get('limit'), DEFAULT_LIMIT, 1, MAX_LIMIT)
+  const result = await env.DB.prepare(
+    `SELECT cycle_id, package, status, score, risk, old_version, new_version,
+            maintainer, rules_json, coverage_gaps_json, has_diff, time
+       FROM scan_events WHERE ${where.join(' AND ')}
+      ORDER BY time DESC, package ASC LIMIT ?`
+  ).bind(...params, limit).all()
+  const items = (result.results || []).map((row) => ({
+    ...row,
+    rules: JSON.parse(row.rules_json || '[]'),
+    coverage_gaps: JSON.parse(row.coverage_gaps_json || '[]'),
+    rules_json: undefined,
+    coverage_gaps_json: undefined,
+    has_diff: Boolean(row.has_diff),
+  }))
+  return json({ raw_since: boundary, items, next: items.length === limit ? { before: items[items.length - 1].time } : null })
+}
+
+async function scanCycle(env, cycleId) {
+  const cycle = await env.DB.prepare('SELECT * FROM scan_cycles WHERE cycle_id = ?').bind(cycleId).first()
+  if (!cycle) return json({ error: 'not_found' }, 404)
+  const result = await env.DB.prepare(
+    `SELECT package, status, score, risk, old_version, new_version, maintainer,
+            rules_json, coverage_gaps_json, has_diff, time
+       FROM scan_events WHERE cycle_id = ? ORDER BY package`
+  ).bind(cycleId).all()
+  const items = (result.results || []).map((row) => ({
+    ...row,
+    rules: JSON.parse(row.rules_json || '[]'),
+    coverage_gaps: JSON.parse(row.coverage_gaps_json || '[]'),
+    rules_json: undefined,
+    coverage_gaps_json: undefined,
+    has_diff: Boolean(row.has_diff),
+  }))
+  return json({ cycle, items })
+}
+
+
+function analyticsWindow(url) {
+  const now = Math.floor(Date.now() / 1000)
+  const name = String(url.searchParams.get('window') || '7d')
+  const days = SCAN_WINDOWS[name] || 7
+  const from = asInt(url.searchParams.get('from'))
+  const to = asInt(url.searchParams.get('to'))
+  return {
+    from: from === null ? now - days * SECONDS_PER_DAY : from,
+    to: to === null ? now : to,
+    name: SCAN_WINDOWS[name] ? name : '7d',
+  }
+}
+
+async function analyticsSummary(env, url) {
+  const { from, to, name } = analyticsWindow(url)
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS notifications,
+            COALESCE(SUM(CASE WHEN event = 'trustsight.alerts' THEN 1 ELSE 0 END), 0) AS alerts,
+            COALESCE(SUM(CASE WHEN event = 'trustsight.heartbeat' THEN 1 ELSE 0 END), 0) AS heartbeats,
+            COALESCE(SUM(n_alerts), 0) AS alert_entries,
+            COALESCE(SUM(n_over_threshold), 0) AS over_threshold,
+            COALESCE(SUM(n_ioc), 0) AS ioc,
+            COALESCE(SUM(CASE WHEN event = 'trustsight.alerts'
+              THEN JSON_EXTRACT(payload, '$.cycle.processed') ELSE 0 END), 0) AS processed,
+            COALESCE(SUM(CASE WHEN event = 'trustsight.alerts'
+              THEN JSON_EXTRACT(payload, '$.cycle.added') ELSE 0 END), 0) AS added,
+            COALESCE(SUM(CASE WHEN event = 'trustsight.alerts'
+              THEN JSON_EXTRACT(payload, '$.cycle.changed') ELSE 0 END), 0) AS changed,
+            COALESCE(SUM(CASE WHEN event = 'trustsight.alerts'
+              THEN JSON_EXTRACT(payload, '$.cycle.removed') ELSE 0 END), 0) AS removed
+       FROM notifications WHERE time >= ? AND time <= ?`
+  ).bind(from, to).first() || {}
+  const rules = await env.DB.prepare(
+    `SELECT rule_id, COUNT(*) AS count FROM rule_events
+      WHERE time >= ? AND time <= ? GROUP BY rule_id ORDER BY count DESC LIMIT 15`
+  ).bind(from, to).all()
+  const last = await env.DB.prepare(
+    `SELECT MAX(time) AS last FROM notifications WHERE time >= ? AND time <= ?`
+  ).bind(from, to).first() || {}
+  return json({ window: name, from, to, totals: row, rules: rules.results || [], last: last.last || null })
+}
+
+async function analyticsTimeseries(env, url) {
+  const { from, to } = analyticsWindow(url)
+  const bucket = String(url.searchParams.get('bucket') || 'day') === 'hour' ? 'hour' : 'day'
+  const key = bucket === 'hour' ? "strftime('%Y-%m-%dT%H:00:00Z', time, 'unixepoch')" : "strftime('%Y-%m-%d', time, 'unixepoch')"
+  const rows = await env.DB.prepare(
+    `SELECT ${key} AS bucket, COUNT(*) AS notifications,
+            COALESCE(SUM(CASE WHEN event = 'trustsight.alerts' THEN 1 ELSE 0 END), 0) AS alerts,
+            COALESCE(SUM(n_over_threshold), 0) AS over_threshold,
+            COALESCE(SUM(n_ioc), 0) AS ioc,
+            COALESCE(SUM(CASE WHEN event = 'trustsight.alerts'
+              THEN JSON_EXTRACT(payload, '$.cycle.processed') ELSE 0 END), 0) AS processed,
+            COALESCE(SUM(CASE WHEN event = 'trustsight.alerts'
+              THEN JSON_EXTRACT(payload, '$.cycle.added') ELSE 0 END), 0) AS added,
+            COALESCE(SUM(CASE WHEN event = 'trustsight.alerts'
+              THEN JSON_EXTRACT(payload, '$.cycle.changed') ELSE 0 END), 0) AS changed,
+            COALESCE(SUM(CASE WHEN event = 'trustsight.alerts'
+              THEN JSON_EXTRACT(payload, '$.cycle.removed') ELSE 0 END), 0) AS removed
+       FROM notifications WHERE time >= ? AND time <= ?
+      GROUP BY bucket ORDER BY bucket`
+  ).bind(from, to).all()
+  return json({ window: bucket, from, to, rows: rows.results || [] })
+}
+
+async function analyticsBreakdown(env, url) {
+  const { from, to, name } = analyticsWindow(url)
+  const dimension = String(url.searchParams.get('dimension') || 'rule')
+  if (dimension === 'event') {
+    const rows = await env.DB.prepare(
+      `SELECT event AS key, COUNT(*) AS count FROM notifications
+        WHERE time >= ? AND time <= ? GROUP BY event ORDER BY count DESC`
+    ).bind(from, to).all()
+    return json({ dimension, window: name, from, to, rows: rows.results || [] })
+  }
+  if (dimension === 'severity') {
+    const rows = await env.DB.prepare(
+      `SELECT severity AS key, COUNT(*) AS count FROM rule_events
+        WHERE time >= ? AND time <= ? GROUP BY severity ORDER BY count DESC`
+    ).bind(from, to).all()
+    return json({ dimension, window: name, from, to, rows: rows.results || [] })
+  }
+  const rows = await env.DB.prepare(
+    `SELECT rule_id AS key, COUNT(*) AS count FROM rule_events
+      WHERE time >= ? AND time <= ? GROUP BY rule_id ORDER BY count DESC LIMIT 50`
+  ).bind(from, to).all()
+  return json({ dimension: 'rule', window: name, from, to, rows: rows.results || [] })
+}
+
 async function stats(env) {
   // feed_stats is maintained by triggers, so this is one row, not a scan.
   const row = await env.DB.prepare(
@@ -1214,6 +1465,12 @@ async function handleApiUnsafe(request, env, url) {
   if (path === '/api/iocs') return iocs(env, url)
   if (path === '/api/feed') return feed(env, url)
   if (path === '/api/stats') return stats(env)
+  if (path === '/api/scans') return scans(env, url)
+  if (path === '/api/scan-stats') return scanStats(env, url)
+  if (path === '/api/scan-stats/timeseries') return scanTimeseries(env, url)
+  if (path === '/api/analytics/summary') return analyticsSummary(env, url)
+  if (path === '/api/analytics/timeseries') return analyticsTimeseries(env, url)
+  if (path === '/api/analytics/breakdown') return analyticsBreakdown(env, url)
   if (path === '/api/latest') return latestOne(env)
 
   let match
@@ -1237,6 +1494,11 @@ async function handleApiUnsafe(request, env, url) {
     const term = safeDecode(match[1])
     if (term === null) return json({ error: 'bad_path' }, 400)
     return bySearch(env, url, term)
+  }
+  if ((match = path.match(/^\/api\/scans\/(.+)$/))) {
+    const id = safeDecode(match[1])
+    if (id === null) return json({ error: 'bad_path' }, 400)
+    return scanCycle(env, id)
   }
   if ((match = path.match(/^\/api\/checkpoints\/([^/]+)\/proof$/))) {
     const id = safeDecode(match[1])

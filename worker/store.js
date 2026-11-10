@@ -3,6 +3,7 @@
 // stored one way is byte-identical to the same document stored the other.
 
 import { buildEventIndex, isTrustSightNotification, parseNotification } from './lib.js'
+import { normalizeScanDocument } from './scans.js'
 
 const MAX_BATCH_STATEMENTS = 100
 
@@ -122,6 +123,64 @@ export async function storeRow(env, row, verification = null) {
     await insertRow(env, row, `${row.slug}-${row.id}`, stored)
   }
   return true
+}
+
+
+/**
+ * Persist one signed `trustsight.scans` chunk.  Idempotent on
+ * `(cycle_id, chunk_index)`: a retry of the same chunk changes no row, while a
+ * different chunk advances `chunks_received` and eventually `complete`.
+ */
+export async function storeScanDocument(env, payload, receivedAt = Math.floor(Date.now() / 1000)) {
+  const { cycle, records, rules, chunkIndex } = normalizeScanDocument(payload, receivedAt)
+  const statements = [
+    env.DB.prepare(
+      `INSERT OR IGNORE INTO scan_cycles
+         (cycle_id, started_at, finished_at, received_at, tool_version,
+          partial, bootstrap, backfill_day, chunk_count, attempted, succeeded,
+          fetch_failed, not_vetted, vanished, reserved, with_diff, alerts)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      cycle.cycle_id, cycle.started_at, cycle.finished_at, cycle.received_at,
+      cycle.tool_version, cycle.partial, cycle.bootstrap, cycle.backfill_day,
+      cycle.chunk_count, cycle.attempted, cycle.succeeded, cycle.fetch_failed,
+      cycle.not_vetted, cycle.vanished, cycle.reserved, cycle.with_diff,
+      cycle.alerts,
+    ),
+    env.DB.prepare(
+      `INSERT OR IGNORE INTO scan_cycle_chunks
+         (cycle_id, chunk_index, received_at) VALUES (?, ?, ?)`
+    ).bind(cycle.cycle_id, chunkIndex, cycle.received_at),
+  ]
+  for (const record of records) {
+    statements.push(env.DB.prepare(
+      `INSERT OR IGNORE INTO scan_events
+         (cycle_id, package, status, score, risk, old_version, new_version,
+          maintainer, rules_json, coverage_gaps_json, has_diff, time)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      record.cycle_id, record.package, record.status, record.score, record.risk,
+      record.old_version, record.new_version, record.maintainer,
+      record.rules_json, record.coverage_gaps_json, record.has_diff, record.time,
+    ))
+  }
+  for (const rule of rules) {
+    statements.push(env.DB.prepare(
+      `INSERT OR IGNORE INTO scan_rule_events
+         (cycle_id, package, rule_id, severity, time)
+       VALUES (?, ?, ?, ?, ?)`
+    ).bind(rule.cycle_id, rule.package, rule.rule_id, rule.severity, rule.time))
+  }
+  statements.push(env.DB.prepare(
+    `UPDATE scan_cycles SET
+       chunks_received = (SELECT COUNT(*) FROM scan_cycle_chunks WHERE cycle_id = ?),
+       complete = (SELECT COUNT(*) FROM scan_cycle_chunks WHERE cycle_id = ?) >= chunk_count
+     WHERE cycle_id = ?`
+  ).bind(cycle.cycle_id, cycle.cycle_id, cycle.cycle_id))
+  for (let i = 0; i < statements.length; i += MAX_BATCH_STATEMENTS) {
+    await env.DB.batch(statements.slice(i, i + MAX_BATCH_STATEMENTS))
+  }
+  return { stored: true, cycle_id: cycle.cycle_id, chunk_index: chunkIndex }
 }
 
 /**

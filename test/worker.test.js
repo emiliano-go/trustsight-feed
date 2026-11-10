@@ -600,8 +600,8 @@ describe('api endpoints', () => {
     expect(res.status).toBe(503)
     const body = await res.json()
     expect(body.ready).toBe(false)
-    expect(body.expected_schema).toBe('13')
-    await env.DB.prepare("UPDATE meta SET value = '13' WHERE key = 'schema'").run()
+    expect(body.expected_schema).toBe('14')
+    await env.DB.prepare("UPDATE meta SET value = '14' WHERE key = 'schema'").run()
   })
 
   it('reports health from the database', async () => {
@@ -610,8 +610,8 @@ describe('api endpoints', () => {
     const body = await res.json()
     expect(body.status).toBe('ok')
     expect(body.db).toBe('ok')
-    expect(body.schema).toBe('13')
-    expect(body.expected_schema).toBe('13')
+    expect(body.schema).toBe('14')
+    expect(body.expected_schema).toBe('14')
     expect(body.ready).toBe(true)
     expect(body.last).toBe(1777723200)
     expect(res.headers.get('cache-control')).toBe('no-store')

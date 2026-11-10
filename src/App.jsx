@@ -320,8 +320,8 @@ export function App() {
           Read <a href={FP_DOCS} target="_blank" rel="noreferrer">the distinction</a>.
         </p>
         <div className="masthead-stats">
-          <div title={stats ? `${formatCount(stats.total)} alerts + ${formatCount(stats.alive)} alive` : undefined}>
-            <b>{stats ? formatCount(stats.total + (stats.alive || 0)) : '…'}</b>Total scans
+          <div title={stats ? `${formatCount(stats.total)} alert notifications + ${formatCount(stats.alive)} heartbeats` : undefined}>
+            <b>{stats ? formatCount(stats.total + (stats.alive || 0)) : '…'}</b>Notifications
           </div>
           <div><b>{stats ? formatCount(stats.total) : '…'}</b>Alerts</div>
           {lastSeen !== null ? (
@@ -339,6 +339,7 @@ export function App() {
         </div>
         <nav className="masthead-links" aria-label="Primary">
           <a href={DOCS} target="_blank" rel="noreferrer">Docs ↗</a>
+          <a href="/analytics" data-route>Analytics</a>
           <a href="/deps" data-route>Dependencies</a>
           <a href="/api" data-route>/api</a>
           <a href={SECURITY} target="_blank" rel="noreferrer">Security model ↗</a>

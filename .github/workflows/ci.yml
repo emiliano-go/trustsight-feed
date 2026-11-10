@@ -21,7 +21,7 @@ jobs:
         with:
           repository: emiliano-go/trustsight
           path: vendor/trustsight
-          ref: 7c2061321631d6ca86cea8759a5ceec99e5e12b6
+          ref: 37660957f5f22c147bbd230150edde286bb6d323
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
@@ -54,7 +54,7 @@ jobs:
         with:
           repository: emiliano-go/trustsight
           path: vendor/trustsight
-          ref: 7c2061321631d6ca86cea8759a5ceec99e5e12b6
+          ref: 37660957f5f22c147bbd230150edde286bb6d323
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
