@@ -571,6 +571,30 @@ export function LimitsNote() {
   )
 }
 
+/** The dependency an H046 entry exposes, and who moved it. */
+function DependencyTransition({ entry }) {
+  const status = entry.dependency_status
+  const newOwner = entry.dependency_new_maintainer
+  const oldOwner = entry.dependency_old_maintainer
+  const adopted = status === 'adopted' || (!status && newOwner && !oldOwner)
+  const orphaned = status === 'orphaned' || (!status && oldOwner && !newOwner)
+  if (adopted && newOwner) {
+    return (
+      <>
+        , adopted by <MaintainerLink name={newOwner} /> this cycle
+      </>
+    )
+  }
+  if (orphaned && oldOwner) {
+    return (
+      <>
+        , orphaned from <MaintainerLink name={oldOwner} /> this cycle
+      </>
+    )
+  }
+  return <> , which was adopted or orphaned this cycle</>
+}
+
 /** One bare-alert package, with the ownership detail the entry records. */
 function AlertPackage({ entry, iocPackages }) {
   return (
@@ -584,8 +608,8 @@ function AlertPackage({ entry, iocPackages }) {
       <MaintainerChange entry={entry} />
       {entry.dependency ? (
         <p className="pkg__meta">
-          depends on <a className="md-code" href={packageHref(entry.dependency)} data-route>{entry.dependency}</a>,
-          which was adopted or orphaned this cycle
+          depends on <a className="md-code" href={packageHref(entry.dependency)} data-route>{entry.dependency}</a>
+          <DependencyTransition entry={entry} />
         </p>
       ) : null}
       <ChangeViews
@@ -647,7 +671,7 @@ function AlertList({ alerts, overPackages, iocPackages, campaigns = [] }) {
           <div className="alert__rules">
             <RuleSection id={group.rule} />
           </div>
-          {group.entries.some((e) => e.old || e.new) ? (
+          {group.entries.some((e) => e.old || e.new || e.dependency) ? (
             <div className="alert__packages">
               {group.entries.map((entry, i) => (
                 <AlertPackage entry={entry} iocPackages={iocPackages} key={`${entry.package}-${i}`} />
