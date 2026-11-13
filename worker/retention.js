@@ -66,13 +66,18 @@ export async function rollupScans(env, days = SCAN_RETENTION_DAYS) {
     ).bind(cutoff),
     env.DB.prepare(
       `INSERT INTO scan_daily_packages
-         (day, package, scans, max_score, has_diff)
-       SELECT date(time, 'unixepoch'), package, COUNT(*),
-              COALESCE(MAX(score), 0), COALESCE(MAX(has_diff), 0)
-         FROM scan_events WHERE time < ? GROUP BY 1, 2
+         (day, package, scans, max_score, has_diff, dependencies_json)
+       SELECT date(e.time, 'unixepoch'), e.package, COUNT(*),
+              COALESCE(MAX(e.score), 0), COALESCE(MAX(e.has_diff), 0),
+              (SELECT x.dependencies_json FROM scan_events x
+                WHERE x.package = e.package
+                  AND date(x.time, 'unixepoch') = date(e.time, 'unixepoch')
+                ORDER BY x.time DESC LIMIT 1)
+         FROM scan_events e WHERE e.time < ? GROUP BY 1, 2
        ON CONFLICT(day, package) DO UPDATE SET
          scans=excluded.scans, max_score=excluded.max_score,
-         has_diff=excluded.has_diff`
+         has_diff=excluded.has_diff,
+         dependencies_json=excluded.dependencies_json`
     ).bind(cutoff),
   ]
   await env.DB.batch(statements)

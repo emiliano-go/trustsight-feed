@@ -3,6 +3,7 @@ import { AccessibilityMenu, ThemeSwitch, Wordmark } from './Controls.jsx'
 import { ChangeViews, LimitsNote, diffValues, parsePkgbuild, sourceUrlsFromDiff } from './Message.jsx'
 import { RuleChip } from './RuleChip.jsx'
 import { AUR_PACKAGE, AUR_PKGBUILD, eventBadgeClass, eventLabel, flattenProse, formatTime, relative } from './util.js'
+import { apiUrl } from './api.js'
 
 const safeHref = (value) => (/^https?:\/\//i.test(String(value || '')) ? value : null)
 
@@ -17,6 +18,7 @@ function fpIssueUrl(name) {
 /** Every stored alert that names one package, and everything they record about it. */
 export function Package({ name }) {
   const [history, setHistory] = useState(null)
+  const [scan, setScan] = useState(null)
   const [error, setError] = useState('')
   const [live, setLive] = useState({
     maintainer: '', url: '', sources: [],
@@ -29,7 +31,7 @@ export function Package({ name }) {
     setHistory(null)
     setError('')
 
-    fetch(`/api/package/${encodeURIComponent(name)}/history`)
+    fetch(apiUrl(`/api/package/${encodeURIComponent(name)}/history`))
       .then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         return res.json()
@@ -41,9 +43,9 @@ export function Package({ name }) {
     // source for the current maintainer, and the newest PKGBUILD/diff for the
     // current upstream. All three are cached by the Worker.
     Promise.all([
-      fetch(`/api/maintainers?packages=${encodeURIComponent(name)}`).then((r) => (r.ok ? r.json() : {})).catch(() => ({})),
-      fetch(`/api/source/${encodeURIComponent(name)}?file=PKGBUILD`).then((r) => (r.ok ? r.json() : {})).catch(() => ({})),
-      fetch(`/api/diff/${encodeURIComponent(name)}`).then((r) => (r.ok ? r.json() : {})).catch(() => ({})),
+      fetch(apiUrl(`/api/maintainers?packages=${encodeURIComponent(name)}`)).then((r) => (r.ok ? r.json() : {})).catch(() => ({})),
+      fetch(apiUrl(`/api/source/${encodeURIComponent(name)}?file=PKGBUILD`)).then((r) => (r.ok ? r.json() : {})).catch(() => ({})),
+      fetch(apiUrl(`/api/diff/${encodeURIComponent(name)}`)).then((r) => (r.ok ? r.json() : {})).catch(() => ({})),
     ]).then(([maint, src, diffBody]) => {
       if (!alive) return
       const parsed = parsePkgbuild(String(src.content || ''))
@@ -62,6 +64,16 @@ export function Package({ name }) {
     return () => { alive = false }
   }, [name])
 
+  useEffect(() => {
+    let alive = true
+    setScan(null)
+    fetch(apiUrl(`/api/scans?package=${encodeURIComponent(name)}&limit=1`))
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body) => { if (alive && body) setScan((body.items || [])[0] || null) })
+      .catch(() => { if (alive) setScan(null) })
+    return () => { alive = false }
+  }, [name])
+
   const maxScore = history && history.max_score !== null && history.max_score !== undefined ? history.max_score : null
   const latest = history && history.timeline.length ? history.timeline[0] : null
   const currentUrls = [...new Set([live.url, ...live.sources].filter(Boolean))]
@@ -77,6 +89,12 @@ export function Package({ name }) {
   }
   const pastUrls = [...pastByUrl.values()]
   const upstreamCount = currentUrls.length + pastUrls.length
+  const deps = scan && scan.dependency_analysis
+  const depthLabel = (value) => (
+    value === -1 ? 'full closure (bounded)'
+      : value === 0 ? 'off'
+        : `${value} level${value === 1 ? '' : 's'}`
+  )
 
   return (
     <div className="page" id="top">
@@ -175,6 +193,76 @@ export function Package({ name }) {
                 ) : null}
               </div>
             </section>
+
+            {deps ? (
+              <section className="detail__section">
+                <h2>Dependency analysis</h2>
+                <div className="context__cards">
+                  <article className="context__card">
+                    <span className="context__title">Requested depth</span>
+                    <span className="context__value">{depthLabel(deps.requested_depth)}</span>
+                  </article>
+                  <article className="context__card">
+                    <span className="context__title">Dependencies examined</span>
+                    <span className="context__value">{deps.examined}</span>
+                  </article>
+                  <article className="context__card">
+                    <span className="context__title">Deepest level reached</span>
+                    <span className="context__value">{deps.maximum_depth_reached}</span>
+                  </article>
+                  <article className={`context__card${deps.flagged_count ? ' context__card--add' : ''}`}>
+                    <span className="context__title">Independently flagged</span>
+                    <span className="context__value">{deps.flagged_count}</span>
+                    {deps.failed_count ? (
+                      <span className="context__note">{deps.failed_count} could not be analysed</span>
+                    ) : null}
+                  </article>
+                </div>
+                {deps.truncated ? (
+                  <p className="pkg__meta">
+                    The walk stopped before the AUR dependency closure was exhausted
+                    {deps.note ? `: ${deps.note}` : '.'} Part of the closure was not read.
+                  </p>
+                ) : null}
+                {deps.flagged.length ? (
+                  <ul className="history-list">
+                    {deps.flagged.map((dep) => (
+                      <li className="history-row" key={`${dep.depth}-${dep.name}`}>
+                        <span className="badge badge--version">L{dep.depth}</span>
+                        <a className="history-row__main" href={`/deps/${encodeURIComponent(dep.name)}`} data-route>{dep.name}</a>
+                        <span className="history-row__time">
+                          score {dep.score} · {dep.risk || 'unknown'}
+                          {dep.finding_count ? ` · ${dep.finding_count} finding${dep.finding_count === 1 ? '' : 's'}` : ''}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="pkg__meta">
+                    No analysed dependency cleared the review threshold. That is not a
+                    statement that the closure is safe, only that no known signal fired.
+                  </p>
+                )}
+                {deps.failed.length ? (
+                  <>
+                    <p className="pkg__meta">Dependencies that could not be analysed:</p>
+                    <ul className="history-list">
+                      {deps.failed.map((dep) => (
+                        <li className="history-row" key={`failed-${dep.depth}-${dep.name}`}>
+                          <span className="badge">not vetted</span>
+                          <a className="history-row__main" href={`/deps/${encodeURIComponent(dep.name)}`} data-route>{dep.name}</a>
+                          <span className="history-row__time">L{dep.depth}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : null}
+                <p className="pkg__meta">
+                  From the latest stored scan{scan.time ? ` (${relative(scan.time)})` : ''}.
+                  Flags are the dependency&rsquo;s own score; they do not add to {name}&rsquo;s score.
+                </p>
+              </section>
+            ) : null}
 
             <section className="detail__section">
               <h2>Maintainers <span className="count">{history.maintainers.length}</span></h2>
