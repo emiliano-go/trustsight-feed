@@ -1031,7 +1031,8 @@ async function scans(env, url) {
   const limit = clampInt(url.searchParams.get('limit'), DEFAULT_LIMIT, 1, MAX_LIMIT)
   const result = await env.DB.prepare(
     `SELECT cycle_id, package, status, score, risk, old_version, new_version,
-            maintainer, rules_json, coverage_gaps_json, has_diff, time
+            maintainer, rules_json, coverage_gaps_json, dependencies_json,
+            has_diff, time
        FROM scan_events WHERE ${where.join(' AND ')}
       ORDER BY time DESC, package ASC LIMIT ?`
   ).bind(...params, limit).all()
@@ -1039,8 +1040,10 @@ async function scans(env, url) {
     ...row,
     rules: JSON.parse(row.rules_json || '[]'),
     coverage_gaps: JSON.parse(row.coverage_gaps_json || '[]'),
+    dependency_analysis: row.dependencies_json ? JSON.parse(row.dependencies_json) : null,
     rules_json: undefined,
     coverage_gaps_json: undefined,
+    dependencies_json: undefined,
     has_diff: Boolean(row.has_diff),
   }))
   return json({ raw_since: boundary, items, next: items.length === limit ? { before: items[items.length - 1].time } : null })
@@ -1051,15 +1054,17 @@ async function scanCycle(env, cycleId) {
   if (!cycle) return json({ error: 'not_found' }, 404)
   const result = await env.DB.prepare(
     `SELECT package, status, score, risk, old_version, new_version, maintainer,
-            rules_json, coverage_gaps_json, has_diff, time
+            rules_json, coverage_gaps_json, dependencies_json, has_diff, time
        FROM scan_events WHERE cycle_id = ? ORDER BY package`
   ).bind(cycleId).all()
   const items = (result.results || []).map((row) => ({
     ...row,
     rules: JSON.parse(row.rules_json || '[]'),
     coverage_gaps: JSON.parse(row.coverage_gaps_json || '[]'),
+    dependency_analysis: row.dependencies_json ? JSON.parse(row.dependencies_json) : null,
     rules_json: undefined,
     coverage_gaps_json: undefined,
+    dependencies_json: undefined,
     has_diff: Boolean(row.has_diff),
   }))
   return json({ cycle, items })
