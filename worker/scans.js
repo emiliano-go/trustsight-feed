@@ -6,6 +6,7 @@ export const MAX_SCAN_RECORDS = 1000
 export const MAX_SCAN_STRING = 255
 export const MAX_SCAN_RULES = 128
 export const MAX_SCAN_GAPS = 64
+export const MAX_SCAN_DEPENDENCIES = 25
 
 const PACKAGE_RE = /^[A-Za-z0-9@._+-]{1,255}$/
 const STATUSES = new Set(['ok', 'fetch_failed', 'not_vetted', 'vanished', 'reserved'])
@@ -17,6 +18,11 @@ function text(value, max = MAX_SCAN_STRING) {
 function int(value, fallback = 0) {
   const number = Number(value)
   return Number.isSafeInteger(number) && number >= 0 ? number : fallback
+}
+
+function signedInt(value, fallback = 0) {
+  const number = Number(value)
+  return Number.isSafeInteger(number) ? number : fallback
 }
 
 function scalarList(value, max) {
@@ -42,6 +48,48 @@ function ruleList(value) {
     if (rows.length >= MAX_SCAN_RULES) break
   }
   return rows
+}
+
+function dependencyRows(value) {
+  if (!Array.isArray(value)) return []
+  const rows = []
+  const seen = new Set()
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue
+    const name = text(item.name)
+    if (!PACKAGE_RE.test(name) || seen.has(name)) continue
+    seen.add(name)
+    rows.push({
+      name,
+      depth: Math.min(8, int(item.depth)),
+      score: Math.min(100, int(item.score)),
+      risk: text(item.risk, 32),
+      finding_count: Math.min(10000, int(item.finding_count)),
+      via: text(item.via, 64),
+      parent: text(item.parent),
+      failed: item.failed ? 1 : 0,
+    })
+    if (rows.length >= MAX_SCAN_DEPENDENCIES) break
+  }
+  return rows
+}
+
+/** Validate one optional dependency-walk summary; malformed pieces drop. */
+function dependencyAnalysis(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const flagged = dependencyRows(value.flagged)
+  const failed = dependencyRows(value.failed)
+  return {
+    requested_depth: Math.max(-1, Math.min(8, signedInt(value.requested_depth))),
+    examined: Math.min(10000, int(value.examined)),
+    maximum_depth_reached: Math.min(8, int(value.maximum_depth_reached)),
+    truncated: value.truncated ? 1 : 0,
+    note: text(value.note, 300),
+    flagged_count: Math.min(10000, int(value.flagged_count, flagged.length)),
+    failed_count: Math.min(10000, int(value.failed_count, failed.length)),
+    flagged,
+    failed,
+  }
 }
 
 export function isScanDocument(payload) {
@@ -98,6 +146,7 @@ export function normalizeScanDocument(payload, receivedAt = Math.floor(Date.now(
     const status = text(raw.status, 32)
     if (!STATUSES.has(status)) throw new Error('bad_scan_status')
     const ruleRows = ruleList(raw.rules)
+    const dependencies = dependencyAnalysis(raw.dependency_analysis)
     const record = {
       cycle_id: cycleId,
       package: packageName,
@@ -109,6 +158,7 @@ export function normalizeScanDocument(payload, receivedAt = Math.floor(Date.now(
       maintainer: text(raw.maintainer),
       rules_json: JSON.stringify(ruleRows.map((rule) => rule.id)),
       coverage_gaps_json: JSON.stringify(scalarList(raw.coverage_gaps, MAX_SCAN_GAPS)),
+      dependencies_json: dependencies ? JSON.stringify(dependencies) : '',
       has_diff: raw.has_diff ? 1 : 0,
       time,
     }

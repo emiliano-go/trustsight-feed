@@ -78,9 +78,13 @@ async function rollup(day) {
       WHERE time >= ? AND time < ? AND score IS NOT NULL GROUP BY bucket`, [start, end],
   ).results || []
   const packages = await query(
-    `SELECT package, COUNT(*) AS scans, MAX(score) AS max_score,
-            MAX(has_diff) AS has_diff
-       FROM scan_events WHERE time >= ? AND time < ? GROUP BY package`, [start, end],
+    `SELECT e.package, COUNT(*) AS scans, MAX(e.score) AS max_score,
+            MAX(e.has_diff) AS has_diff,
+            (SELECT x.dependencies_json FROM scan_events x
+              WHERE x.package = e.package AND x.time >= ? AND x.time < ?
+              ORDER BY x.time DESC LIMIT 1) AS dependencies_json
+       FROM scan_events e WHERE e.time >= ? AND e.time < ? GROUP BY e.package`,
+    [start, end, start, end],
   ).results || []
   if (dryRun) {
     console.log(`would roll up ${day}: ${totals.attempted} scans, ${rules.length} rules`)
@@ -121,10 +125,13 @@ async function rollup(day) {
   }
   for (const row of packages) {
     await query(`INSERT INTO scan_daily_packages
-      (day, package, scans, max_score, has_diff) VALUES (?, ?, ?, ?, ?)
+      (day, package, scans, max_score, has_diff, dependencies_json)
+      VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(day, package) DO UPDATE SET scans=excluded.scans,
-      max_score=excluded.max_score, has_diff=excluded.has_diff`,
-    [day, row.package, row.scans || 0, row.max_score || 0, row.has_diff || 0])
+      max_score=excluded.max_score, has_diff=excluded.has_diff,
+      dependencies_json=excluded.dependencies_json`,
+    [day, row.package, row.scans || 0, row.max_score || 0, row.has_diff || 0,
+      row.dependencies_json || ''])
   }
   await query('DELETE FROM scan_rule_events WHERE time >= ? AND time < ?', [start, end])
   await query('DELETE FROM scan_events WHERE time >= ? AND time < ?', [start, end])

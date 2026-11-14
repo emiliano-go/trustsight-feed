@@ -519,6 +519,14 @@
     "description": "G003 groups adoptions under one maintainer and G008 watches one first-seen account. This is the multi-account adoption window: different maintainers taking unrelated dormant packages in the same cycle. The dormant-target clause (`g014.min_dormant`, default 2 targets older than `g014.dormant_days`, default 180) keeps the ordinary \"a new maintainer adopts an active package they care about\" case out, in the same way G008's dormant clause does.",
     "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g014"
   },
+  "g015": {
+    "id": "G015",
+    "name": "Sleeper Adoption Campaign",
+    "severity": "MEDIUM",
+    "categoryTitle": "Correlation",
+    "description": "G003, G008 and G014 see the adoption wave while it is fresh. This is the delayed counterpart: a multi-account sleeper cohort that waits through the cooling-off period (`g015.min_adoption_age_days`, default 30) and then reactivates most of its dormant packages together. Adoptions older than `g015.max_adoption_age_days` (default 365), cohorts spread over more than `g015.adoption_window_days` (default 180), active-package adoptions, routine checksum or version refreshes, split outputs and naming families stand down.",
+    "docsUrl": "https://docs.trustsight.org/reference/rules/correlation/#g015"
+  },
   "h001": {
     "id": "H001",
     "name": "Checksum Disabled",

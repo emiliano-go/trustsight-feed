@@ -28,6 +28,20 @@ function payload(overrides = {}) {
         old_version: '1.0', new_version: '1.1', maintainer: 'one',
         rules: [{ id: 'H037', severity: 'MEDIUM' }],
         coverage_gaps: [], has_diff: true,
+        dependency_analysis: {
+          requested_depth: -1,
+          examined: 3,
+          maximum_depth_reached: 2,
+          truncated: false,
+          note: '',
+          flagged_count: 1,
+          failed_count: 0,
+          flagged: [{
+            name: 'dep-a', depth: 1, score: 45, risk: 'high',
+            finding_count: 2, via: 'depends', parent: 'alpha', failed: false,
+          }],
+          failed: [],
+        },
       },
       {
         package: 'beta', status: 'ok', score: 0, risk: 'low',
@@ -126,11 +140,14 @@ describe('scan storage', () => {
     const list = await (await SELF.fetch('https://example.com/api/scans?cycle=cycle-api')).json()
     expect(list.items).toHaveLength(2)
     expect(list.items[0].rules).toBeDefined()
+    expect(list.items[0].dependency_analysis.requested_depth).toBe(-1)
+    expect(list.items[0].dependency_analysis.flagged[0].name).toBe('dep-a')
     const stats = await (await SELF.fetch('https://example.com/api/scan-stats?window=30d')).json()
     expect(stats.totals.attempted).toBeGreaterThanOrEqual(2)
     const series = await (await SELF.fetch('https://example.com/api/scan-stats/timeseries?window=30d&bucket=day')).json()
     expect(series.rows.length).toBeGreaterThanOrEqual(1)
     const cycle = await (await SELF.fetch('https://example.com/api/scans/cycle-api')).json()
     expect(cycle.cycle.cycle_id).toBe('cycle-api')
+    expect(cycle.items[0].dependency_analysis.examined).toBe(3)
   })
 })

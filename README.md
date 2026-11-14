@@ -45,6 +45,12 @@ resource, stop.
   verifies the Ed25519 signature over the raw body, and stores one row per
   notification in D1. The ntfy-shaped parser is kept as a parity path, not as
   a poller.
+- **All-scan stream.** Beside the alert documents, the watcher posts
+  `trustsight.scans` chunks for every attempted package. Each record carries
+  a bounded `dependency_analysis` summary (requested depth, examined count,
+  deepest level, truncation, and the identities of independently flagged
+  dependencies), which the package page renders. Full dependency findings
+  stay in the watcher's database.
 - **D1 (SQLite)** stores the notifications, the derived campaign/maintainer/
   IOC event indexes, and the signed checkpoints. FTS5 indexes package names,
   rule ids, versions, titles and days.

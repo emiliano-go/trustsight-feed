@@ -602,7 +602,7 @@ export const openapiSpec = {
     '/api/scans': {
       get: {
         tags: ['Analytics'], summary: 'Recent all-scan records',
-        description: 'Raw per-package scan records for the last 30 days. Older days are squashed into the scan-stats rollups.',
+        description: 'Raw per-package scan records for the last 30 days. Older days are squashed into the scan-stats rollups. Each record may carry a bounded dependency_analysis summary (requested depth, examined count, deepest level, truncation, and independently flagged dependencies).',
         parameters: [
           { name: 'package', in: 'query', schema: { type: 'string' } },
           { name: 'status', in: 'query', schema: { type: 'string' } },
