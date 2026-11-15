@@ -4,7 +4,7 @@ The feed renders rule ids in JSON and in the references list, and each one
 explains itself on hover. The explanation is built from the trusted sources
 in the sibling TrustSight checkout:
 
-* ``docs/reference/rules/*.md`` - the ``### ID: Name {#anchor}`` heading plus
+* ``docs/rules/*.md`` - the ``### ID: Name {#anchor}`` heading plus
   the ``- **Severity:**`` and ``- **Description:**`` lines, which are the
   published definition of every rule. The page's own heading is the rule's
   category, and the page path is the docs URL.
@@ -30,7 +30,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "src" / "rule-catalog.generated.json"
-DOCS_BASE = "https://docs.trustsight.org/reference/rules"
+DOCS_BASE = "https://docs.trustsight.org/rules"
 
 HEADING = re.compile(r"^### ([A-Z]\d{3}):\s*(.*?)\s*(?:\{#([^}]+)\})?\s*$")
 H1 = re.compile(r"^#\s+(.*?)\s*$")
@@ -146,12 +146,17 @@ def _rules_dir() -> Path:
         if candidate:
             src = Path(candidate)
             repo_root = src.parent
-            docs = repo_root / "docs" / "reference" / "rules"
-            if docs.is_dir():
-                return docs
+            # The docs rework moved rule definitions under docs/rules/.
+            # Keep the old path as a fallback so this script also works
+            # against a core checkout from before the move.
+            for relative in (Path("docs") / "rules",
+                             Path("docs") / "reference" / "rules"):
+                docs = repo_root / relative
+                if docs.is_dir():
+                    return docs
     raise SystemExit(
-        "cannot find docs/reference/rules; put the TrustSight checkout beside "
-        "this one or set TRUSTSIGHT_SRC to its src/ directory"
+        "cannot find docs/rules; put the TrustSight checkout beside this one "
+        "or set TRUSTSIGHT_SRC to its src/ directory"
     )
 
 
