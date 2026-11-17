@@ -690,6 +690,44 @@ describe('signed direct ingest', () => {
     expect(row.title).toBe('TrustSight: hot-pkg scored 45')
   })
 
+  it('routes a signed scan document to the scan tables', async () => {
+    const { privateKey, env: e } = await withKeys()
+    const ts = Math.floor(Date.now() / 1000)
+    const cycle = `scan-ingest-${ts}`
+    const doc = JSON.stringify({
+      event: 'trustsight.scans',
+      tool: 'trustsight',
+      tool_version: '0.29.2',
+      cycle_id: cycle,
+      started_at: new Date(ts * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z'),
+      finished_at: new Date(ts * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z'),
+      chunk_index: 0,
+      chunk_count: 1,
+      summary: { attempted: 1, succeeded: 1 },
+      scans: [{
+        package: 'scan-pkg',
+        status: 'ok',
+        score: 0,
+        risk: 'low',
+        dependency_analysis: {
+          requested_depth: -1,
+          examined: 2,
+          maximum_depth_reached: 1,
+          flagged: [],
+          failed: [],
+        },
+      }],
+    })
+    const sig = await sign(privateKey, 'webhook-scan', ts, doc)
+    const res = await ingestDocument(e, doc, headersFor('webhook-scan', ts, sig))
+    expect(res.ok).toBe(true)
+    expect(res.scan).toBe(true)
+    const note = await env.DB.prepare('SELECT COUNT(*) AS n FROM notifications WHERE id = ?').bind('webhook-scan').first()
+    expect(note.n).toBe(0)
+    const event = await env.DB.prepare('SELECT dependencies_json FROM scan_events WHERE cycle_id = ? AND package = ?').bind(cycle, 'scan-pkg').first()
+    expect(JSON.parse(event.dependencies_json).requested_depth).toBe(-1)
+  })
+
   it('produces the same stored document as the ntfy route', async () => {
     // The whole point: the signed ingest and the ntfy-shaped path are the same
     // API. Only the row id (the source's identity) and the topic differ.

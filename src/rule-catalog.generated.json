@@ -63,6 +63,22 @@
     "description": "Inspection only; nothing is loaded or executed.",
     "docsUrl": "https://docs.trustsight.org/rules/artifact/#a008"
   },
+  "a009": {
+    "id": "A009",
+    "name": "Executable Binary In Source Archive",
+    "severity": "HIGH",
+    "categoryTitle": "Artifact",
+    "description": "A source archive normally ships source, not compiled objects. A committed ELF binary is report-only (weight 0, anergic) until calibrated; the file is never executed.",
+    "docsUrl": "https://docs.trustsight.org/rules/artifact/#a009"
+  },
+  "a010": {
+    "id": "A010",
+    "name": "Setuid File In Source Archive",
+    "severity": "HIGH",
+    "categoryTitle": "Artifact",
+    "description": "The bit is read from the archive header, not by executing anything. It is report-only (weight 0, anergic) until calibrated; a source tree that ships a setuid file is worth a look even before it is built.",
+    "docsUrl": "https://docs.trustsight.org/rules/artifact/#a010"
+  },
   "c001": {
     "id": "C001",
     "name": "Checksum Changed Without Source Change With Stable Version",
@@ -124,7 +140,7 @@
     "name": "Unread Content Moved Under A Stable Version",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "The [upstream-payload gap](../../explanation/what-trustsight-cannot-see.md) is real: a checksummed tarball's bytes are not in the diff, so a recipe can look untouched while the code it builds is replaced. What *is* in the diff is the carrier's **identity** - the checksum, the commit, the object id - and a change to that with no version change is the same event [H033](#h033) already claims for a git ref and [C001](#c001) for a checksum.",
+    "description": "The [upstream-payload gap](../explanation/limitations-and-uncertainty.md) is real: a checksummed tarball's bytes are not in the diff, so a recipe can look untouched while the code it builds is replaced. What *is* in the diff is the carrier's **identity** - the checksum, the commit, the object id - and a change to that with no version change is the same event [H033](#h033) already claims for a git ref and [C001](#c001) for a checksum.",
     "docsUrl": "https://docs.trustsight.org/rules/integrity/#c008"
   },
   "c009": {
@@ -156,7 +172,7 @@
     "name": "Source Domain Resembles Declared Upstream",
     "severity": "MEDIUM",
     "categoryTitle": "Deception and Anti-Analysis",
-    "description": "[R013b](system.md#r013) catches only mixed-script homoglyph domains, and the package/dependency typosquat never looks at domains, so a pure-ASCII mis-spell of the upstream's own host was invisible. The `url=` is declared by the same party under review, so this is a heuristic: it names a near-miss for a reviewer to judge. Eligibility is limited to a trusted-forge or official upstream, which keeps the near-miss meaningful - a source host resembling an *unknown* upstream is not evidence of impersonation.",
+    "description": "[R013b](deception.md#r013) catches only mixed-script homoglyph domains, and the package/dependency typosquat never looks at domains, so a pure-ASCII mis-spell of the upstream's own host was invisible. The `url=` is declared by the same party under review, so this is a heuristic: it names a near-miss for a reviewer to judge. Eligibility is limited to a trusted-forge or official upstream, which keeps the near-miss meaningful - a source host resembling an *unknown* upstream is not evidence of impersonation.",
     "docsUrl": "https://docs.trustsight.org/rules/deception/#c012"
   },
   "c013": {
@@ -460,7 +476,7 @@
     "name": "Campaign Corroboration",
     "severity": "INFO,",
     "categoryTitle": "Correlation",
-    "description": "Trained immunity, reported: while a campaign is primed, a package in its scope is named as corroborated - one `G007` entry carrying `campaign_id`, weight 0. It adds no points: the bonus it replaced measured scope *breadth*, not corroboration, and the benign corpus carries no active campaign, so the points were never measured against the false-positive rate. Inert when no campaign is active. See [Campaign Alert Mode](../../explanation/campaign-alert-mode.md).",
+    "description": "Trained immunity, reported: while a campaign is primed, a package in its scope is named as corroborated - one `G007` entry carrying `campaign_id`, weight 0. It adds no points: the bonus it replaced measured scope *breadth*, not corroboration, and the benign corpus carries no active campaign, so the points were never measured against the false-positive rate. Inert when no campaign is active. See [Campaign Alert Mode](../explanation/detection-and-evidence.md).",
     "docsUrl": "https://docs.trustsight.org/rules/correlation/#g007"
   },
   "g008": {
@@ -518,6 +534,14 @@
     "categoryTitle": "Correlation",
     "description": "G003 groups adoptions under one maintainer and G008 watches one first-seen account. This is the multi-account adoption window: different maintainers taking unrelated dormant packages in the same cycle. The dormant-target clause (`g014.min_dormant`, default 2 targets older than `g014.dormant_days`, default 180) keeps the ordinary \"a new maintainer adopts an active package they care about\" case out, in the same way G008's dormant clause does.",
     "docsUrl": "https://docs.trustsight.org/rules/correlation/#g014"
+  },
+  "g015": {
+    "id": "G015",
+    "name": "Sleeper Adoption Campaign",
+    "severity": "MEDIUM",
+    "categoryTitle": "Correlation",
+    "description": "G003, G008 and G014 see the adoption wave while it is fresh. This is the delayed counterpart: a multi-account sleeper cohort that waits through the cooling-off period (`g015.min_adoption_age_days`, default 30) and then reactivates most of its dormant packages together. Adoptions older than `g015.max_adoption_age_days` (default 365), cohorts spread over more than `g015.adoption_window_days` (default 180), active-package adoptions, routine checksum or version refreshes, split outputs and naming families stand down.",
+    "docsUrl": "https://docs.trustsight.org/rules/correlation/#g015"
   },
   "h001": {
     "id": "H001",
@@ -780,7 +804,7 @@
     "name": "Moved Git Ref",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "A tag is a name upstream can repoint at will, so \"the same tag\" is not the same code twice. TrustSight never resolves a tag against the network (see [the security model](../../security.md#the-invariants)), so the rule works from declared facts: the commit a recipe pins, and the version it claims.",
+    "description": "A tag is a name upstream can repoint at will, so \"the same tag\" is not the same code twice. TrustSight never resolves a tag against the network (see [the security model](../security-design/security-model.md#the-invariants)), so the rule works from declared facts: the commit a recipe pins, and the version it claims.",
     "docsUrl": "https://docs.trustsight.org/rules/integrity/#h033"
   },
   "h034": {
@@ -964,7 +988,7 @@
     "name": "Known Indicator of Compromise",
     "severity": "TIERED",
     "categoryTitle": "Indicators",
-    "description": "Five surfaces are read: the package's own name; names added to `depends`/`makedepends`/`optdepends`/`checkdepends`/`provides`/`replaces`/ `conflicts`; the host of any URL and any bare host token; any hex digest of digest length; and a file the diff added or modified, or the recipe names via `install=` or a local `source=()` entry. A `pkgbuild_pattern` entry is matched as a regular expression against added lines; an invalid or catastrophic-backtracking pattern is refused at load rather than run. The IOC federation stage is separate and reports attributed matches through `PackageFact.ioc_matches`; see [IOC Federation](../ioc.md).",
+    "description": "Five surfaces are read: the package's own name; names added to `depends`/`makedepends`/`optdepends`/`checkdepends`/`provides`/`replaces`/ `conflicts`; the host of any URL and any bare host token; any hex digest of digest length; and a file the diff added or modified, or the recipe names via `install=` or a local `source=()` entry. A `pkgbuild_pattern` entry is matched as a regular expression against added lines; an invalid or catastrophic-backtracking pattern is refused at load rather than run. The IOC federation stage is separate and reports attributed matches through `PackageFact.ioc_matches`; see [IOC Federation](../reference/ioc.md).",
     "docsUrl": "https://docs.trustsight.org/rules/indicator/#h056"
   },
   "h057": {
@@ -1028,7 +1052,7 @@
     "name": "Provides/Replaces Scope Expansion",
     "severity": "HIGH",
     "categoryTitle": "Naming and Dependencies",
-    "description": "Claiming another project's name redirects installs of that name to this package. A `conflicts` entry only refuses co-installation; it is HIGH when the target is widely depended on and INFO at weight 0 when it is merely established, which keeps a documented file collision from reading as a hijack. Relatedness suppresses the obvious false positive: variant, companion and sibling stems of the package's own name never fire. Cold start cannot fire either branch, since neither corpus nor pacman data exists to establish what is established. H064 always runs; D004 owns the `provides`/`replaces` claim and may double-report when it is enabled (it is, by default).",
+    "description": "Claiming another project's name redirects installs of that name to this package. A `conflicts` entry only refuses co-installation and never claims to be the target, so it is INFO at weight 0 whatever the target's popularity; a drop-in replacement that conflicts the package it replaces must not read as a name grab. A `provides`/`replaces` claim on the same name still scores. Relatedness suppresses the obvious false positive: variant, companion and sibling stems of the package's own name never fire. Cold start cannot fire either branch, since neither corpus nor pacman data exists to establish what is established. H064 always runs; D004 owns the `provides`/`replaces` claim and may double-report when it is enabled (it is, by default).",
     "docsUrl": "https://docs.trustsight.org/rules/naming-and-dependency/#h064"
   },
   "h065": {
@@ -1100,7 +1124,7 @@
     "name": "Introduction Rate Deviation",
     "severity": "MEDIUM",
     "categoryTitle": "Corpus Behavioral",
-    "description": "The corpus-wide introduction rate for a cycle deviates from the baseline mean by at least `[thresholds] h073.z_score` (default 3.0), once at least `h073.min_history_cycles` (default 3) cycles of history exist. An immature history is quiet.",
+    "description": "## Interpretation",
     "docsUrl": "https://docs.trustsight.org/rules/corpus-behavioral/#h073"
   },
   "h074": {
@@ -1108,7 +1132,7 @@
     "name": "Adopt-then-Modify",
     "severity": "MEDIUM",
     "categoryTitle": "Maintainer and Metadata",
-    "description": "H074 is the exception to the novelty ceiling described in [what TrustSight cannot see](../../explanation/what-trustsight-cannot-see.md): it fires on the **first** package of a campaign, from the maintainer field and commit times alone, before any payload shape exists to recognise. Adoption without a version change is quiet, and so is a change outside the window.",
+    "description": "H074 is the exception to the novelty ceiling described in [what TrustSight cannot see](../explanation/limitations-and-uncertainty.md): it fires on the **first** package of a campaign, from the maintainer field and commit times alone, before any payload shape exists to recognise. Adoption without a version change is quiet, and so is a change outside the window.",
     "docsUrl": "https://docs.trustsight.org/rules/maintainer-and-metadata/#h074"
   },
   "h075": {
@@ -1420,7 +1444,7 @@
     "name": "Licensor Absent On Licensed Shape",
     "severity": "INFO,",
     "categoryTitle": "Meta and Confluence",
-    "description": "A rule declaring `escalates_when` fired while none of its declared licensors did - the detector travelled without its usual company. Like M004 this is a sensor-health observation, not evidence about the package, so it goes to the `cofire_health` channel and never scores. See [Escalation Licensing](../../explanation/escalation-licensing.md).",
+    "description": "A rule declaring `escalates_when` fired while none of its declared licensors did - the detector travelled without its usual company. Like M004 this is a sensor-health observation, not evidence about the package, so it goes to the `cofire_health` channel and never scores. See [Escalation Licensing](../explanation/scoring-and-verdicts.md).",
     "docsUrl": "https://docs.trustsight.org/rules/meta/#m005"
   },
   "m006": {
@@ -1428,7 +1452,7 @@
     "name": "Campaign Re-armed Too Often",
     "severity": "INFO,",
     "categoryTitle": "Meta and Confluence",
-    "description": "A campaign re-armed faster than `[alerts] campaign_min_reactivation_observations` allows. The window is still refreshed - re-activation is never blocked - but a campaign that re-primes over and over is the **instrument** churning, not a package misbehaving, so it is surfaced as a tool-health note rather than passed over in silence. Unlike M004 and M005 it is a cycle-level observation: it is raised in the correlation cycle's log, not attached to any package's `cofire_health`, and it never scores. See [Campaign Alert Mode](../../explanation/campaign-alert-mode.md).",
+    "description": "A campaign re-armed faster than `[alerts] campaign_min_reactivation_observations` allows. The window is still refreshed - re-activation is never blocked - but a campaign that re-primes over and over is the **instrument** churning, not a package misbehaving, so it is surfaced as a tool-health note rather than passed over in silence. Unlike M004 and M005 it is a cycle-level observation: it is raised in the correlation cycle's log, not attached to any package's `cofire_health`, and it never scores. See [Campaign Alert Mode](../explanation/detection-and-evidence.md).",
     "docsUrl": "https://docs.trustsight.org/rules/meta/#m006"
   },
   "novelty": {
@@ -2071,6 +2095,30 @@
     "description": "Verification of the dependency's bytes was weakened. INFO and weight 0: a lockfile can legitimately drop integrity for a path or workspace entry, and the finding is a review prompt rather than a scored change. The lockfile's removal is reported here because the file that pinned every dependency is gone.",
     "docsUrl": "https://docs.trustsight.org/rules/upstream-manifests/#u012"
   },
+  "u013": {
+    "id": "U013",
+    "name": "CI Exfil Shape (Local)",
+    "severity": "MEDIUM",
+    "categoryTitle": "Upstream Release Integrity",
+    "description": "This is the local counterpart of U007. It runs only when the operator enabled `[upstream_scan]`, the declared archive's checksum verified, and the workflow was read from that archive. It is anergic (weight 0) until the corpus calibrates it, so it is a report-only signal rather than a scored claim.",
+    "docsUrl": "https://docs.trustsight.org/rules/upstream-release/#u013"
+  },
+  "u014": {
+    "id": "U014",
+    "name": "Git-History Credential Sweep (Local)",
+    "severity": "MEDIUM",
+    "categoryTitle": "Upstream Release Integrity",
+    "description": "This is the local counterpart of U008. It runs only on a workflow read by the opt-in `[upstream_scan]` lane and is anergic (weight 0) until calibrated.",
+    "docsUrl": "https://docs.trustsight.org/rules/upstream-release/#u014"
+  },
+  "u015": {
+    "id": "U015",
+    "name": "Federated Upstream Manifest Delta",
+    "severity": "INFO",
+    "categoryTitle": "Upstream Manifests",
+    "description": "The local analysis does not fetch: this is the signed result of the server-side `[upstream_scan]` lane, reported at weight 0 (anergic) as an indicator. A miss is uninformative.",
+    "docsUrl": "https://docs.trustsight.org/rules/upstream-manifests/#u015"
+  },
   "w001": {
     "id": "W001",
     "name": "Executes Code This Analysis Did Not Read",
@@ -2175,6 +2223,14 @@
     "description": "Fires when a package stands inside an active campaign perimeter and the same run carries a standing boundary note (`W009`, another `W` finding, or a coverage gap). The note is not new evidence and does not accuse the package: it says the campaign's neighbourhood is being reviewed with a known blind spot, until the campaign TTL expires.",
     "docsUrl": "https://docs.trustsight.org/rules/unverifiable/#w013"
   },
+  "w014": {
+    "id": "W014",
+    "name": "Upstream Scan Not Completed",
+    "severity": "INFO",
+    "categoryTitle": "Unverifiable",
+    "description": "This is a weight-0 boundary, not a scored finding and not a clean verdict. It names what the lane could not read this cycle; with the lane disabled, W011 already states that upstream content is not read at all.",
+    "docsUrl": "https://docs.trustsight.org/rules/unverifiable/#w014"
+  },
   "x001": {
     "id": "X001",
     "name": "Encoded Payload Decoded And Executed",
@@ -2212,7 +2268,7 @@
     "name": "Home Reached By An Alternative Spelling",
     "severity": "HIGH",
     "categoryTitle": "Crossfire",
-    "description": "Fires when a write or redirect reaches a home directory by a spelling [H032](install-and-persist.md#h032) does not match: `/home/alice`, `/home/$USER/...`, `~alice`, `/root`, `${HOME:-/home/alice}/...`, or a traversal naming `home` or `root`. The trailing separator is optional.",
+    "description": "Fires when a write or redirect reaches a home directory by a spelling [H032](install-and-persist.md#h032) does not match: `/home/alice`, `/home/$USER/...`, `~alice`, `/root`, `${HOME:-/home/alice}/...`, or a traversal naming `home` or `root`. The trailing separator is optional. A file-descriptor redirect (`2>`, `&>`) and a write to `/dev/null`, `/dev/stdout` or `/dev/stderr` write no file and are not a write.",
     "docsUrl": "https://docs.trustsight.org/rules/crossfire/#x005"
   },
   "x006": {

@@ -4,6 +4,7 @@ import { RuleChip, RuleHighlight, RuleSection, ruleInfo, sortRuleIds } from './R
 import { AUR_PACKAGE, AUR_PKGBUILD, chunk, eventBadgeClass, eventLabel, flattenProse, formatTime, locationLabel, relative } from './util.js'
 import { alertingClusters, campaignCommon, campaignEvents } from '../worker/lib.js'
 import { renderMarkdown, renderInlineCode } from './markdown.jsx'
+import { DependencySummary } from './DependencySummary.jsx'
 
 const safeHref = (value) => (/^https?:\/\//i.test(String(value || '')) ? value : null)
 
@@ -620,6 +621,7 @@ function AlertPackage({ entry, iocPackages }) {
         diffTruncated={entry.diff_truncated}
         defaultView="diff"
       />
+      <DependencySummary name={entry.package} />
     </article>
   )
 }
@@ -1346,6 +1348,7 @@ function PackageSections({ packages, iocPackages }) {
               />
             )}
             <ScoreBreakdown pkg={pkg} />
+            <DependencySummary name={pkg.package} />
             {rules.length ? (
               <div className="rule-sections">
                 {sortRuleIds(rules).map((id) => <RuleSection key={id} id={id} />)}

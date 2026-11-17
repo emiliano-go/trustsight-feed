@@ -100,6 +100,25 @@ export async function ingestDocument(env, rawBody, headers) {
   const text = rawBody instanceof Uint8Array ? new TextDecoder().decode(bytes) : String(rawBody ?? '')
   const verdict = await verifyIngest(env, headers, bytes)
   if (!verdict.ok) return verdict
+  let payload
+  try {
+    payload = JSON.parse(text)
+  } catch {
+    return { ok: false, status: 400, error: 'malformed' }
+  }
+  if (isScanDocument(payload)) {
+    try {
+      const stored = await storeScanDocument(env, payload)
+      await noteIngest(env)
+      return { ok: true, status: 200, stored, id: verdict.id, scan: true }
+    } catch (error) {
+      return {
+        ok: false,
+        status: 400,
+        error: String(error && error.message ? error.message : error),
+      }
+    }
+  }
   // The title is derived from the signed body; the unsigned header is not
   // trusted.  An intercepted POST could otherwise rewrite the headline.
   const title = ''
