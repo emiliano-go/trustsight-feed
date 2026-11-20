@@ -1,5 +1,6 @@
 import { handleApi } from './api.js'
 import { ingestDocument, MAX_BODY_BYTES } from './ingest.js'
+import { handleMcp } from './mcp.js'
 import { runCheckpoint } from './checkpoints.js'
 import { rollupScans } from './retention.js'
 import { EXPECTED_SCHEMA } from './schema.js'
@@ -213,6 +214,20 @@ export default {
     // trailing-slash spelling goes to the same place.
     if (url.pathname === '/api') return env.ASSETS.fetch(request)
     if (url.pathname === '/api/') return redirect('/api')
+
+    // Read-only MCP bridge over the same public API. It lives here, beside the
+    // data it serves, so tool schemas and the routes they call move together.
+    if (url.pathname === '/mcp/') return redirect('/mcp')
+    if (url.pathname === '/mcp') {
+      // The bridge fans out into the same reads a client could make directly,
+      // so it shares the API budget rather than opening a second one.
+      if (request.method !== 'OPTIONS' && env.API_LIMITER) {
+        const key = request.headers.get('CF-Connecting-IP') || 'anonymous'
+        const { success } = await env.API_LIMITER.limit({ key })
+        if (!success) return rateLimited()
+      }
+      return handleMcp(request, env)
+    }
 
     // Short API spellings at the root redirect to their /api equivalent.
     if (ROOT_ALIASES.some((base) => url.pathname === base || url.pathname.startsWith(`${base}/`))) {

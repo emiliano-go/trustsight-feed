@@ -174,6 +174,16 @@ The root spellings `/feed`, `/latest`, `/date/*`, `/package/*`, `/rule/*`,
 `/stats` and `/messages/*` redirect (308) to their `/api` equivalent, so a
 shortened URL never falls through to the app shell.
 
+### MCP
+
+`/mcp` is a stateless Streamable HTTP MCP endpoint over the same store, with
+four read-only tools: `search-alerts`, `latest-alerts`, `package-history` and
+`rule-triggers`. It is the bridge MCP clients connect to; the discovery
+documents on `trustsight.org` point here. Each tool call is dispatched through
+the same `handleApi` route an HTTP client would use, so there is no second
+implementation of the API and no write surface. It shares the 120-a-minute API
+budget.
+
 ## Analytics
 
 `/analytics` is the watcher dashboard. It starts with alert- and
