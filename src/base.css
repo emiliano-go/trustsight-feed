@@ -435,12 +435,14 @@ main > .section:nth-child(n + 2) {
   margin-top: auto;
   padding-top: 48px;
   display: flex;
-  gap: 28px;
+  /* Whole links wrap; a link never breaks between its label and its arrow. */
+  flex-wrap: wrap;
+  gap: 12px 28px;
   font-family: var(--font-mono);
   font-size: 0.7647rem;
 }
 
-.masthead-links a { color: var(--fg-muted); border-bottom: 0; }
+.masthead-links a { color: var(--fg-muted); border-bottom: 0; white-space: nowrap; }
 .masthead-links a:hover { color: var(--accent); }
 
 /* ---------- install command (copy button) ---------- */
