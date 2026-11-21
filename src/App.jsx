@@ -339,7 +339,6 @@ export function App() {
         </div>
         <nav className="masthead-links" aria-label="Primary">
           <a href={DOCS} target="_blank" rel="noreferrer">Docs ↗</a>
-          <a href="/analytics" data-route>Analytics</a>
           <a href="/deps" data-route>Dependencies</a>
           <a href="/api" data-route>/api</a>
           <a href={SECURITY} target="_blank" rel="noreferrer">Security model ↗</a>
