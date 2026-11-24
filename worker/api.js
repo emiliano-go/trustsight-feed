@@ -207,12 +207,10 @@ async function listQuery(env, options = {}) {
   }
   if (over) where.push('n.n_over_threshold > 0')
   if (ioc) where.push('n.n_ioc > 0')
-  if (campaigns) {
-    where.push("json_array_length(json_extract(n.payload, '$.campaign_cluster')) > 0")
-  }
-  if (refusals) {
-    where.push("json_array_length(json_extract(n.payload, '$.refusals')) > 0")
-  }
+  // Counted at ingest and backed by a partial index, so these filter to the
+  // matching rows instead of extracting JSON from every stored payload.
+  if (campaigns) where.push('n.n_campaigns > 0')
+  if (refusals) where.push('n.n_refusals > 0')
   if (fromTime !== null) { where.push('n.time >= ?'); params.push(fromTime) }
   if (toTime !== null) { where.push('n.time <= ?'); params.push(toTime) }
   if (before !== null && beforeId !== null) {
@@ -1164,6 +1162,7 @@ async function stats(env) {
   // feed_stats is maintained by triggers, so this is one row, not a scan.
   const row = await env.DB.prepare(
     `SELECT total, alive, first, last, alerts, over_threshold, ioc, impersonation,
+            campaign_events, maintainer_events, ioc_events,
             (SELECT MAX(time) FROM notifications
               WHERE event = 'trustsight.alerts') AS last_alert,
             (SELECT MAX(time) FROM notifications
@@ -1195,13 +1194,19 @@ async function stats(env) {
     .filter((entry) => entry.version)
     .sort((a, b) => b.time - a.time)
   if (versions.length) row.tool_version = versions[0].version
+  // The event counts are maintained by triggers on their own tables (migration
+  // 0016), so this reads one feed_stats row instead of scanning three tables.
+  // Checkpoints stay a count: one row per day cannot cost anything measurable.
   const counts = await env.DB.prepare(
-    `SELECT (SELECT COUNT(*) FROM campaign_events) AS campaigns,
-            (SELECT COUNT(*) FROM maintainer_events) AS maintainers,
-            (SELECT COUNT(*) FROM ioc_events) AS ioc_events,
-            (SELECT COUNT(*) FROM feed_checkpoints WHERE complete = 1) AS checkpoints`
+    'SELECT COUNT(*) AS checkpoints FROM feed_checkpoints WHERE complete = 1'
   ).first()
-  return json({ ...row, ...(counts || {}) })
+  return json({
+    ...row,
+    campaigns: row.campaign_events || 0,
+    maintainers: row.maintainer_events || 0,
+    ioc_events: row.ioc_events || 0,
+    ...(counts || {}),
+  })
 }
 
 /** The tool_version a stored payload JSON carries, when it has one. */

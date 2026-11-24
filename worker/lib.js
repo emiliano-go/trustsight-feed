@@ -56,6 +56,10 @@ export function parseNotification(msg) {
     n_over_threshold: over.length,
     n_ioc: ioc.length,
     n_impersonation: imp.length,
+    // Counted here so the feed filters are an index probe (partial indexes in
+    // migration 0016) instead of a JSON extract over every stored payload.
+    n_campaigns: Array.isArray(payload && payload.campaign_cluster) ? payload.campaign_cluster.length : 0,
+    n_refusals: Array.isArray(payload && payload.refusals) ? payload.refusals.length : 0,
     search_text: buildSearchText({ event, title, day, payload }),
   }
 }

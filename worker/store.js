@@ -15,14 +15,16 @@ async function insertRow(env, row, slug, verification = null) {
     env.DB.prepare(
       `INSERT INTO notifications
          (id, time, event, topic, title, priority, tags, day, slug, message_raw,
-          payload, n_alerts, n_over_threshold, n_ioc, n_impersonation, search_text,
+          payload, n_alerts, n_over_threshold, n_ioc, n_impersonation, n_campaigns,
+          n_refusals, search_text,
           created_at, webhook_id, key_id, signed_at, signature, body_sha256)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO NOTHING`
     ).bind(
       row.id, row.time, row.event, row.topic, row.title, row.priority, row.tags,
       row.day, slug, row.message_raw, row.payload, row.n_alerts,
-      row.n_over_threshold, row.n_ioc, row.n_impersonation, row.search_text,
+      row.n_over_threshold, row.n_ioc, row.n_impersonation, row.n_campaigns,
+      row.n_refusals, row.search_text,
       Math.floor(Date.now() / 1000),
       verification ? verification.webhookId : null,
       verification ? verification.keyId : null,
