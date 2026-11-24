@@ -29,24 +29,35 @@ function redirect(location) {
 // asks for stats every 30 seconds) do not become repeated D1 queries.  The
 // first request after a TTL pays for the query; the rest are cache hits.
 const CACHE_TTLS = [
-  [/^\/api\/stats$/, 60],
+  // The feed list is the one view a reader expects to move, so it keeps the
+  // shortest TTL.  The key is the full URL, so a filtered view never answers
+  // a different filter's request; ten seconds is short enough that a newly
+  // ingested alert is at most one refresh away.
+  [/^\/api\/feed$/, 10],
   [/^\/api\/feed\.(?:atom|json)$/, 60],
-  [/^\/api\/campaigns$/, 60],
-  [/^\/api\/triggers$/, 60],
-  [/^\/api\/rules$/, 60],
-  [/^\/api\/campaign\//, 60],
-  [/^\/api\/maintainer\//, 60],
-  [/^\/api\/iocs$/, 60],
-  [/^\/api\/keys$/, 3600],
-  [/^\/api\/checkpoints$/, 60],
-  [/^\/api\/checkpoints\//, 60],
   [/^\/api\/latest(?:\/\d+)?$/, 30],
   [/^\/api\/date\//, 60],
-  [/^\/api\/package\/[^/]+\/history$/, 60],
-  [/^\/api\/package\//, 30],
-  [/^\/api\/rule\//, 30],
+  // Aggregates: expensive per call, and nothing on the page needs them to the
+  // second.
+  [/^\/api\/stats$/, 60],
+  [/^\/api\/scan-stats\/timeseries$/, 300],
+  [/^\/api\/scan-stats$/, 300],
+  [/^\/api\/scans$/, 120],
+  [/^\/api\/analytics\//, 300],
+  [/^\/api\/campaigns$/, 300],
+  [/^\/api\/campaign\//, 300],
+  [/^\/api\/triggers$/, 120],
+  [/^\/api\/rules$/, 300],
+  [/^\/api\/iocs$/, 300],
+  [/^\/api\/keys$/, 3600],
+  [/^\/api\/checkpoints$/, 300],
+  [/^\/api\/checkpoints\//, 300],
+  [/^\/api\/package\/[^/]+\/history$/, 300],
+  [/^\/api\/package\//, 120],
+  [/^\/api\/rule\//, 120],
   [/^\/api\/messages\//, 300],
   [/^\/api\/maintainers$/, 3600],
+  [/^\/api\/maintainer\//, 300],
   [/^\/api\/source\//, 3600],
   [/^\/api\/diff\//, 3600],
   [/^\/api\/index\.json$/, 86400],
