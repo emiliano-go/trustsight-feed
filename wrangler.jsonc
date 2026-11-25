@@ -50,7 +50,12 @@
   // Daily signed checkpoint over the stored notification archive.  The
   // private key is a Wrangler secret, never a var.
   "triggers": {
-    "crons": ["0 0 * * *"]
+    "crons": [
+      // Daily checkpoint and scan rollup.
+      "0 0 * * *",
+      // The watcher watchdog: the feed notices when the push path goes quiet.
+      "*/15 * * * *"
+    ]
   },
   "vars": {
     "NTFY_SERVER": "https://ntfy.sh",

@@ -139,6 +139,9 @@ export function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [stats, setStats] = useState(null)
+  // Watcher liveness comes from /health, not /api/stats: /api/stats is cached
+  // at the edge for freshness' sake, and a stale stall banner is worse than none.
+  const [watcher, setWatcher] = useState(null)
   const [now, setNow] = useState(() => Date.now())
   const [paused, setPaused] = useState(false)
   const loadSeq = useRef(0)
@@ -238,10 +241,17 @@ export function App() {
   // from the feed so the list is never replaced by a periodic tick.
   useEffect(() => {
     let live = true
-    const refresh = () => fetch(STATS_URL)
+    const refreshWatcher = () => fetch('/health', { cache: 'no-store' })
       .then((r) => r.json())
-      .then((d) => { if (live) setStats(d) })
+      .then((d) => { if (live) setWatcher(d.watcher || null) })
       .catch(() => {})
+    const refresh = () => {
+      fetch(STATS_URL)
+        .then((r) => r.json())
+        .then((d) => { if (live) setStats(d) })
+        .catch(() => {})
+      refreshWatcher()
+    }
     refresh()
     const timer = setInterval(refresh, 30000)
     return () => { live = false; clearInterval(timer) }
@@ -284,6 +294,8 @@ export function App() {
   function manualRefresh() {
     setNow(Date.now())
     fetch(STATS_URL).then((r) => r.json()).then(setStats).catch(() => {})
+    fetch('/health', { cache: 'no-store' }).then((r) => r.json())
+      .then((d) => setWatcher(d.watcher || null)).catch(() => {})
     load({ background: itemsRef.current.length > 0 })
   }
 
@@ -291,6 +303,7 @@ export function App() {
     ? 'No alerts match these filters.'
     : 'No alerts yet. New ones appear here as the watcher raises them.'
   const lastSeen = lastNotification(stats)
+  const watcherStalled = Boolean(watcher && watcher.responsive === false)
 
   return (
     <div className="page" id="top">
@@ -351,6 +364,21 @@ export function App() {
       </header>
 
       <main id="content">
+        {watcherStalled ? (
+          <p className="watcher-alert" role="alert">
+            <b>Watcher non responsive</b>
+            <span>
+              No alert, heartbeat or scan has reached the feed for{' '}
+              {relative(watcher.last_ingest, now)} (threshold{' '}
+              {Math.round(watcher.threshold_seconds / 60)} minutes). The rows below stop at{' '}
+              <time dateTime={new Date(watcher.last_ingest * 1000).toISOString()}>
+                {formatTime(watcher.last_ingest)}
+              </time>
+              , so newer alerts may exist upstream and are not listed yet.{' '}
+              <a href="/health" target="_blank" rel="noreferrer">Receiver health ↗</a>
+            </span>
+          </p>
+        ) : null}
         <section className="section feed-section" aria-labelledby="feed">
           <h2 id="feed" className="visually-hidden">Search the alerts</h2>
 

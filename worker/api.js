@@ -5,6 +5,7 @@ import { campaignCommon, ftsQuery, fuzzyScore, maintainerKey, packageHistory, su
 import { atomFeed, jsonFeed } from './feeds.js'
 import { merkleProof } from './checkpoints.js'
 import { openapiSpec } from './openapi.js'
+import { watcherState } from './watchdog.js'
 
 const DEFAULT_LIMIT = 50
 const MAX_LIMIT = 200
@@ -1200,12 +1201,14 @@ async function stats(env) {
   const counts = await env.DB.prepare(
     'SELECT COUNT(*) AS checkpoints FROM feed_checkpoints WHERE complete = 1'
   ).first()
+  const watcher = await watcherState(env)
   return json({
     ...row,
     campaigns: row.campaign_events || 0,
     maintainers: row.maintainer_events || 0,
     ioc_events: row.ioc_events || 0,
     ...(counts || {}),
+    watcher,
   })
 }
 
