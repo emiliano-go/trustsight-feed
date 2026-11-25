@@ -3,13 +3,33 @@
 // Ed25519 signature over "webhook-id.webhook-timestamp.rawbody"; the receiver
 // holds only the public key, so a leak of the feed's config cannot forge a
 // document.  A replayed request is idempotent on the row id, not re-stored.
+//
+// The timestamp binds the signature, so a document queued while this endpoint
+// was rejecting requests keeps its original timestamp forever.  A short
+// freshness window therefore turns any outage longer than the window into a
+// permanent stall: the producer retries the head of its queue, every retry is
+// rejected as stale, and nothing behind it is ever delivered.  That is exactly
+// what happened on 24/11/26 - the D1 row-read limit returned 500s for an hour,
+// the watcher's outbox head kept its 18:15 timestamp, and the feed sat a day
+// behind while every retry was refused.
+//
+// Accepting an older signed document is safe because delivery is idempotent:
+// the row id is the storage key and body_sha256 is unique, so a replay writes
+// nothing, and a late document is stored under its own `time` rather than
+// arriving out of order.  Only the future side stays tight, where a skewed
+// clock would let a producer name a time that has not happened yet.
 
 import { parseNotification } from './lib.js'
 import { storeRow, storeScanDocument } from './store.js'
 import { isScanDocument } from './scans.js'
 
 export const MAX_BODY_BYTES = 1_000_000
-export const REPLAY_WINDOW_SECONDS = 300
+//: How old a signed document may be and still be accepted.  Long enough to
+//: survive an outage measured in days; see the module comment.
+export const REPLAY_WINDOW_SECONDS = 30 * 24 * 60 * 60
+//: How far ahead of this receiver's clock a producer may be.  A future
+//: timestamp is a clock fault, not a retry.
+export const MAX_FUTURE_SKEW_SECONDS = 300
 export const MAX_WEBHOOK_ID_CHARS = 200
 export const MAX_KEY_ID_CHARS = 128
 export const MAX_SIGNATURE_CHARS = 512
@@ -62,8 +82,12 @@ export async function verifyIngest(env, headers, rawBody) {
       || sigB64.length > MAX_SIGNATURE_CHARS) {
     return { ok: false, status: 400, error: 'signature_headers_too_large' }
   }
-  if (Math.abs(Math.floor(Date.now() / 1000) - time) > REPLAY_WINDOW_SECONDS) {
+  const now = Math.floor(Date.now() / 1000)
+  if (now - time > REPLAY_WINDOW_SECONDS) {
     return { ok: false, status: 401, error: 'stale' }
+  }
+  if (time - now > MAX_FUTURE_SKEW_SECONDS) {
+    return { ok: false, status: 401, error: 'future_timestamp' }
   }
   const spki = publicKeyFor(env, keyId)
   if (!spki) return { ok: false, status: 401, error: 'unknown_key' }

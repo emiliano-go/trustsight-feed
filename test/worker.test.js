@@ -2,7 +2,7 @@ import { env, SELF } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest'
 import worker, { readBodyCapped } from '../worker/index.js'
 import { alertingClusters, baseSlug, buildSearchText, campaignCommon, ftsQuery, fuzzyScore, isTrustSightNotification, packageFacts, packageHistory, parseNotification, pickHeadline, summarize } from '../worker/lib.js'
-import { ingestDocument, REPLAY_WINDOW_SECONDS, verifyIngest } from '../worker/ingest.js'
+import { ingestDocument, MAX_FUTURE_SKEW_SECONDS, REPLAY_WINDOW_SECONDS, verifyIngest } from '../worker/ingest.js'
 
 function messageEvent(overrides = {}) {
   return {
@@ -767,6 +767,34 @@ describe('signed direct ingest', () => {
     const res = await ingestDocument(e, doc, headersFor('stale', old, sig))
     expect(res.status).toBe(401)
     expect(res.error).toBe('stale')
+  })
+
+  it('accepts a document that waited in the producer outbox overnight', async () => {
+    // A document's timestamp is bound into its signature, so a retry cannot
+    // refresh it.  A one-hour outage once left the head of the watcher queue
+    // permanently stale: every retry answered 401 and nothing behind it was
+    // ever delivered, so the feed sat a day behind.  Late delivery is safe
+    // because storage is idempotent on the row id and body hash, and the row
+    // keeps its own `time` rather than arriving out of order.
+    const { privateKey, env: e } = await withKeys()
+    const queued = Math.floor(Date.now() / 1000) - 26 * 60 * 60
+    const doc = '{"event":"trustsight.alerts","tool":"trustsight","title":"late"}'
+    const sig = await sign(privateKey, 'outbox-head', queued, doc)
+    const res = await ingestDocument(e, doc, headersFor('outbox-head', queued, sig))
+    expect(res.ok).toBe(true)
+    expect(res.stored).toBe(true)
+    const row = await env.DB.prepare('SELECT time FROM notifications WHERE id = ?').bind('outbox-head').first()
+    expect(row.time).toBe(queued)
+  })
+
+  it('rejects a timestamp from the future', async () => {
+    const { privateKey, env: e } = await withKeys()
+    const ahead = Math.floor(Date.now() / 1000) + MAX_FUTURE_SKEW_SECONDS + 10
+    const doc = '{"event":"trustsight.alerts","tool":"trustsight","title":"t"}'
+    const sig = await sign(privateKey, 'future', ahead, doc)
+    const res = await ingestDocument(e, doc, headersFor('future', ahead, sig))
+    expect(res.status).toBe(401)
+    expect(res.error).toBe('future_timestamp')
   })
 
   it('rejects a request missing the signature headers', async () => {
