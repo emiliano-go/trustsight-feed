@@ -4,6 +4,11 @@ import { handleMcp } from './mcp.js'
 import { runCheckpoint } from './checkpoints.js'
 import { rollupScans } from './retention.js'
 import { EXPECTED_SCHEMA } from './schema.js'
+import { stallThresholdSeconds, watchdogTick } from './watchdog.js'
+
+//: The schedule that owns the daily checkpoint and the scan rollup.  Every
+//: other cron entry is the watchdog tick.
+const DAILY_CRON = '0 0 * * *'
 
 function rateLimited() {
   return new Response(JSON.stringify({ error: 'rate_limited' }), {
@@ -129,6 +134,13 @@ async function health(env) {
     const current = schema ? String(schema.value) : null
     const ready = current === EXPECTED_SCHEMA
     const age = checkpoint ? Math.max(0, Math.floor(Date.now() / 1000) - checkpoint.generated_at) : null
+    // Silence is measured here, on the receiver: the watcher can be healthy and
+    // still unable to reach this endpoint, which is what a day-long stall looks
+    // like from the feed's side.
+    const threshold = stallThresholdSeconds(env)
+    const ingested = Number(meta.last_ingest_ok_at)
+    const heard = Number.isFinite(ingested) && ingested > 0
+    const silent = heard ? Math.max(0, Math.floor(Date.now() / 1000) - ingested) : null
     return new Response(JSON.stringify({
       status: ready ? 'ok' : 'degraded',
       time: new Date().toISOString(),
@@ -138,6 +150,11 @@ async function health(env) {
       ready,
       last: last ? last.t : null,
       last_ingest: meta.last_ingest_ok_at || null,
+      watcher: {
+        responsive: heard ? silent <= threshold : null,
+        silent_seconds: silent,
+        threshold_seconds: threshold,
+      },
       backfill: {
         at: meta.events_backfill_at || null,
         through_rowid: meta.events_backfill_through_rowid || null,
@@ -276,9 +293,20 @@ export default {
     return env.ASSETS.fetch(request)
   },
 
-  async scheduled(_event, env, ctx) {
-    // A failed checkpoint must not kill the scheduled invocation; /health and
-    // the logs carry the failure, and the next run extends the same state.
+  async scheduled(event, env, ctx) {
+    // Two schedules: the daily one owns the checkpoint and the scan rollup, the
+    // quarter-hourly one is the watcher watchdog.  A failure in either must not
+    // kill the invocation; /health and the logs carry it.
+    if (event && event.cron && event.cron !== DAILY_CRON) {
+      ctx.waitUntil(watchdogTick(env).then((result) => {
+        if (result.action !== 'none') {
+          console.log(`watcher watchdog: ${result.action} (silent ${result.silent_seconds}s)`)
+        }
+      }).catch((err) => {
+        console.error('watchdog failed', String(err && err.message ? err.message : err))
+      }))
+      return
+    }
     ctx.waitUntil(runCheckpoint(env).catch((err) => {
       console.error('checkpoint failed', String(err && err.message ? err.message : err))
     }))
