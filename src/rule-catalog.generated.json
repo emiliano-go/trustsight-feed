@@ -643,6 +643,7 @@
     "id": "H005",
     "name": "validpgpkeys Added",
     "severity": "",
+    "emitted": false,
     "categoryTitle": "Integrity and Verification",
     "description": "H005 is retained as a documentation anchor for a retired rule. It is not in the shipped ruleset and emits no finding. A post-diff `validpgpkeys` declaration is reported as `P002` at weight 0; changes to an existing signing-key set are handled by H078, and removal is handled by H024.",
     "docsUrl": "https://docs.trustsight.org/rules/integrity/#h005"
@@ -651,6 +652,7 @@
     "id": "H006",
     "name": "New Make/Opt/Check Dependency",
     "severity": "",
+    "emitted": false,
     "categoryTitle": "Naming and Dependencies",
     "description": "H006 is retained as a documentation anchor for a retired rule. It emits no finding: a network-capable `makedepends` addition is scored by [D003](#d003), and an `optdepends` addition is reported as a fact, never scored, without corpus state.",
     "docsUrl": "https://docs.trustsight.org/rules/naming-and-dependency/#h006"
@@ -659,6 +661,7 @@
     "id": "H007",
     "name": "Symlink Redirect",
     "severity": "",
+    "emitted": false,
     "categoryTitle": "Staging and Reconnaissance",
     "description": "H007 is retained as a documentation anchor for a retired rule. It emits no finding; a symlink written outside `$pkgdir` is one shape of [H076](#h076).",
     "docsUrl": "https://docs.trustsight.org/rules/staging-and-recon/#h007"
@@ -667,6 +670,7 @@
     "id": "H008",
     "name": "Suspicious Environment Variable",
     "severity": "",
+    "emitted": false,
     "categoryTitle": "Integrity and Verification",
     "description": "H008 is retained as a documentation anchor for a retired rule. It emits no finding: the indirect `CFLAGS=\"$(...)\"` shape is [X024](crossfire.md#x024), and a top-level flag-set replacement is [H079](#h079).",
     "docsUrl": "https://docs.trustsight.org/rules/integrity/#h008"
@@ -675,6 +679,7 @@
     "id": "H009",
     "name": "Network connection attempt",
     "severity": "",
+    "emitted": false,
     "categoryTitle": "Fetch and Execution",
     "description": "H009 is retained as a documentation anchor for a reserved `runtime` id. No code emits it: the current model cannot observe post-install behaviour from a static diff, so the identifier is held so a future runtime probe can use it without a baseline change.",
     "docsUrl": "https://docs.trustsight.org/rules/fetch-and-execution/#h009"
@@ -683,6 +688,7 @@
     "id": "H010",
     "name": "Suspicious file write",
     "severity": "",
+    "emitted": false,
     "categoryTitle": "Staging and Reconnaissance",
     "description": "H010 is retained as a documentation anchor for a reserved `runtime` id. No code emits it; a write to a sensitive location is claimed by the static rules when the diff shows it, such as [H076](#h076) and [R058](#r058).",
     "docsUrl": "https://docs.trustsight.org/rules/staging-and-recon/#h010"
@@ -691,6 +697,7 @@
     "id": "H011",
     "name": "Sensitive binary execution",
     "severity": "",
+    "emitted": false,
     "categoryTitle": "Fetch and Execution",
     "description": "H011 is retained as a documentation anchor for a reserved `runtime` id. No code emits it; it is held alongside [H009](#h009) for a future runtime probe.",
     "docsUrl": "https://docs.trustsight.org/rules/fetch-and-execution/#h011"
@@ -699,6 +706,7 @@
     "id": "H012",
     "name": "Strace detection attempt (TracerPid check)",
     "severity": "",
+    "emitted": false,
     "categoryTitle": "Deception and Anti-Analysis",
     "description": "H012 is retained as a documentation anchor for a reserved `runtime` id. No code emits it: reading `TracerPid` is post-install behaviour a static diff cannot observe. [H067](#h067) claims the static anti-analysis probe.",
     "docsUrl": "https://docs.trustsight.org/rules/deception/#h012"
@@ -707,6 +715,7 @@
     "id": "H013",
     "name": "Strace log truncated (possible flood evasion)",
     "severity": "",
+    "emitted": false,
     "categoryTitle": "Deception and Anti-Analysis",
     "description": "H013 is retained as a documentation anchor for a reserved `runtime` id. No code emits it; it is held alongside [H012](#h012).",
     "docsUrl": "https://docs.trustsight.org/rules/deception/#h013"
@@ -715,6 +724,7 @@
     "id": "H014",
     "name": "Eval or Exec Usage",
     "severity": "",
+    "emitted": false,
     "categoryTitle": "Obfuscation",
     "description": "H014 is retained as a documentation anchor for a retired rule. It emits no finding: `eval` of a substitution is [R039](#r039), and a top-level fetch that accompanies an `exec` is [H077](fetch-and-execution.md#h077).",
     "docsUrl": "https://docs.trustsight.org/rules/obfuscation/#h014"
@@ -827,6 +837,7 @@
     "id": "H028",
     "name": "Accelerated Release Cadence",
     "severity": "",
+    "emitted": false,
     "categoryTitle": "Corpus Behavioral",
     "description": "H028 is **metadata, never a scored finding**. The pipeline records whether the HEAD commit has 3+ commits within 24 hours (counting HEAD itself) as the `recent_commit_burst` boolean on `PackageFact`; it is not appended to `triggered_rules` and contributes nothing to the score.",
     "docsUrl": "https://docs.trustsight.org/rules/corpus-behavioral/#h028"
@@ -1188,7 +1199,7 @@
     "name": "Introduction Rate Deviation",
     "severity": "MEDIUM",
     "categoryTitle": "Corpus Behavioral",
-    "description": "## Interpretation",
+    "description": "The corpus-wide introduction rate for a cycle deviates from the baseline mean by at least `[thresholds] h073.z_score` (default 3.0), once at least `h073.min_history_cycles` (default 3) cycles of history exist. An immature history is quiet.",
     "docsUrl": "https://docs.trustsight.org/rules/corpus-behavioral/#h073"
   },
   "h074": {
@@ -2178,7 +2189,7 @@
   "u011": {
     "id": "U011",
     "name": "Upstream Origin Changed",
-    "severity": "",
+    "severity": "MEDIUM",
     "categoryTitle": "Upstream Manifests",
     "description": "The declared origin moved under a dependency that already existed: a registry entry became a git/VCS entry, or a lockfile entry started resolving from a different registry or host. The build now fetches the same name from a different place, which is the manifest-level counterpart of a source host move. A dependency that merely appears or disappears is owned by U001/U002.",
     "docsUrl": "https://docs.trustsight.org/rules/upstream-manifests/#u011"
@@ -2186,7 +2197,7 @@
   "u012": {
     "id": "U012",
     "name": "Lockfile Integrity Weakened",
-    "severity": "",
+    "severity": "INFO",
     "categoryTitle": "Upstream Manifests",
     "description": "Verification of the dependency's bytes was weakened. INFO and weight 0: a lockfile can legitimately drop integrity for a path or workspace entry, and the finding is a review prompt rather than a scored change. The lockfile's removal is reported here because the file that pinned every dependency is gone.",
     "docsUrl": "https://docs.trustsight.org/rules/upstream-manifests/#u012"

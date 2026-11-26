@@ -35,6 +35,8 @@ DOCS_BASE = "https://docs.trustsight.org/rules"
 HEADING = re.compile(r"^### ([A-Z]\d{3}):\s*(.*?)\s*(?:\{#([^}]+)\})?\s*$")
 H1 = re.compile(r"^#\s+(.*?)\s*$")
 BULLET = re.compile(r"^-\s*\*\*([A-Za-z ]+):\*\*\s*(.*\S)?\s*$")
+#: Any markdown heading: a page section ends the prose a rule owns.
+HEADING_ANY = re.compile(r"^#{1,6}\s+\S")
 
 # Rule ids the tool emits that have no published docs heading: the weighted
 # novelty signal, the source-provenance bucket and the coverage gap.  The feed
@@ -185,6 +187,12 @@ def _section_bullets_and_prose(lines: list[str], start: int, end: int) -> tuple[
     key: str | None = None
     parts: list[str] = []
     block: list[str] = []
+    # A rule section is followed by `## Interpretation` and `## Related
+    # documentation`.  Those headings are page structure, not the rule's
+    # explanation: before this stopped at the heading, H073 (which documents a
+    # Condition but no Description) took "## Interpretation" as its
+    # description and the feed rendered the marker literally.
+    stop_prose = False
 
     def flush_bullet() -> None:
         nonlocal key, parts
@@ -204,6 +212,11 @@ def _section_bullets_and_prose(lines: list[str], start: int, end: int) -> tuple[
             flush_bullet()
             flush_prose()
             continue
+        if HEADING_ANY.match(stripped):
+            flush_bullet()
+            flush_prose()
+            stop_prose = True
+            continue
         m = BULLET.match(line)
         if m:
             flush_bullet()
@@ -212,7 +225,7 @@ def _section_bullets_and_prose(lines: list[str], start: int, end: int) -> tuple[
             parts = [m.group(2).strip()] if m.group(2) else []
         elif key is not None:
             parts.append(stripped)
-        else:
+        elif not stop_prose:
             block.append(stripped)
     flush_bullet()
     flush_prose()
@@ -272,6 +285,11 @@ def _parse_page(path: Path) -> list[dict]:
             "id": rule_id,
             "name": name,
             "severity": severity,
+            # A section without a Severity line is an anchor the docs keep for
+            # a retired rule, or a metadata field the pipeline never appends to
+            # triggered_rules.  Both are listed so an old payload's chip still
+            # explains itself, and both have to say that nothing is emitted.
+            "emitted": bool(severity),
             # An explicit Description wins; otherwise the explanatory
             # paragraph, and only then the bare Condition.
             "description": explicit or paragraph or condition,
@@ -296,6 +314,8 @@ def build_catalog() -> str:
                 "id": entry["id"],
                 "name": entry["name"],
                 "severity": entry["severity"],
+                # Only the exception travels: an emitted rule needs no flag.
+                **({"emitted": False} if not entry["emitted"] else {}),
                 "categoryTitle": titles.get(entry["id"], entry["pageTitle"]),
                 "description": entry["description"],
                 "docsUrl": f"{DOCS_BASE}/{entry['page']}/#{entry['anchor']}",

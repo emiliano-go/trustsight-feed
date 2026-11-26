@@ -499,7 +499,14 @@ function groupAlerts(alerts) {
   const order = sortRuleIds([...byRule.keys()])
   const rank = (id) => (isCampaignRule(id) ? 0 : 1)
   const rules = [...byRule.values()]
-    .map((group) => ({ ...group, packages: [...new Set(group.entries.map((e) => e.package))].sort() }))
+    .map((group) => ({
+      ...group,
+      packages: [...new Set(group.entries.map((e) => e.package))].sort(),
+      // Mass adoption is a fact about one account, so the group names it
+      // instead of leaving the reader to open a member's page to find out who
+      // took the packages.  A batch can span accounts; then it says how many.
+      maintainers: [...new Set(group.entries.map((e) => e.maintainer).filter(Boolean))].sort(),
+    }))
     .sort((a, b) => rank(a.rule) - rank(b.rule) || order.indexOf(a.rule) - order.indexOf(b.rule))
   return { rules, bare }
 }
@@ -664,6 +671,20 @@ function AlertList({ alerts, overPackages, iocPackages, campaigns = [] }) {
             <RuleChip id={group.rule} />
             <span className="pkg__version">{group.packages.length} package{group.packages.length === 1 ? '' : 's'}</span>
           </header>
+          {group.maintainers.length ? (
+            <p className="pkg__meta pkg__meta--owner">
+              {group.maintainers.length === 1 ? 'Maintainer ' : 'Maintainers '}
+              {group.maintainers.slice(0, 3).map((name, i) => (
+                <span key={name}>
+                  {i ? ', ' : ''}
+                  <MaintainerLink name={name} />
+                </span>
+              ))}
+              {group.maintainers.length > 3
+                ? ` and ${group.maintainers.length - 3} more`
+                : null}
+            </p>
+          ) : null}
           {(() => {
             const common = campaignCommon(campaigns.find((cluster) => cluster.rule_id === group.rule))
             return common ? (

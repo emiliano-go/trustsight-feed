@@ -33,13 +33,22 @@ export function openRuleExplanation(id) {
   window.dispatchEvent(new CustomEvent('ts-rule-open', { detail: { id } }))
 }
 
+function SeverityTag({ rule }) {
+  if (!rule) return null
+  // A retired anchor, or a metadata field the pipeline never appends to
+  // triggered_rules: it has no severity to show, and saying nothing read as a
+  // blank chip.  Say what it is instead.
+  if (rule.emitted === false) return <span className="sev sev--anchor">not emitted</span>
+  const sev = rule.severity ? String(rule.severity).toUpperCase() : ''
+  return sev ? <span className={`sev ${severityClass(sev)}`}>{sev}</span> : null
+}
+
 function RuleBody({ id }) {
   const rule = ruleInfo(id)
-  const sev = rule && rule.severity ? rule.severity.toUpperCase() : ''
   return (
     <span className="rule-pop__head">
       <strong>{rule ? rule.name : `Rule ${id}`}</strong>
-      {sev ? <span className={`sev ${severityClass(sev)}`}>{sev}</span> : null}
+      <SeverityTag rule={rule} />
     </span>
   )
 }
@@ -123,7 +132,6 @@ export function sortRuleIds(ids) {
  */
 export function RuleSection({ id }) {
   const rule = ruleInfo(id)
-  const sev = rule && rule.severity ? rule.severity.toUpperCase() : ''
 
   if (isCoarse()) {
     return (
@@ -135,7 +143,7 @@ export function RuleSection({ id }) {
       >
         <span className="rule-section__id">{id}</span>
         <span className="rule-section__name">{rule ? rule.name : 'Unknown rule'}</span>
-        {sev ? <span className={`sev ${severityClass(sev)}`}>{sev}</span> : null}
+        <SeverityTag rule={rule} />
       </button>
     )
   }
@@ -145,7 +153,7 @@ export function RuleSection({ id }) {
       <h3 className="rule-section__head">
         <span className="rule-section__id">{id}</span>
         <span className="rule-section__name">{rule ? rule.name : 'Unknown rule'}</span>
-        {sev ? <span className={`sev ${severityClass(sev)}`}>{sev}</span> : null}
+        <SeverityTag rule={rule} />
       </h3>
       <p className="rule-section__desc">
         {rule && rule.description

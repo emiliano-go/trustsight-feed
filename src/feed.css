@@ -753,6 +753,14 @@ a.chip--ioc:hover {
 }
 .rule-section:last-child { border-bottom: 1px solid var(--rule); }
 
+.sev--anchor {
+  color: var(--fg-muted);
+  border-color: var(--rule);
+  font-style: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 .rule-section__head {
   display: flex;
   align-items: baseline;
