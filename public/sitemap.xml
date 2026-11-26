@@ -2,10 +2,74 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://watcher.trustsight.org/</loc>
-    <lastmod>2026-11-25</lastmod>
+    <lastmod>2026-11-26</lastmod>
   </url>
   <url>
     <loc>https://watcher.trustsight.org/api/</loc>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-11-26/032456/</loc>
+    <lastmod>2026-11-26</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-11-26/030843/</loc>
+    <lastmod>2026-11-26</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-11-26/025239/</loc>
+    <lastmod>2026-11-26</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-11-26/023645/</loc>
+    <lastmod>2026-11-26</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-11-26/022018/</loc>
+    <lastmod>2026-11-26</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-11-26/020031/</loc>
+    <lastmod>2026-11-26</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-11-26/014340/</loc>
+    <lastmod>2026-11-26</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-11-26/012729/</loc>
+    <lastmod>2026-11-26</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-11-26/011045/</loc>
+    <lastmod>2026-11-26</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-11-26/005443/</loc>
+    <lastmod>2026-11-26</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-11-26/003852/</loc>
+    <lastmod>2026-11-26</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-11-26/002255/</loc>
+    <lastmod>2026-11-26</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-11-26/000550/</loc>
+    <lastmod>2026-11-26</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-11-25/234920/</loc>
+    <lastmod>2026-11-25</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-11-25/234146/</loc>
+    <lastmod>2026-11-25</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-11-25/230105/</loc>
+    <lastmod>2026-11-25</lastmod>
   </url>
   <url>
     <loc>https://watcher.trustsight.org/2026-11-25/225546/</loc>
@@ -157,6 +221,30 @@
   </url>
   <url>
     <loc>https://watcher.trustsight.org/2026-11-24/184414/</loc>
+    <lastmod>2026-11-24</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-11-24/175840/</loc>
+    <lastmod>2026-11-24</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-11-24/174234/</loc>
+    <lastmod>2026-11-24</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-11-24/171050/</loc>
+    <lastmod>2026-11-24</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-11-24/162224/</loc>
+    <lastmod>2026-11-24</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-11-24/160619/</loc>
+    <lastmod>2026-11-24</lastmod>
+  </url>
+  <url>
+    <loc>https://watcher.trustsight.org/2026-11-24/155029/</loc>
     <lastmod>2026-11-24</lastmod>
   </url>
   <url>
