@@ -26,7 +26,7 @@ function payload(overrides = {}) {
       {
         package: 'alpha', status: 'ok', score: 25, risk: 'medium',
         old_version: '1.0', new_version: '1.1', maintainer: 'one',
-        rules: [{ id: 'H037', severity: 'MEDIUM' }],
+        rules: [{ id: 'H037', severity: 'MEDIUM' }, { id: 'S011', severity: 'INFO', weight: 0, anergic: true }],
         coverage_gaps: [], has_diff: true,
         dependency_analysis: {
           requested_depth: -1,
@@ -60,6 +60,7 @@ describe('scan validation', () => {
     expect(doc.records).toHaveLength(2)
     expect(doc.rules).toEqual([
       expect.objectContaining({ rule_id: 'H037', severity: 'MEDIUM' }),
+      expect.objectContaining({ rule_id: 'S011', severity: 'INFO', weight: 0, anergic: 1 }),
     ])
   })
 
@@ -167,6 +168,9 @@ describe('scan storage', () => {
     expect(list.items[0].rules).toBeDefined()
     expect(list.items[0].dependency_analysis.requested_depth).toBe(-1)
     expect(list.items[0].dependency_analysis.flagged[0].name).toBe('dep-a')
+    const observations = await (await SELF.fetch('https://example.com/api/observations?package=alpha&limit=5')).json()
+    expect(observations.items).toHaveLength(1)
+    expect(observations.items[0]).toMatchObject({ package: 'alpha', rule_id: 'S011', anergic: 1, weight: 0 })
     const stats = await (await SELF.fetch('https://example.com/api/scan-stats?window=30d')).json()
     expect(stats.totals.attempted).toBeGreaterThanOrEqual(2)
     const series = await (await SELF.fetch('https://example.com/api/scan-stats/timeseries?window=30d&bucket=day')).json()

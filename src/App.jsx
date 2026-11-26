@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { AccessibilityMenu, ThemeSwitch, Wordmark } from './Controls.jsx'
 import { RuleChip } from './RuleChip.jsx'
+import { AnergicObservations, AnergicToggle, useAnergic } from './Anergic.jsx'
 import { eventBadgeClass, eventLabel, flattenProse, formatTime, lastNotification, relative } from './util.js'
 
 const DOCS = 'https://docs.trustsight.org'
@@ -133,6 +134,7 @@ export function FeedSkeleton() {
 
 export function App() {
   const [filters, setFilters] = useState(filtersFromUrl)
+  const [showAnergic, toggleAnergic] = useAnergic()
   const [items, setItems] = useState([])
   const [next, setNext] = useState(null)
   const [newItems, setNewItems] = useState([])
@@ -407,6 +409,7 @@ export function App() {
                 </button>
               ))}
             </div>
+            <AnergicToggle on={showAnergic} onChange={toggleAnergic} />
             <button
               type="button"
               className={`filter live-toggle${paused ? ' is-paused' : ''}`}
@@ -492,6 +495,8 @@ export function App() {
               {newItems.length} new alert{newItems.length === 1 ? '' : 's'} — show
             </button>
           ) : null}
+
+          {showAnergic ? <AnergicObservations rule={filters.rule} limit={25} /> : null}
 
           {error ? <p className="feed-error">Couldn&rsquo;t load the feed ({error}). Try Refresh.</p> : null}
           {!loading && !error && !items.length ? (

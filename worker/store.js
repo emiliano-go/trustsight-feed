@@ -171,9 +171,10 @@ export async function storeScanDocument(env, payload, receivedAt = Math.floor(Da
   for (const rule of rules) {
     statements.push(env.DB.prepare(
       `INSERT OR IGNORE INTO scan_rule_events
-         (cycle_id, package, rule_id, severity, time)
-       VALUES (?, ?, ?, ?, ?)`
-    ).bind(rule.cycle_id, rule.package, rule.rule_id, rule.severity, rule.time))
+         (cycle_id, package, rule_id, severity, weight, anergic, time)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).bind(rule.cycle_id, rule.package, rule.rule_id, rule.severity,
+      rule.weight, rule.anergic, rule.time))
   }
   statements.push(env.DB.prepare(
     `UPDATE scan_cycles SET

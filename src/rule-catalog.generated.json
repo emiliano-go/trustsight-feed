@@ -63,6 +63,70 @@
     "description": "Inspection only; nothing is loaded or executed.",
     "docsUrl": "https://docs.trustsight.org/rules/artifact/#a008"
   },
+  "a009": {
+    "id": "A009",
+    "name": "Executable Binary In Source Archive",
+    "severity": "HIGH",
+    "categoryTitle": "Artifact",
+    "description": "A source archive normally ships source, not compiled objects. A committed ELF binary is report-only (weight 0, anergic) until calibrated; the file is never executed.",
+    "docsUrl": "https://docs.trustsight.org/rules/artifact/#a009"
+  },
+  "a010": {
+    "id": "A010",
+    "name": "Setuid File In Source Archive",
+    "severity": "HIGH",
+    "categoryTitle": "Artifact",
+    "description": "The bit is read from the archive header, not by executing anything. It is report-only (weight 0, anergic) until calibrated; a source tree that ships a setuid file is worth a look even before it is built.",
+    "docsUrl": "https://docs.trustsight.org/rules/artifact/#a010"
+  },
+  "a011": {
+    "id": "A011",
+    "name": "Hook Runs On Every Transaction",
+    "severity": "MEDIUM",
+    "categoryTitle": "Artifact",
+    "description": "The hook text is read from the artifact manifest; nothing is executed. Weight 0 (anergic) until calibrated.",
+    "docsUrl": "https://docs.trustsight.org/rules/artifact/#a011"
+  },
+  "a012": {
+    "id": "A012",
+    "name": "Shipped Hook Or Udev Fetches Or Runs A User Path",
+    "severity": "HIGH",
+    "categoryTitle": "Artifact",
+    "description": "These files run as root outside the package manager's checksum. The text is read only; nothing is executed. Weight 0 (anergic) until calibrated.",
+    "docsUrl": "https://docs.trustsight.org/rules/artifact/#a012"
+  },
+  "a013": {
+    "id": "A013",
+    "name": "Udev Rule Runs A Program",
+    "severity": "MEDIUM",
+    "categoryTitle": "Artifact",
+    "description": "A udev rule can launch a command as root whenever a device appears. Read-only inspection; weight 0 (anergic) until calibrated.",
+    "docsUrl": "https://docs.trustsight.org/rules/artifact/#a013"
+  },
+  "a014": {
+    "id": "A014",
+    "name": "Unsafe ELF Runpath",
+    "severity": "HIGH",
+    "categoryTitle": "Artifact",
+    "description": "The ELF header is read with a bounded parser; the binary is never mapped or executed. `$ORIGIN` is relative to the binary's own package directory and is not automatically unsafe. Weight 0 (anergic) until calibrated.",
+    "docsUrl": "https://docs.trustsight.org/rules/artifact/#a014"
+  },
+  "a015": {
+    "id": "A015",
+    "name": "Packed Or Encrypted ELF Section",
+    "severity": "MEDIUM",
+    "categoryTitle": "Artifact",
+    "description": "The section table is read with the bounded ELF parser; nothing is executed or unpacked. Weight 0 (anergic) until calibrated.",
+    "docsUrl": "https://docs.trustsight.org/rules/artifact/#a015"
+  },
+  "a016": {
+    "id": "A016",
+    "name": "Release Asset Diverges From Its Tag",
+    "severity": "HIGH",
+    "categoryTitle": "Artifact",
+    "description": "This is the upstream lane's xz 5.6.x shape: the release tarball carried automake fragments that did not exist in the tag. Automatic forge archives are generated from the tree and cannot diverge this way, so they are out of scope.",
+    "docsUrl": "https://docs.trustsight.org/rules/artifact/#a016"
+  },
   "c001": {
     "id": "C001",
     "name": "Checksum Changed Without Source Change With Stable Version",
@@ -124,7 +188,7 @@
     "name": "Unread Content Moved Under A Stable Version",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "The [upstream-payload gap](../../explanation/what-trustsight-cannot-see.md) is real: a checksummed tarball's bytes are not in the diff, so a recipe can look untouched while the code it builds is replaced. What *is* in the diff is the carrier's **identity** - the checksum, the commit, the object id - and a change to that with no version change is the same event [H033](#h033) already claims for a git ref and [C001](#c001) for a checksum.",
+    "description": "The [upstream-payload gap](../explanation/limitations-and-uncertainty.md) is real: a checksummed tarball's bytes are not in the diff, so a recipe can look untouched while the code it builds is replaced. What *is* in the diff is the carrier's **identity** - the checksum, the commit, the object id - and a change to that with no version change is the same event [H033](#h033) already claims for a git ref and [C001](#c001) for a checksum.",
     "docsUrl": "https://docs.trustsight.org/rules/integrity/#c008"
   },
   "c009": {
@@ -156,7 +220,7 @@
     "name": "Source Domain Resembles Declared Upstream",
     "severity": "MEDIUM",
     "categoryTitle": "Deception and Anti-Analysis",
-    "description": "[R013b](system.md#r013) catches only mixed-script homoglyph domains, and the package/dependency typosquat never looks at domains, so a pure-ASCII mis-spell of the upstream's own host was invisible. The `url=` is declared by the same party under review, so this is a heuristic: it names a near-miss for a reviewer to judge. Eligibility is limited to a trusted-forge or official upstream, which keeps the near-miss meaningful - a source host resembling an *unknown* upstream is not evidence of impersonation.",
+    "description": "[R013b](deception.md#r013) catches only mixed-script homoglyph domains, and the package/dependency typosquat never looks at domains, so a pure-ASCII mis-spell of the upstream's own host was invisible. The `url=` is declared by the same party under review, so this is a heuristic: it names a near-miss for a reviewer to judge. Eligibility is limited to a trusted-forge or official upstream, which keeps the near-miss meaningful - a source host resembling an *unknown* upstream is not evidence of impersonation.",
     "docsUrl": "https://docs.trustsight.org/rules/deception/#c012"
   },
   "c013": {
@@ -228,7 +292,7 @@
     "name": "Dependency Removal During A Build Change",
     "severity": "HIGH",
     "categoryTitle": "Composition",
-    "description": "Dropping `checkdepends` eliminates the test-suite execution that would catch a payload; the conjunction with a build change is what makes the removal suspicious rather than hygienic. `optdepends` removal is far more often ordinary cleanup, so it stays MEDIUM. Measured on the locked benign corpus: 27 on the v1 corpus (0.72%) combined, the published calibration floor; the fire-rate gate clears `checkdepends` for HIGH.",
+    "description": "Dropping `checkdepends` eliminates the test-suite execution that would catch a payload; the conjunction with a build change is what makes the removal suspicious rather than hygienic. `optdepends` is not part of this rule: it lists optional runtime suggestions, so removing one removes no check and cannot hide a payload (yapfast dropped `vulkan-icd-loader` when its renderer moved to GL). Measured on the locked benign corpus: the `checkdepends` shape is what the published calibration floor covers, and the fire-rate gate clears it for HIGH.",
     "docsUrl": "https://docs.trustsight.org/rules/composition/#c021"
   },
   "c022": {
@@ -335,6 +399,14 @@
     "description": "H103 compares the fields that change what a build does and deliberately leaves the version line alone: stale metadata is ordinary. This reports that ordinary drift as INFO, feed-tier, so a consumer can see it without treating it as suspicious. Missing metadata or an unresolved variable stands the rule down.",
     "docsUrl": "https://docs.trustsight.org/rules/maintainer-and-metadata/#c034"
   },
+  "c035": {
+    "id": "C035",
+    "name": "Owned Namespace Occupied",
+    "severity": "HIGH",
+    "categoryTitle": "Integrity and Verification",
+    "description": "The operator owns the host and path prefix, not the whole forge. A package that declares the same host under another owner is reported at weight 0 (anergic) until calibrated.",
+    "docsUrl": "https://docs.trustsight.org/rules/integrity/#c035"
+  },
   "coverage": {
     "id": "COVERAGE",
     "name": "Coverage Gap",
@@ -396,7 +468,7 @@
     "name": "Encoded-Alphabet Fraction",
     "severity": "MEDIUM",
     "categoryTitle": "Entropy",
-    "description": "The alphabet sets are X029's, applied as a statistic rather than a staging predicate.",
+    "description": "The alphabet sets are X029's, applied as a statistic rather than a staging predicate. The contents of a `sha256sums`/`sha512sums`/`md5sums`/`b2sums` array are removed before the statistic runs: a recipe that declares a dozen digests adds a block of 64-hex tokens, and a digest list is metadata for the build rather than encoded payload. E001 measures the same filtered text for the same reason.",
     "docsUrl": "https://docs.trustsight.org/rules/entropy/#e002"
   },
   "e003": {
@@ -436,7 +508,7 @@
     "name": "Shared Upstream Dependency",
     "severity": "HIGH",
     "categoryTitle": "Correlation",
-    "description": "The committed-manifest counterpart to G001: a dependency name and remote host that many packages gain in the same window is the same-new-upstream-dependency campaign shape. It reads the recorded `upstream_dep_additions` view, which the corpus writer clears at cycle start and repopulates with the dependencies each processed package added; a prior cycle's row cannot re-fire the join. Split outputs of one pkgbase are one project, not several unrelated packages.",
+    "description": "The committed-manifest counterpart to G001: a dependency name and remote host that many packages gain in the same window is the same-new-upstream-dependency campaign shape. It reads the recorded `upstream_dep_additions` view, which the corpus writer clears at cycle start and repopulates with the dependencies each processed package added; a prior cycle's row cannot re-fire the join. Split outputs of one pkgbase are one project, not several unrelated packages, and a name family `is_related_package` joins (`sonora` and `sonora-bin`) is the same project's two packagings sharing one source tree.",
     "docsUrl": "https://docs.trustsight.org/rules/correlation/#g004"
   },
   "g005": {
@@ -460,7 +532,7 @@
     "name": "Campaign Corroboration",
     "severity": "INFO,",
     "categoryTitle": "Correlation",
-    "description": "Trained immunity, reported: while a campaign is primed, a package in its scope is named as corroborated - one `G007` entry carrying `campaign_id`, weight 0. It adds no points: the bonus it replaced measured scope *breadth*, not corroboration, and the benign corpus carries no active campaign, so the points were never measured against the false-positive rate. Inert when no campaign is active. See [Campaign Alert Mode](../../explanation/campaign-alert-mode.md).",
+    "description": "Trained immunity, reported: while a campaign is primed, a package in its scope is named as corroborated - one `G007` entry carrying `campaign_id`, weight 0. It adds no points: the bonus it replaced measured scope *breadth*, not corroboration, and the benign corpus carries no active campaign, so the points were never measured against the false-positive rate. Inert when no campaign is active. See [Campaign Alert Mode](../explanation/detection-and-evidence.md).",
     "docsUrl": "https://docs.trustsight.org/rules/correlation/#g007"
   },
   "g008": {
@@ -500,7 +572,7 @@
     "name": "Shared Payload Signal",
     "severity": "HIGH",
     "categoryTitle": "Correlation",
-    "description": "A per-package rule names one package's payload. This is the cross-account join: three unrelated maintainers shipping the same payload technique in one window is a campaign, not three coincidences. Only the curated payload allowlist counts (`R001`, `R002`, `R003`, `R008`, `H017`, `H035`, `H041`, `H075`, `H090`, `C016`, `C032`, `S001`-`S008`); broad practice rules such as `R010` (uses curl) or `H001` (checksum `SKIP`) are deliberately excluded so ordinary ecosystem churn cannot read as coordination.",
+    "description": "A per-package rule names one package's payload. This is the cross-account join: three unrelated maintainers shipping the same payload technique in one window is a campaign, not three coincidences. Only the curated payload allowlist counts (`R001`, `R002`, `R003`, `R008`, `H017`, `H035`, `H041`, `H075`, `H090`, `C016`, `C032`, `S001`-`S011`); broad practice rules such as `R010` (uses curl) or `H001` (checksum `SKIP`) are deliberately excluded so ordinary ecosystem churn cannot read as coordination.",
     "docsUrl": "https://docs.trustsight.org/rules/correlation/#g012"
   },
   "g013": {
@@ -518,6 +590,22 @@
     "categoryTitle": "Correlation",
     "description": "G003 groups adoptions under one maintainer and G008 watches one first-seen account. This is the multi-account adoption window: different maintainers taking unrelated dormant packages in the same cycle. The dormant-target clause (`g014.min_dormant`, default 2 targets older than `g014.dormant_days`, default 180) keeps the ordinary \"a new maintainer adopts an active package they care about\" case out, in the same way G008's dormant clause does.",
     "docsUrl": "https://docs.trustsight.org/rules/correlation/#g014"
+  },
+  "g015": {
+    "id": "G015",
+    "name": "Sleeper Adoption Campaign",
+    "severity": "MEDIUM",
+    "categoryTitle": "Correlation",
+    "description": "G003, G008 and G014 see the adoption wave while it is fresh. This is the delayed counterpart: a multi-account sleeper cohort that waits through the cooling-off period (`g015.min_adoption_age_days`, default 30) and then reactivates most of its dormant packages together. Adoptions older than `g015.max_adoption_age_days` (default 365), cohorts spread over more than `g015.adoption_window_days` (default 180), active-package adoptions, routine checksum or version refreshes, split outputs and naming families stand down.",
+    "docsUrl": "https://docs.trustsight.org/rules/correlation/#g015"
+  },
+  "g016": {
+    "id": "G016",
+    "name": "Account Blast Radius",
+    "severity": "INFO",
+    "categoryTitle": "Correlation",
+    "description": "This is **bystander activation** as an analogy, not an accusation. A specific payload signal in one package is the antigen-bearing focus; the account is the local environment; the other packages are antigen-nonspecific bystanders. The finding names the account and the sibling packages so a reader can look at the account once, without treating any sibling as malicious.",
+    "docsUrl": "https://docs.trustsight.org/rules/correlation/#g016"
   },
   "h001": {
     "id": "H001",
@@ -780,7 +868,7 @@
     "name": "Moved Git Ref",
     "severity": "HIGH",
     "categoryTitle": "Integrity and Verification",
-    "description": "A tag is a name upstream can repoint at will, so \"the same tag\" is not the same code twice. TrustSight never resolves a tag against the network (see [the security model](../../security.md#the-invariants)), so the rule works from declared facts: the commit a recipe pins, and the version it claims.",
+    "description": "A tag is a name upstream can repoint at will, so \"the same tag\" is not the same code twice. TrustSight never resolves a tag against the network (see [the security model](../security-design/security-model.md#the-invariants)), so the rule works from declared facts: the commit a recipe pins, and the version it claims.",
     "docsUrl": "https://docs.trustsight.org/rules/integrity/#h033"
   },
   "h034": {
@@ -860,7 +948,7 @@
     "name": "Attack-Chain Composition",
     "severity": "INFO",
     "categoryTitle": "Composition",
-    "description": "Stages: takeover (H026, H044, H074, H086, H088, H105), mass adoption (H045, H073), install hook (H023, H017, H100), foreign fetch (R001, H035, H066, H034, H075), registry (W002, H106), payload (H068, H069), obfuscation (H036, H065), anti-analysis (H067), write-then-execute (H072, H081, C032), staging (H038), recon (H040), persistence (H039, H062, H076, H093, H095, H108), exfil (H041, H071, H107), hidden drop (H042), integrity removed (H087, H091) and sabotage (S001-S008). Later rules also map onto these stages, including R041, R054, R144, the H080-H083/H089-H091 additions and the X001-X034 crossfire rules; the authoritative rule-to-stage map is `_STAGE_OF` in `analysis/composition.py`.",
+    "description": "Stages: takeover (H026, H044, H074, H086, H088, H105), mass adoption (H045, H073), install hook (H023, H017, H100), foreign fetch (R001, H035, H066, H034, H075), registry (W002, H106), payload (H068, H069), obfuscation (H036, H065), anti-analysis (H067), write-then-execute (H072, H081, C032), staging (H038), recon (H040), persistence (H039, H062, H076, H093, H095, H108), exfil (H041, H071, H107), hidden drop (H042), integrity removed (H087, H091) and sabotage (S001-S011). Later rules also map onto these stages, including R041, R054, R144, the H080-H083/H089-H091 additions and the X001-X034 crossfire rules; the authoritative rule-to-stage map is `_STAGE_OF` in `analysis/composition.py`.",
     "docsUrl": "https://docs.trustsight.org/rules/composition/#h043"
   },
   "h044": {
@@ -964,7 +1052,7 @@
     "name": "Known Indicator of Compromise",
     "severity": "TIERED",
     "categoryTitle": "Indicators",
-    "description": "Five surfaces are read: the package's own name; names added to `depends`/`makedepends`/`optdepends`/`checkdepends`/`provides`/`replaces`/ `conflicts`; the host of any URL and any bare host token; any hex digest of digest length; and a file the diff added or modified, or the recipe names via `install=` or a local `source=()` entry. A `pkgbuild_pattern` entry is matched as a regular expression against added lines; an invalid or catastrophic-backtracking pattern is refused at load rather than run. The IOC federation stage is separate and reports attributed matches through `PackageFact.ioc_matches`; see [IOC Federation](../ioc.md).",
+    "description": "Five surfaces are read: the package's own name; names added to `depends`/`makedepends`/`optdepends`/`checkdepends`/`provides`/`replaces`/ `conflicts`; the host of any URL and any bare host token; any hex digest of digest length; and a file the diff added or modified, or the recipe names via `install=` or a local `source=()` entry. A `pkgbuild_pattern` entry is matched as a regular expression against added lines; an invalid or catastrophic-backtracking pattern is refused at load rather than run. The IOC federation stage is separate and reports attributed matches through `PackageFact.ioc_matches`; see [IOC Federation](../reference/ioc.md).",
     "docsUrl": "https://docs.trustsight.org/rules/indicator/#h056"
   },
   "h057": {
@@ -1028,7 +1116,7 @@
     "name": "Provides/Replaces Scope Expansion",
     "severity": "HIGH",
     "categoryTitle": "Naming and Dependencies",
-    "description": "Claiming another project's name redirects installs of that name to this package. A `conflicts` entry only refuses co-installation; it is HIGH when the target is widely depended on and INFO at weight 0 when it is merely established, which keeps a documented file collision from reading as a hijack. Relatedness suppresses the obvious false positive: variant, companion and sibling stems of the package's own name never fire. Cold start cannot fire either branch, since neither corpus nor pacman data exists to establish what is established. H064 always runs; D004 owns the `provides`/`replaces` claim and may double-report when it is enabled (it is, by default).",
+    "description": "Claiming another project's name redirects installs of that name to this package. A `conflicts` entry only refuses co-installation and never claims to be the target, so it is INFO at weight 0 whatever the target's popularity; a drop-in replacement that conflicts the package it replaces must not read as a name grab. A `provides`/`replaces` claim on the same name still scores. Relatedness suppresses the obvious false positive: variant, companion and sibling stems of the package's own name never fire. Cold start cannot fire either branch, since neither corpus nor pacman data exists to establish what is established. H064 always runs; D004 owns the `provides`/`replaces` claim and may double-report when it is enabled (it is, by default).",
     "docsUrl": "https://docs.trustsight.org/rules/naming-and-dependency/#h064"
   },
   "h065": {
@@ -1100,7 +1188,7 @@
     "name": "Introduction Rate Deviation",
     "severity": "MEDIUM",
     "categoryTitle": "Corpus Behavioral",
-    "description": "The corpus-wide introduction rate for a cycle deviates from the baseline mean by at least `[thresholds] h073.z_score` (default 3.0), once at least `h073.min_history_cycles` (default 3) cycles of history exist. An immature history is quiet.",
+    "description": "## Interpretation",
     "docsUrl": "https://docs.trustsight.org/rules/corpus-behavioral/#h073"
   },
   "h074": {
@@ -1108,7 +1196,7 @@
     "name": "Adopt-then-Modify",
     "severity": "MEDIUM",
     "categoryTitle": "Maintainer and Metadata",
-    "description": "H074 is the exception to the novelty ceiling described in [what TrustSight cannot see](../../explanation/what-trustsight-cannot-see.md): it fires on the **first** package of a campaign, from the maintainer field and commit times alone, before any payload shape exists to recognise. Adoption without a version change is quiet, and so is a change outside the window.",
+    "description": "H074 is the exception to the novelty ceiling described in [what TrustSight cannot see](../explanation/limitations-and-uncertainty.md): it fires on the **first** package of a campaign, from the maintainer field and commit times alone, before any payload shape exists to recognise. Adoption without a version change is quiet, and so is a change outside the window.",
     "docsUrl": "https://docs.trustsight.org/rules/maintainer-and-metadata/#h074"
   },
   "h075": {
@@ -1383,6 +1471,14 @@
     "description": "`R054` catches a persistence file written outside the package root; this rule catches the command that enables it. Shipping a unit and documenting how the user may enable it is ordinary packaging. Enabling it during install changes the running system without the user asking, and survives package removal in the usual service-management sense.",
     "docsUrl": "https://docs.trustsight.org/rules/install-and-persist/#h108"
   },
+  "h109": {
+    "id": "H109",
+    "name": "Build Helper Executed From A Secondary Source",
+    "severity": "HIGH",
+    "categoryTitle": "Fetch and Execution",
+    "description": "The 2025 CHAOS RAT packages used this shape: an otherwise ordinary recipe added a patch repository under the uploader's account and ran a helper from that checkout. H105 catches the same act after an ownership change; this rule catches a new or unchanged package where the secondary source is the only unusual input.",
+    "docsUrl": "https://docs.trustsight.org/rules/fetch-and-execution/#h109"
+  },
   "m001": {
     "id": "M001",
     "name": "Claim Contradicted By Structure",
@@ -1420,7 +1516,7 @@
     "name": "Licensor Absent On Licensed Shape",
     "severity": "INFO,",
     "categoryTitle": "Meta and Confluence",
-    "description": "A rule declaring `escalates_when` fired while none of its declared licensors did - the detector travelled without its usual company. Like M004 this is a sensor-health observation, not evidence about the package, so it goes to the `cofire_health` channel and never scores. See [Escalation Licensing](../../explanation/escalation-licensing.md).",
+    "description": "A rule declaring `escalates_when` fired while none of its declared licensors did - the detector travelled without its usual company. Like M004 this is a sensor-health observation, not evidence about the package, so it goes to the `cofire_health` channel and never scores. See [Escalation Licensing](../explanation/scoring-and-verdicts.md).",
     "docsUrl": "https://docs.trustsight.org/rules/meta/#m005"
   },
   "m006": {
@@ -1428,7 +1524,7 @@
     "name": "Campaign Re-armed Too Often",
     "severity": "INFO,",
     "categoryTitle": "Meta and Confluence",
-    "description": "A campaign re-armed faster than `[alerts] campaign_min_reactivation_observations` allows. The window is still refreshed - re-activation is never blocked - but a campaign that re-primes over and over is the **instrument** churning, not a package misbehaving, so it is surfaced as a tool-health note rather than passed over in silence. Unlike M004 and M005 it is a cycle-level observation: it is raised in the correlation cycle's log, not attached to any package's `cofire_health`, and it never scores. See [Campaign Alert Mode](../../explanation/campaign-alert-mode.md).",
+    "description": "A campaign re-armed faster than `[alerts] campaign_min_reactivation_observations` allows. The window is still refreshed - re-activation is never blocked - but a campaign that re-primes over and over is the **instrument** churning, not a package misbehaving, so it is surfaced as a tool-health note rather than passed over in silence. Unlike M004 and M005 it is a cycle-level observation: it is raised in the correlation cycle's log, not attached to any package's `cofire_health`, and it never scores. See [Campaign Alert Mode](../explanation/detection-and-evidence.md).",
     "docsUrl": "https://docs.trustsight.org/rules/meta/#m006"
   },
   "novelty": {
@@ -1863,6 +1959,30 @@
     "description": "Anti-forensics, and MEDIUM because on its own it is weak evidence: a misguided recipe might clear history for tidiness. Its value is compositional - erasing the record of what ran is a strong signal *beside* something that ran, and H027 counts capability spread across families.",
     "docsUrl": "https://docs.trustsight.org/rules/sabotage/#s008"
   },
+  "s009": {
+    "id": "S009",
+    "name": "Privileged Account Or udev Rule",
+    "severity": "HIGH",
+    "categoryTitle": "Sabotage",
+    "description": "A package build has no reason to grant an account privileged group membership or set its password. Shipping a udev rule that launches a program is persistence on device events, outside the staged package tree. Ordinary service-account creation through `sysusers.d` is not this condition.",
+    "docsUrl": "https://docs.trustsight.org/rules/sabotage/#s009"
+  },
+  "s010": {
+    "id": "S010",
+    "name": "Kernel Module Loaded During Build",
+    "severity": "HIGH",
+    "categoryTitle": "Sabotage",
+    "description": "A `.install` script can legitimately load the module it shipped; a PKGBUILD build or package body loading an arbitrary module is changing the running kernel from the build recipe. The file header distinguishes the two cases.",
+    "docsUrl": "https://docs.trustsight.org/rules/sabotage/#s010"
+  },
+  "s011": {
+    "id": "S011",
+    "name": "Self-Referential Payload Teardown",
+    "severity": "INFO",
+    "categoryTitle": "Sabotage",
+    "description": "This is the self-referential gap that R099/R104 and the composition chain cannot see. R099 catches a trap, and R104 catches `trap '' ERR`; S011 catches the trap aimed at erasing the payload, the script deleting itself, and the process trying not to be reaped. It is narrower than R099 by construction: ordinary build cleanup, an ordinary `EXIT` trap, and a `trap` used for error handling do not match.",
+    "docsUrl": "https://docs.trustsight.org/rules/sabotage/#s011"
+  },
   "source_bucket": {
     "id": "SOURCE_BUCKET",
     "name": "Source Provenance",
@@ -2071,6 +2191,30 @@
     "description": "Verification of the dependency's bytes was weakened. INFO and weight 0: a lockfile can legitimately drop integrity for a path or workspace entry, and the finding is a review prompt rather than a scored change. The lockfile's removal is reported here because the file that pinned every dependency is gone.",
     "docsUrl": "https://docs.trustsight.org/rules/upstream-manifests/#u012"
   },
+  "u013": {
+    "id": "U013",
+    "name": "CI Exfil Shape (Local)",
+    "severity": "MEDIUM",
+    "categoryTitle": "Upstream Release Integrity",
+    "description": "This is the local counterpart of U007. It runs only when the operator enabled `[upstream_scan]`, the declared archive's checksum verified, and the workflow was read from that archive. It is anergic (weight 0) until the corpus calibrates it, so it is a report-only signal rather than a scored claim.",
+    "docsUrl": "https://docs.trustsight.org/rules/upstream-release/#u013"
+  },
+  "u014": {
+    "id": "U014",
+    "name": "Git-History Credential Sweep (Local)",
+    "severity": "MEDIUM",
+    "categoryTitle": "Upstream Release Integrity",
+    "description": "This is the local counterpart of U008. It runs only on a workflow read by the opt-in `[upstream_scan]` lane and is anergic (weight 0) until calibrated.",
+    "docsUrl": "https://docs.trustsight.org/rules/upstream-release/#u014"
+  },
+  "u015": {
+    "id": "U015",
+    "name": "Federated Upstream Manifest Delta",
+    "severity": "INFO",
+    "categoryTitle": "Upstream Manifests",
+    "description": "The local analysis does not fetch: this is the signed result of the server-side `[upstream_scan]` lane, reported at weight 0 (anergic) as an indicator. A miss is uninformative.",
+    "docsUrl": "https://docs.trustsight.org/rules/upstream-manifests/#u015"
+  },
   "w001": {
     "id": "W001",
     "name": "Executes Code This Analysis Did Not Read",
@@ -2175,6 +2319,22 @@
     "description": "Fires when a package stands inside an active campaign perimeter and the same run carries a standing boundary note (`W009`, another `W` finding, or a coverage gap). The note is not new evidence and does not accuse the package: it says the campaign's neighbourhood is being reviewed with a known blind spot, until the campaign TTL expires.",
     "docsUrl": "https://docs.trustsight.org/rules/unverifiable/#w013"
   },
+  "w014": {
+    "id": "W014",
+    "name": "Upstream Scan Not Completed",
+    "severity": "INFO",
+    "categoryTitle": "Unverifiable",
+    "description": "This is a weight-0 boundary, not a scored finding and not a clean verdict. It names what the lane could not read this cycle; with the lane disabled, W011 already states that upstream content is not read at all.",
+    "docsUrl": "https://docs.trustsight.org/rules/unverifiable/#w014"
+  },
+  "w015": {
+    "id": "W015",
+    "name": "Archive Structure Ambiguous",
+    "severity": "INFO",
+    "categoryTitle": "Unverifiable",
+    "description": "The archive is read in the read-role sandbox. Nothing is extracted to disk or executed, and the boundary is always reported at weight 0.",
+    "docsUrl": "https://docs.trustsight.org/rules/unverifiable/#w015"
+  },
   "x001": {
     "id": "X001",
     "name": "Encoded Payload Decoded And Executed",
@@ -2212,7 +2372,7 @@
     "name": "Home Reached By An Alternative Spelling",
     "severity": "HIGH",
     "categoryTitle": "Crossfire",
-    "description": "Fires when a write or redirect reaches a home directory by a spelling [H032](install-and-persist.md#h032) does not match: `/home/alice`, `/home/$USER/...`, `~alice`, `/root`, `${HOME:-/home/alice}/...`, or a traversal naming `home` or `root`. The trailing separator is optional.",
+    "description": "Fires when a write or redirect reaches a home directory by a spelling [H032](install-and-persist.md#h032) does not match: `/home/alice`, `/home/$USER/...`, `~alice`, `/root`, `${HOME:-/home/alice}/...`, or a traversal naming `home` or `root`. The trailing separator is optional. A file-descriptor redirect (`2>`, `&>`) and a write to `/dev/null`, `/dev/stdout` or `/dev/stderr` write no file and are not a write.",
     "docsUrl": "https://docs.trustsight.org/rules/crossfire/#x005"
   },
   "x006": {
