@@ -48,6 +48,7 @@ const CACHE_TTLS = [
   [/^\/api\/scan-stats\/timeseries$/, 300],
   [/^\/api\/scan-stats$/, 300],
   [/^\/api\/scans$/, 120],
+  [/^\/api\/upstream$/, 300],
   [/^\/api\/analytics\//, 300],
   [/^\/api\/campaigns$/, 300],
   [/^\/api\/campaign\//, 300],

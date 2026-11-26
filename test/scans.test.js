@@ -135,6 +135,31 @@ describe('scan storage', () => {
     expect(Array.isArray(breakdown.rows)).toBe(true)
   })
 
+  it('reports the upstream lane on its own endpoint', async () => {
+    await storeScanDocument(env, payload({
+      cycle_id: 'cycle-upstream',
+      scans: [
+        { package: 'gamma', status: 'ok', score: 0, risk: 'low', old_version: '1', new_version: '2',
+          maintainer: 'm', rules: [{ id: 'U001', severity: 'INFO' }, { id: 'U002', severity: 'INFO' }],
+          coverage_gaps: [], has_diff: true },
+        { package: 'delta', status: 'ok', score: 0, risk: 'low', old_version: '1', new_version: '2',
+          maintainer: 'm', rules: [{ id: 'W014', severity: 'INFO' }, { id: 'H037', severity: 'MEDIUM' }],
+          coverage_gaps: [], has_diff: true },
+      ],
+    }))
+    const body = await (await SELF.fetch('https://example.com/api/upstream?window=30d')).json()
+    const ids = body.rules.map((row) => row.rule_id)
+    expect(ids).toContain('U001')
+    expect(ids).toContain('U002')
+    expect(ids).toContain('W014')
+    // Only the lane's own rules are reported, never the rest of the scan.
+    expect(ids).not.toContain('H037')
+    expect(body.totals.refusals).toBeGreaterThanOrEqual(1)
+    expect(body.totals.findings).toBeGreaterThanOrEqual(3)
+    expect(body.recent.some((row) => row.package === 'gamma')).toBe(true)
+    expect(body.observed.last).toBeGreaterThan(0)
+  })
+
   it('serves scan and aggregate endpoints', async () => {
     await storeScanDocument(env, payload({ cycle_id: 'cycle-api' }))
     const list = await (await SELF.fetch('https://example.com/api/scans?cycle=cycle-api')).json()
