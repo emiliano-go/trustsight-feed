@@ -120,6 +120,15 @@ describe('the read budget of the public endpoints', () => {
     expect(after.campaigns).toBe(before.campaigns - removed)
   })
 
+  it('reports the upstream lane without walking the scan tables', async () => {
+    const result = await rowsRead('/api/upstream?window=30d')
+    expect(result.status).toBe(200)
+    // A fixed number of indexed probes per upstream rule plus the cycle
+    // totals, so the cost is O(rules + days) and never O(scans).  The seed
+    // holds no U rule at all, so nothing walks scan_events either.
+    expect(result.reads).toBeLessThan(250)
+  })
+
   it('serves the unfiltered feed from the first page only', async () => {
     const result = await rowsRead('/api/feed?limit=20')
     expect(result.status).toBe(200)

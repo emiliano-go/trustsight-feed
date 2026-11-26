@@ -993,6 +993,72 @@ async function scanStats(env, url) {
   })
 }
 
+//: The upstream lane's rules.  U001-U015 read the dependency manifests a
+//: recipe declares - committed beside it, or fetched from the declared source
+//: archive by the opt-in server-side lane - and W014/W015 name the refusals.
+function upstreamRuleIds() {
+  const ids = []
+  for (let i = 1; i <= 15; i += 1) ids.push(`U${String(i).padStart(3, '0')}`)
+  ids.push('W014', 'W015')
+  return ids
+}
+
+async function upstream(env, url) {
+  const { from, to, name } = scanWindow(url)
+  const ids = upstreamRuleIds()
+  const marks = ids.map(() => '?').join(',')
+  const boundary = scanRawBoundary()
+  const rawFrom = Math.max(from, boundary)
+  const dailyTo = Math.min(to, boundary - 1)
+  const dayFrom = isoSecond(from).slice(0, 10)
+  const dayTo = isoSecond(dailyTo).slice(0, 10)
+  const rules = await env.DB.prepare(
+    `SELECT rule_id, MAX(severity) AS severity, SUM(count) AS count FROM (
+       SELECT rule_id, severity, COUNT(*) AS count FROM scan_rule_events
+        WHERE time >= ? AND time <= ? AND rule_id IN (${marks})
+        GROUP BY rule_id, severity
+       UNION ALL
+       SELECT rule_id, severity, SUM(count) AS count FROM scan_daily_rules
+        WHERE day >= ? AND day <= ? AND rule_id IN (${marks})
+        GROUP BY rule_id, severity
+     ) GROUP BY rule_id ORDER BY count DESC`
+  ).bind(rawFrom, to, ...ids, dayFrom, dayTo, ...ids).all()
+  // The lane's own footprint: which packages it named, most recent first.  A
+  // week is enough to say "it is running" without walking the whole window.
+  const recentFrom = Math.max(rawFrom, Math.floor(Date.now() / 1000) - 7 * SECONDS_PER_DAY)
+  const recent = await env.DB.prepare(
+    `SELECT package, rule_id, MAX(severity) AS severity,
+            MAX(time) AS time, COUNT(*) AS hits
+       FROM scan_rule_events
+      WHERE time >= ? AND rule_id IN (${marks})
+      GROUP BY package, rule_id ORDER BY time DESC LIMIT 20`
+  ).bind(recentFrom, ...ids).all()
+  const span = await env.DB.prepare(
+    `SELECT MIN(time) AS first, MAX(time) AS last FROM scan_rule_events
+      WHERE time >= ? AND rule_id IN (${marks})`
+  ).bind(rawFrom, ...ids).first() || {}
+  const scans = await env.DB.prepare(
+    `SELECT COALESCE(SUM(attempted), 0) AS scans, COUNT(*) AS cycles
+       FROM scan_cycles WHERE started_at >= ? AND started_at <= ?`
+  ).bind(isoSecond(from), isoSecond(to)).first() || {}
+  const rows = rules.results || []
+  const countOf = (id) => Number(rows.find((row) => row.rule_id === id)?.count || 0)
+  return json({
+    window: name, from, to,
+    raw_since: boundary,
+    totals: {
+      scans: Number(scans.scans || 0),
+      cycles: Number(scans.cycles || 0),
+      findings: rows.reduce((sum, row) => sum + Number(row.count || 0), 0),
+      rules_fired: rows.length,
+      refusals: countOf('W014') + countOf('W015'),
+    },
+    observed: { first: span.first || null, last: span.last || null },
+    rules: rows,
+    recent: recent.results || [],
+  })
+}
+
 async function scanTimeseries(env, url) {
   const { from, to } = scanWindow(url)
   const bucket = String(url.searchParams.get('bucket') || 'day') === 'hour' ? 'hour' : 'day'
@@ -1480,6 +1546,7 @@ async function handleApiUnsafe(request, env, url) {
   if (path === '/api/stats') return stats(env)
   if (path === '/api/scans') return scans(env, url)
   if (path === '/api/scan-stats') return scanStats(env, url)
+  if (path === '/api/upstream') return upstream(env, url)
   if (path === '/api/scan-stats/timeseries') return scanTimeseries(env, url)
   if (path === '/api/analytics/summary') return analyticsSummary(env, url)
   if (path === '/api/analytics/timeseries') return analyticsTimeseries(env, url)

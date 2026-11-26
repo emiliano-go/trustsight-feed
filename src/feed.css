@@ -1518,3 +1518,75 @@ a.chip--ioc:hover {
   .dep-summary { padding: 14px 14px 12px; }
   .dep-summary .context__cards { grid-template-columns: 1fr 1fr; }
 }
+
+/* Report-only observations.  The toggle is deliberately a filter button so
+   the default feed and package view never change shape for readers who do
+   not ask for it. */
+.anergic-toggle.is-on { color: var(--plate-amber); border-color: var(--plate-amber); }
+.anergic-section { margin-top: 1.25rem; }
+.anergic-list { list-style: none; margin: 0.75rem 0 0; padding: 0; display: grid; gap: 0.5rem; }
+.anergic-item { border: 1px solid var(--line); border-radius: var(--radius); padding: 0.65rem 0.75rem; }
+.anergic-item__head { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+.anergic-item__head .pkg__meta { margin: 0 0 0 auto; }
+.anergic-item .pkg__meta { margin: 0.35rem 0 0; }
+
+/* ---------- upstream lane ---------- */
+
+.upstream-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin: 18px 0 14px;
+}
+.upstream-card {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+}
+.upstream-card b {
+  font-family: var(--font-mono);
+  font-size: 1.3529rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.upstream-card span {
+  color: var(--fg-muted);
+  font-size: 0.7647rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.upstream-meta {
+  margin: 0 0 22px;
+  color: var(--fg-muted);
+  font-size: 0.8235rem;
+  line-height: 1.6;
+}
+.upstream-section { margin: 26px 0 0; }
+.upstream-section h2 {
+  margin: 0 0 10px;
+  font-size: 0.8824rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.upstream-table td a { color: var(--fg); text-decoration: none; }
+.upstream-table td a:hover { color: var(--accent); text-decoration: underline; }
+.upstream-num { text-align: right; font-family: var(--font-mono); white-space: nowrap; }
+.upstream-recent { margin: 0; padding: 0; list-style: none; }
+.upstream-recent li {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 0.8824rem;
+}
+.upstream-recent li:last-child { border-bottom: 0; }
+.upstream-recent a { color: var(--fg); text-decoration: none; font-family: var(--font-mono); }
+.upstream-recent a:hover { color: var(--accent); }
+.upstream-empty {
+  padding: 34px 0;
+  color: var(--fg-muted);
+  font-size: 0.8824rem;
+  text-align: center;
+}

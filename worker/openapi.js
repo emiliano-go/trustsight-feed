@@ -629,6 +629,14 @@ export const openapiSpec = {
         responses: { 200: { description: 'Aggregates.', content: { 'application/json': { schema: { type: 'object', additionalProperties: true } } } }, 429: RATE_LIMITED },
       },
     },
+    '/api/upstream': {
+      get: {
+        tags: ['Analytics'], summary: 'Upstream lane',
+        description: 'What the upstream lane found: the U001-U015 rules that read declared dependency manifests, plus W014/W015 where the lane could not complete. Counts come from the rollups where raw scan rows have been squashed.',
+        parameters: [{ name: 'window', in: 'query', schema: { type: 'string', enum: ['24h', '7d', '30d'], default: '30d' } }],
+        responses: { 200: { description: 'Rule counts, totals and recent packages.', content: { 'application/json': { schema: { type: 'object', additionalProperties: true } } } }, 429: RATE_LIMITED },
+      },
+    },
     '/api/scan-stats/timeseries': {
       get: {
         tags: ['Analytics'], summary: 'All-scan time series',
