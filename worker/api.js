@@ -44,6 +44,7 @@ const ENDPOINTS = [
   'GET /api/stats',
   'GET /api/scans?from=&to=&package=&status=&risk=&rule=&cycle=&limit=&before=',
   'GET /api/scans/{cycle_id}',
+  'GET /api/observations?package=&rule=&from=&to=&limit=',
   'GET /api/scan-stats?window=24h|7d|30d',
   'GET /api/scan-stats/timeseries?bucket=hour|day&from=&to=',
   'GET /api/analytics/summary?window=24h|7d|30d',
@@ -1136,6 +1137,40 @@ async function scanCycle(env, cycleId) {
 }
 
 
+async function observations(env, url) {
+  const { from, to } = scanWindow(url)
+  const boundary = scanRawBoundary()
+  const where = ['re.anergic = 1', 're.time >= ?', 're.time <= ?']
+  const params = [Math.max(from, boundary), to]
+  const packageName = String(url.searchParams.get('package') || '').trim()
+  if (packageName) { where.push('re.package = ?'); params.push(packageName.slice(0, 255)) }
+  const rule = String(url.searchParams.get('rule') || '').trim()
+  if (rule) { where.push('re.rule_id = ?'); params.push(rule.toUpperCase()) }
+  const before = asInt(url.searchParams.get('before'))
+  if (before !== null) { where.push('re.time < ?'); params.push(before) }
+  const limit = clampInt(url.searchParams.get('limit'), 50, 1, MAX_LIMIT)
+  const result = await env.DB.prepare(
+    `SELECT re.cycle_id, re.package, re.rule_id, re.severity, re.weight, re.anergic,
+            re.time, se.score, se.risk, se.old_version, se.new_version,
+            se.maintainer
+       FROM scan_rule_events re
+       JOIN scan_events se ON se.cycle_id = re.cycle_id
+                          AND se.package = re.package
+      WHERE ${where.join(' AND ')}
+      ORDER BY re.time DESC, re.package ASC, re.rule_id ASC LIMIT ?`
+  ).bind(...params, limit).all()
+  const items = (result.results || []).map((row) => ({
+    ...row,
+    weight: Number(row.weight) || 0,
+    score: row.score === null ? null : Number(row.score),
+  }))
+  return json({
+    raw_since: boundary,
+    items,
+    next: items.length === limit ? { before: items[items.length - 1].time } : null,
+  })
+}
+
 function analyticsWindow(url) {
   const now = Math.floor(Date.now() / 1000)
   const name = String(url.searchParams.get('window') || '7d')
@@ -1545,6 +1580,7 @@ async function handleApiUnsafe(request, env, url) {
   if (path === '/api/feed') return feed(env, url)
   if (path === '/api/stats') return stats(env)
   if (path === '/api/scans') return scans(env, url)
+  if (path === '/api/observations') return observations(env, url)
   if (path === '/api/scan-stats') return scanStats(env, url)
   if (path === '/api/upstream') return upstream(env, url)
   if (path === '/api/scan-stats/timeseries') return scanTimeseries(env, url)

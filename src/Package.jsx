@@ -4,6 +4,7 @@ import { ChangeViews, LimitsNote, diffValues, parsePkgbuild, sourceUrlsFromDiff 
 import { RuleChip } from './RuleChip.jsx'
 import { AUR_PACKAGE, AUR_PKGBUILD, eventBadgeClass, eventLabel, flattenProse, formatTime, relative } from './util.js'
 import { apiUrl } from './api.js'
+import { AnergicObservations, AnergicToggle, useAnergic } from './Anergic.jsx'
 
 const safeHref = (value) => (/^https?:\/\//i.test(String(value || '')) ? value : null)
 
@@ -17,6 +18,7 @@ function fpIssueUrl(name) {
 
 /** Every stored alert that names one package, and everything they record about it. */
 export function Package({ name }) {
+  const [showAnergic, toggleAnergic] = useAnergic()
   const [history, setHistory] = useState(null)
   const [scan, setScan] = useState(null)
   const [error, setError] = useState('')
@@ -117,6 +119,7 @@ export function Package({ name }) {
           <a href={AUR_PKGBUILD(name)} target="_blank" rel="noreferrer">PKGBUILD ↗</a>
           <a href={`/deps/${encodeURIComponent(name)}`} data-route>Check dependencies</a>
           <button type="button" className="pkg__action" onClick={() => navigator.clipboard?.writeText(window.location.href)}>Copy permalink</button>
+          <AnergicToggle on={showAnergic} onChange={toggleAnergic} />
           {history && history.first ? <span title={formatTime(history.first)}>first seen {relative(history.first)}</span> : null}
           {history && history.last ? <span title={formatTime(history.last)}>last seen {relative(history.last)}</span> : null}
         </div>
@@ -373,6 +376,7 @@ export function Package({ name }) {
                 </article>
               ))}
             </section>
+            {showAnergic ? <AnergicObservations packageName={name} limit={25} /> : null}
             <LimitsNote />
           </>
         ) : null}

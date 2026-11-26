@@ -44,6 +44,8 @@ function ruleList(value) {
     rows.push({
       id,
       severity: text(typeof item === 'string' ? '' : item && item.severity, 32),
+      weight: Math.max(0, int(typeof item === 'string' ? 0 : item && item.weight)),
+      anergic: typeof item === 'object' && item && item.anergic ? 1 : 0,
     })
     if (rows.length >= MAX_SCAN_RULES) break
   }
@@ -169,6 +171,8 @@ export function normalizeScanDocument(payload, receivedAt = Math.floor(Date.now(
         package: packageName,
         rule_id: rule.id,
         severity: rule.severity,
+        weight: rule.weight,
+        anergic: rule.anergic,
         time,
       })
     }
