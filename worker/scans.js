@@ -8,6 +8,8 @@ export const MAX_SCAN_RULES = 128
 export const MAX_SCAN_GAPS = 64
 export const MAX_SCAN_DEPENDENCIES = 25
 
+const ANERGIC_RULES = new Set(['A011','A012','A013','A014','A015','A016','C035','G016','H109','S011'])
+
 const PACKAGE_RE = /^[A-Za-z0-9@._+-]{1,255}$/
 const STATUSES = new Set(['ok', 'fetch_failed', 'not_vetted', 'vanished', 'reserved'])
 
@@ -45,7 +47,7 @@ function ruleList(value) {
       id,
       severity: text(typeof item === 'string' ? '' : item && item.severity, 32),
       weight: Math.max(0, int(typeof item === 'string' ? 0 : item && item.weight)),
-      anergic: typeof item === 'object' && item && item.anergic ? 1 : 0,
+      anergic: (typeof item === 'object' && item && item.anergic) || ANERGIC_RULES.has(id) ? 1 : 0,
     })
     if (rows.length >= MAX_SCAN_RULES) break
   }
