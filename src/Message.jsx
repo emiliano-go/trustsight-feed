@@ -6,6 +6,9 @@ import { alertingClusters, campaignCommon, campaignEvents } from '../worker/lib.
 import { renderMarkdown, renderInlineCode } from './markdown.jsx'
 import { DependencySummary } from './DependencySummary.jsx'
 
+/** Rules whose subject is an account taking a package over. */
+const ADOPTION_RULES = new Set(['H026', 'H044', 'H045', 'H046', 'G003'])
+
 const safeHref = (value) => (/^https?:\/\//i.test(String(value || '')) ? value : null)
 
 const SECURITY = 'https://docs.trustsight.org/security/'
@@ -672,18 +675,33 @@ function AlertList({ alerts, overPackages, iocPackages, campaigns = [] }) {
             <span className="pkg__version">{group.packages.length} package{group.packages.length === 1 ? '' : 's'}</span>
           </header>
           {group.maintainers.length ? (
-            <p className="pkg__meta pkg__meta--owner">
-              {group.maintainers.length === 1 ? 'Maintainer ' : 'Maintainers '}
-              {group.maintainers.slice(0, 3).map((name, i) => (
-                <span key={name}>
-                  {i ? ', ' : ''}
-                  <MaintainerLink name={name} />
-                </span>
-              ))}
-              {group.maintainers.length > 3
-                ? ` and ${group.maintainers.length - 3} more`
-                : null}
-            </p>
+            ADOPTION_RULES.has(group.rule) ? (
+              <p className="pkg__adoption">
+                {group.maintainers.length === 1 ? 'Adopted by ' : 'Adopted by '}
+                {group.maintainers.slice(0, 3).map((name, i) => (
+                  <span key={name}>
+                    {i ? ', ' : ''}
+                    <MaintainerLink name={name} />
+                  </span>
+                ))}
+                {group.maintainers.length > 3
+                  ? ` and ${group.maintainers.length - 3} more`
+                  : null}
+              </p>
+            ) : (
+              <p className="pkg__meta pkg__meta--owner">
+                {group.maintainers.length === 1 ? 'Maintainer ' : 'Maintainers '}
+                {group.maintainers.slice(0, 3).map((name, i) => (
+                  <span key={name}>
+                    {i ? ', ' : ''}
+                    <MaintainerLink name={name} />
+                  </span>
+                ))}
+                {group.maintainers.length > 3
+                  ? ` and ${group.maintainers.length - 3} more`
+                  : null}
+              </p>
+            )
           ) : null}
           {(() => {
             const common = campaignCommon(campaigns.find((cluster) => cluster.rule_id === group.rule))

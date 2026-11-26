@@ -1,4 +1,5 @@
 import catalog from './rule-catalog.generated.json'
+import plain from './rule-plain.json'
 import { renderMarkdown } from './markdown.jsx'
 
 export const DOCS_RULES = 'https://docs.trustsight.org/reference/rules/'
@@ -18,7 +19,11 @@ export function severityClass(severity) {
 
 export function ruleInfo(id) {
   const key = String(id || '').toLowerCase()
-  return catalog[key] || null
+  const rule = catalog[key]
+  if (!rule) return null
+  // The public reader is not a rule author: lead with one plain sentence and
+  // keep the authored definition behind a disclosure.
+  return { ...rule, plain: plain[rule.id] || '' }
 }
 
 /** True on touch phones and narrow screens, where a floating box is wrong. */
@@ -91,7 +96,13 @@ export function RuleChip({ id, onFilter }) {
         <RuleBody id={id} />
         {rule ? (
           <>
-            {rule.description ? <span className="rule-pop__desc">{renderMarkdown(rule.description, rule.docsUrl)}</span> : null}
+            {rule.plain ? <span className="rule-pop__plain">{rule.plain}</span> : null}
+            {rule.description ? (
+              <details className="rule-pop__more">
+                <summary>Technical detail</summary>
+                <span className="rule-pop__desc">{renderMarkdown(rule.description, rule.docsUrl)}</span>
+              </details>
+            ) : null}
             <a className="rule-pop__link" href={rule.docsUrl} target="_blank" rel="noreferrer">
               rules reference ↗
             </a>
@@ -155,11 +166,18 @@ export function RuleSection({ id }) {
         <span className="rule-section__name">{rule ? rule.name : 'Unknown rule'}</span>
         <SeverityTag rule={rule} />
       </h3>
-      <p className="rule-section__desc">
-        {rule && rule.description
-          ? renderMarkdown(rule.description, rule.docsUrl)
-          : 'This rule is not in the catalog. It may be reserved or added since the catalog was generated.'}
-      </p>
+      {rule && rule.plain ? <p className="rule-section__plain">{rule.plain}</p> : null}
+      {rule && rule.description ? (
+        <details className="rule-section__more">
+          <summary>Technical detail</summary>
+          <p className="rule-section__desc">{renderMarkdown(rule.description, rule.docsUrl)}</p>
+        </details>
+      ) : null}
+      {!rule ? (
+        <p className="rule-section__desc">
+          This rule is not in the catalog. It may be reserved or added since the catalog was generated.
+        </p>
+      ) : null}
       <a className="rule-section__link" href={rule ? rule.docsUrl : DOCS_RULES} target="_blank" rel="noreferrer">
         rules reference ↗
       </a>

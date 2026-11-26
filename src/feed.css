@@ -1688,3 +1688,47 @@ a.chip--ioc:hover {
 .manifest-dep--add { color: var(--plate-green, #3fbf6f); border-color: color-mix(in srgb, currentColor 40%, var(--rule)); }
 .manifest-dep--del { color: var(--plate-red); border-color: color-mix(in srgb, currentColor 40%, var(--rule)); }
 .manifest-dep--more { color: var(--fg-muted); }
+
+/* The account behind a batch is the headline fact, not a footnote. */
+.pkg__adoption {
+  margin: 4px 0 12px;
+  font-size: 1.1176rem;
+  line-height: 1.4;
+}
+.pkg__adoption a {
+  color: var(--fg);
+  font-weight: 650;
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.pkg__adoption a:hover { color: var(--accent); }
+
+/* One plain sentence first; the authored definition stays one tap away. */
+.rule-pop__plain {
+  display: block;
+  margin: 6px 0 8px;
+  color: var(--fg);
+  font-size: 0.8824rem;
+  line-height: 1.55;
+}
+.rule-pop__more summary {
+  cursor: pointer;
+  color: var(--fg-muted);
+  font-size: 0.7647rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.rule-section__plain {
+  margin: 0 0 8px;
+  color: var(--fg);
+  font-size: 0.9412rem;
+  line-height: 1.6;
+}
+.rule-section__more summary {
+  cursor: pointer;
+  color: var(--fg-muted);
+  font-size: 0.7647rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.rule-section__more[open] summary { margin-bottom: 6px; }
