@@ -1534,28 +1534,36 @@ a.chip--ioc:hover {
 
 .upstream-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   margin: 18px 0 14px;
 }
+@media (max-width: 720px) {
+  .upstream-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .upstream-card {
   display: grid;
-  gap: 4px;
+  align-content: start;
+  gap: 6px;
+  min-height: 84px;
   padding: 14px 16px;
   border: 1px solid var(--rule);
   border-radius: 10px;
+  background: color-mix(in srgb, var(--fg) 2%, transparent);
 }
 .upstream-card b {
   font-family: var(--font-mono);
-  font-size: 1.3529rem;
+  font-size: 1.3824rem;
   font-weight: 600;
   letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
 }
 .upstream-card span {
   color: var(--fg-muted);
   font-size: 0.7647rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 .upstream-meta {
   margin: 0 0 22px;
@@ -1566,27 +1574,65 @@ a.chip--ioc:hover {
 .upstream-section { margin: 26px 0 0; }
 .upstream-section h2 {
   margin: 0 0 10px;
-  font-size: 0.8824rem;
+  font-size: 0.7647rem;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--fg-muted);
 }
+
+/* Rule ids never break inside a code: a squeezed column must not read "U0
+   01".  The same holds everywhere a chip appears, so the rule is global. */
+.rule-chip { white-space: nowrap; }
+
+.upstream-table { table-layout: auto; }
+.upstream-table th, .upstream-table td { padding-right: 14px; }
+.upstream-table th:first-child { width: 1%; white-space: nowrap; }
 .upstream-table td a { color: var(--fg); text-decoration: none; }
 .upstream-table td a:hover { color: var(--accent); text-decoration: underline; }
-.upstream-num { text-align: right; font-family: var(--font-mono); white-space: nowrap; }
+.upstream-table .sev { margin-left: 8px; white-space: nowrap; }
+.upstream-name { line-height: 1.45; }
+.upstream-num {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--fg-muted);
+}
 .upstream-recent { margin: 0; padding: 0; list-style: none; }
 .upstream-recent li {
-  padding: 9px 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--rule);
   font-size: 0.8824rem;
 }
 .upstream-recent li:last-child { border-bottom: 0; }
-.upstream-recent a { color: var(--fg); text-decoration: none; font-family: var(--font-mono); }
+.upstream-recent a {
+  color: var(--fg);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .upstream-recent a:hover { color: var(--accent); }
+.upstream-recent__rules {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+.upstream-recent .history-row__time { margin-left: auto; white-space: nowrap; }
 .upstream-empty {
   padding: 34px 0;
   color: var(--fg-muted);
   font-size: 0.8824rem;
   text-align: center;
+}
+@media (max-width: 620px) {
+  .upstream-table tbody th { padding-right: 8px; }
+  .upstream-table .sev { display: none; }
+  .upstream-recent .history-row__time { margin-left: 0; width: 100%; }
 }
