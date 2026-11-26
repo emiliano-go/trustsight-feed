@@ -676,6 +676,7 @@ function AlertList({ alerts, overPackages, iocPackages, campaigns = [] }) {
           </header>
           {group.maintainers.length ? (
             ADOPTION_RULES.has(group.rule) ? (
+              <>
               <p className="pkg__adoption">
                 {group.maintainers.length === 1 ? 'Adopted by ' : 'Adopted by '}
                 {group.maintainers.slice(0, 3).map((name, i) => (
@@ -688,6 +689,11 @@ function AlertList({ alerts, overPackages, iocPackages, campaigns = [] }) {
                   ? ` and ${group.maintainers.length - 3} more`
                   : null}
               </p>
+              <p className="pkg__meta pkg__meta--adoption">
+                AUR staff approve every adoption by hand, often in batches, so a wave like this
+                usually tracks the review queue rather than an attack.
+              </p>
+              </>
             ) : (
               <p className="pkg__meta pkg__meta--owner">
                 {group.maintainers.length === 1 ? 'Maintainer ' : 'Maintainers '}
