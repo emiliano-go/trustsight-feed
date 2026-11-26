@@ -619,6 +619,8 @@ function AlertPackage({ entry, iocPackages }) {
         diff={entry.diff}
         diffSha={entry.pkgbuild_sha256 || entry.diff_sha256}
         diffTruncated={entry.diff_truncated}
+        manifests={entry.manifests || []}
+        manifestsTruncated={Boolean(entry.manifests_truncated)}
         defaultView="diff"
       />
       <DependencySummary name={entry.package} />
@@ -1088,10 +1090,9 @@ function SourceView({ packageName, files, findings }) {
   )
 }
 
-function ViewToggle({ view, onChange }) {
-  const views = [['findings', 'Findings'], ['source', 'Source'], ['diff', 'Diff']]
+function ViewToggle({ view, onChange, views }) {
   return (
-    <div className="view-switch" role="group" aria-label="Findings, source or diff">
+    <div className="view-switch" role="group" aria-label="Findings, source, diff or manifests">
       {views.map(([value, label]) => (
         <button key={value} type="button" className={view === value ? 'is-on' : ''} aria-pressed={view === value} onClick={() => onChange(value)}>{label}</button>
       ))}
@@ -1266,26 +1267,95 @@ function DiffView({ packageName, diff, diffSha, diffTruncated }) {
   )
 }
 
+/** The manifests a change touched, including the ones read from the archive.
+ *
+ * The recipe diff only shows files committed to the AUR repository, so a
+ * dependency added inside the declared source archive is invisible there.  The
+ * watcher sends the bounded delta with the alert; this view lists it.
+ */
+function Manifests({ manifests, truncated }) {
+  if (!manifests.length) return null
+  return (
+    <>
+      <ul className="manifest-list">
+        {manifests.map((manifest) => {
+          const inArchive = String(manifest.path || '').startsWith('upstream/')
+          return (
+            <li className="manifest-row" key={manifest.path}>
+              <div className="manifest-row__head">
+                <code className="md-code">{manifest.path}</code>
+                {inArchive ? <span className="badge badge--warn">from source archive</span> : null}
+                <span className="manifest-row__status">{manifest.status}</span>
+              </div>
+              <div className="manifest-row__deps">
+                {(manifest.added || []).map((name) => (
+                  <span className="manifest-dep manifest-dep--add" key={`a-${name}`}>+{name}</span>
+                ))}
+                {(manifest.removed || []).map((name) => (
+                  <span className="manifest-dep manifest-dep--del" key={`r-${name}`}>-{name}</span>
+                ))}
+                {manifest.added_total > (manifest.added || []).length ? (
+                  <span className="manifest-dep manifest-dep--more">
+                    +{manifest.added_total - manifest.added.length} more added
+                  </span>
+                ) : null}
+                {manifest.removed_total > (manifest.removed || []).length ? (
+                  <span className="manifest-dep manifest-dep--more">
+                    +{manifest.removed_total - manifest.removed.length} more removed
+                  </span>
+                ) : null}
+                {!(manifest.added || []).length && !(manifest.removed || []).length ? (
+                  <span className="manifest-dep manifest-dep--more">content changed</span>
+                ) : null}
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+      {truncated ? (
+        <p className="pkg__meta">More manifests changed than this list shows.</p>
+      ) : null}
+    </>
+  )
+}
+
 /** One package's change: Findings, Source and Diff, in one tabbed view. */
 export function ChangeViews({
   packageName, findings = [], diff, diffSha, diffTruncated, defaultView,
+  manifests = [], manifestsTruncated = false,
 }) {
+  const views = [['findings', 'Findings'], ['source', 'Source'], ['diff', 'Diff']]
+  if (manifests.length) views.push(['manifests', 'Manifests'])
   const [view, setView] = useState(defaultView || (findings.length ? 'findings' : 'diff'))
   const files = [...new Set(findings.map((f) => f.file).filter(Boolean))]
   // PKGBUILD first: it is the artifact a reader wants by default.
   files.sort((a, b) => (a === 'PKGBUILD' ? -1 : b === 'PKGBUILD' ? 1 : a.localeCompare(b)))
+  const archiveFiles = files.filter((path) => String(path).startsWith('upstream/'))
   return (
     <>
       <div className="pkg__viewrow">
-        <ViewToggle view={view} onChange={setView} />
+        <ViewToggle view={view} onChange={setView} views={views} />
       </div>
       {view === 'source'
         ? <SourceView packageName={packageName} files={files.length ? files : ['PKGBUILD']} findings={findings} />
-        : view === 'diff'
-          ? <DiffView packageName={packageName} diff={diff} diffSha={diffSha} diffTruncated={diffTruncated} />
-          : findings.length
-            ? <Findings findings={findings} />
-            : <p className="pkg__meta">This entry carries no line-located finding. Open the Diff tab to read the change.</p>}
+        : view === 'manifests'
+          ? <Manifests manifests={manifests} truncated={manifestsTruncated} />
+          : view === 'diff'
+            ? (
+              <>
+                <DiffView packageName={packageName} diff={diff} diffSha={diffSha} diffTruncated={diffTruncated} />
+                {archiveFiles.length ? (
+                  <p className="pkg__meta">
+                    {archiveFiles.length} finding{archiveFiles.length === 1 ? '' : 's'} name a
+                    manifest inside the declared source archive, which this diff cannot show.{' '}
+                    {manifests.length ? 'Open the Manifests tab for its dependency delta.' : null}
+                  </p>
+                ) : null}
+              </>
+            )
+            : findings.length
+              ? <Findings findings={findings} />
+              : <p className="pkg__meta">This entry carries no line-located finding. Open the Diff tab to read the change.</p>}
     </>
   )
 }
@@ -1336,6 +1406,8 @@ function PackageSections({ packages, iocPackages }) {
                 diff={pkg.diff}
                 diffSha={pkg.pkgbuild_sha256 || pkg.diff_sha256}
                 diffTruncated={pkg.diff_truncated}
+                manifests={pkg.manifests || []}
+                manifestsTruncated={Boolean(pkg.manifests_truncated)}
               />
             ) : (
               <ChangeViews
@@ -1344,6 +1416,8 @@ function PackageSections({ packages, iocPackages }) {
                 diff={pkg.diff}
                 diffSha={pkg.pkgbuild_sha256 || pkg.diff_sha256}
                 diffTruncated={pkg.diff_truncated}
+                manifests={pkg.manifests || []}
+                manifestsTruncated={Boolean(pkg.manifests_truncated)}
                 defaultView="diff"
               />
             )}

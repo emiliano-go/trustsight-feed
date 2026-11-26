@@ -1636,3 +1636,47 @@ a.chip--ioc:hover {
   .upstream-table .sev { display: none; }
   .upstream-recent .history-row__time { margin-left: 0; width: 100%; }
 }
+
+/* ---------- upstream manifest delta ---------- */
+
+.manifest-list {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.manifest-row {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.manifest-row:last-child { border-bottom: 0; }
+.manifest-row__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8824rem;
+}
+.manifest-row__head code { overflow-wrap: anywhere; }
+.manifest-row__status {
+  color: var(--fg-muted);
+  font-size: 0.7647rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.manifest-row__deps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin: 8px 0 0;
+}
+.manifest-dep {
+  padding: 2px 7px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.7647rem;
+  overflow-wrap: anywhere;
+}
+.manifest-dep--add { color: var(--plate-green, #3fbf6f); border-color: color-mix(in srgb, currentColor 40%, var(--rule)); }
+.manifest-dep--del { color: var(--plate-red); border-color: color-mix(in srgb, currentColor 40%, var(--rule)); }
+.manifest-dep--more { color: var(--fg-muted); }
